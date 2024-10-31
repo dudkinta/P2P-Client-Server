@@ -6,9 +6,10 @@ import {
 } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
+import { tcp } from "@libp2p/tcp";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import { kadDHT } from "@libp2p/kad-dht";
+import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { createLibp2p } from "libp2p";
 import {
   createFromProtobuf,
@@ -49,11 +50,10 @@ async function main() {
     addresses: {
       listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`],
     },
-    transports: [webSockets(), webRTC(), circuitRelayTransport()],
+    transports: [tcp(), webSockets(), webRTC(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: {
-      dht: kadDHT(),
       identify: identify(),
       identifyPush: identifyPush(),
       ping: ping(),
@@ -61,6 +61,13 @@ async function main() {
         reservations: {
           maxReservations: 20,
         },
+      }),
+      aminoDHT: kadDHT({
+        protocol: "/ipfs/kad/1.0.0",
+        peerInfoMapper: removePrivateAddressesMapper,
+        logPrefix: "libp2p:dht-amino",
+        datastorePrefix: "/dht-amino",
+        metricsPrefix: "libp2p_dht_amino",
       }),
     },
   });
