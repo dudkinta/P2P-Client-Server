@@ -7,7 +7,6 @@ import {
 import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { tcp } from "@libp2p/tcp";
-import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { createLibp2p } from "libp2p";
@@ -50,7 +49,7 @@ async function main() {
     addresses: {
       listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`],
     },
-    transports: [tcp(), webSockets(), webRTC(), circuitRelayTransport()],
+    transports: [tcp(), webSockets(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: {
