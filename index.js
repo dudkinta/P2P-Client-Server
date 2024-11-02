@@ -7,8 +7,6 @@ import {
 import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { tcp } from "@libp2p/tcp";
-//import { webSockets } from "@libp2p/websockets";
-//import * as filters from "@libp2p/websockets/filters";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { createLibp2p } from "libp2p";
 import {
@@ -27,7 +25,8 @@ const PORT = 6006;
 async function loadOrCreatePeerId() {
   try {
     const peerIdData = await fs.readFile(PEER_ID_FILE);
-    return await createFromProtobuf(peerIdData);
+    const res = await createFromProtobuf(peerIdData);
+    return res;
   } catch (err) {
     if (err.code === "ENOENT") {
       const peerId = await createEd25519PeerId();
@@ -42,7 +41,6 @@ async function loadOrCreatePeerId() {
 async function main() {
   const peerId = await loadOrCreatePeerId();
   console.log("Using Peer ID:", peerId.toString());
-
   const privateKey = await privateKeyFromProtobuf(peerId.privateKey);
   const listenIp = "0.0.0.0";
   const server = await createLibp2p({
@@ -52,9 +50,6 @@ async function main() {
     },
     transports: [
       tcp(),
-      /*webSockets({
-        filter: filters.dnsWss,
-      }),*/
       circuitRelayTransport(),
     ],
     connectionEncrypters: [noise()],
@@ -70,10 +65,7 @@ async function main() {
       }),
       aminoDHT: kadDHT({
         protocol: "/ipfs/kad/1.0.0",
-        peerInfoMapper: removePrivateAddressesMapper,
-        logPrefix: "libp2p:dht-amino",
-        datastorePrefix: "/dht-amino",
-        metricsPrefix: "libp2p_dht_amino",
+        peerInfoMapper: removePrivateAddressesMapper
       }),
     },
   });
@@ -85,6 +77,9 @@ async function main() {
   });
   try {
     await server.start();
+    await server.peerStore.merge(server.peerId, {
+      metadata: new Map([['roles', new TextEncoder().encode('relay')]])
+    });
     console.log("Server has started. Waiting for addresses...");
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
