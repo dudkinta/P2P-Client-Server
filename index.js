@@ -22,6 +22,9 @@ import path from "path";
 
 const PEER_ID_FILE = path.resolve("peer-id.bin");
 const PORT = 6006;
+const ROLES = ["chainrelay"];
+const ROLE_PROTOCOL = "/chain/roles/1.0.0";
+const PEER_LIST_PROTOCOL = "/chain/peers/1.0.0";
 async function loadOrCreatePeerId() {
   try {
     const peerIdData = await fs.readFile(PEER_ID_FILE);
@@ -69,7 +72,14 @@ async function main() {
       }),
     },
   });
-  server.handle("/peers/list", async ({ stream }) => {
+
+  server.handle(ROLE_PROTOCOL, async ({ stream }) => {
+    const connections = server.getConnections();
+
+    await pipe([fromString(JSON.stringify(ROLES))], stream);
+  });
+
+  server.handle(PEER_LIST_PROTOCOL, async ({ stream }) => {
     const connections = server.getConnections();
     const peerIds = connections.map((conn) => conn.remotePeer.toString());
 
@@ -77,9 +87,6 @@ async function main() {
   });
   try {
     await server.start();
-    await server.peerStore.merge(server.peerId, {
-      metadata: new Map([['roles', new TextEncoder().encode('relay')]])
-    });
     console.log("Server has started. Waiting for addresses...");
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
