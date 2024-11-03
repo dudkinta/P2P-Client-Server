@@ -63,18 +63,14 @@ async function main() {
       identify: identify(),
       identifyPush: identifyPush(),
       ping: ping(),
-      relay: circuitRelayServer({
-        reservations: {
-          maxReservations: 20,
-        },
-      }),
+      circuitRelay: circuitRelayServer(),
       aminoDHT: kadDHT({
         clientMode: false,
         serverMode: true,
         protocol: "/ipfs/kad/1.0.0",
         peerInfoMapper: removePrivateAddressesMapper
       }),
-    },
+    }
   });
 
   server.handle(ROLE_PROTOCOL, async ({ stream }) => {
