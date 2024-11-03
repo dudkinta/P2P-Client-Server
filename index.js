@@ -69,6 +69,8 @@ async function main() {
         },
       }),
       aminoDHT: kadDHT({
+        clientMode: false,
+        serverMode: true,
         protocol: "/ipfs/kad/1.0.0",
         peerInfoMapper: removePrivateAddressesMapper
       }),
