@@ -70,7 +70,7 @@ async function main() {
       ping: ping(),
       relay: circuitRelayServer({
         reservations: {
-          maxReservations: 100, // Максимальное количество резерваций
+          maxReservations: Infinity, // Максимальное количество резерваций
         },
       }),
       aminoDHT: kadDHT({
