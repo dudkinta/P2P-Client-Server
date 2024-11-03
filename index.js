@@ -51,11 +51,12 @@ async function main() {
   const server = await createLibp2p({
     privateKey: privateKey,
     addresses: {
-      listen: [`/ip4/${listenIp}/tcp/${PORT}`],
+      listen: [`/ip4/${listenIp}/tcp/${PORT}`, "/p2p-circuit"],
+
     },
     transports: [
       tcp(),
-      circuitRelayTransport(),
+      //circuitRelayTransport(),
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
@@ -63,7 +64,16 @@ async function main() {
       identify: identify(),
       identifyPush: identifyPush(),
       ping: ping(),
-      circuitRelay: circuitRelayServer(),
+      circuitRelayServer: circuitRelayServer({
+        reservations: {
+          maxReservations: 15,
+          reservationClearInterval: 300000,
+          applyDefaultLimit: true,
+          reservationTtl: 7200000,
+          defaultDurationLimit: 50000,
+          defaultDataLimit: BigInt(65535),
+        },
+      }),
       aminoDHT: kadDHT({
         clientMode: false,
         serverMode: true,
