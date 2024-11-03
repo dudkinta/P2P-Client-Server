@@ -1,14 +1,9 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import {
-  circuitRelayServer,
-  circuitRelayTransport,
-} from "@libp2p/circuit-relay-v2";
-import { identify, identifyPush } from "@libp2p/identify";
-import { ping } from "@libp2p/ping";
-import { tcp } from "@libp2p/tcp";
-import { webSockets } from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
+import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
+import { identify } from "@libp2p/identify";
+import { webSockets } from '@libp2p/websockets'
+import * as filters from '@libp2p/websockets/filters'
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { createLibp2p } from "libp2p";
 import {
@@ -53,21 +48,17 @@ async function main() {
   const server = await createLibp2p({
     privateKey: privateKey,
     addresses: {
-      listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`],
+      listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`]
     },
     transports: [
-      tcp(),
       webSockets({
-        filter: filters.all,
+        filter: filters.all
       }),
-      circuitRelayTransport(),
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: {
       identify: identify(),
-      identifyPush: identifyPush(),
-      ping: ping(),
       relay: circuitRelayServer({
         reservations: {
           maxReservations: Infinity, // Максимальное количество резерваций
@@ -79,7 +70,7 @@ async function main() {
         protocol: "/ipfs/kad/1.0.0",
         peerInfoMapper: removePrivateAddressesMapper
       }),
-    }
+    },
   });
 
   server.handle(ROLE_PROTOCOL, async ({ stream }) => {
