@@ -7,6 +7,8 @@ import {
 import { identify, identifyPush } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
+import * as filters from "@libp2p/websockets/filters";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { createLibp2p } from "libp2p";
 import {
@@ -51,11 +53,13 @@ async function main() {
   const server = await createLibp2p({
     privateKey: privateKey,
     addresses: {
-      listen: [`/ip4/${listenIp}/tcp/${PORT}`],
-
+      listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`],
     },
     transports: [
       tcp(),
+      webSockets({
+        filter: filters.all,
+      }),
       circuitRelayTransport(),
     ],
     connectionEncrypters: [noise()],
