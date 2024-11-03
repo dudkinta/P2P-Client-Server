@@ -86,9 +86,13 @@ async function main() {
 
   server.handle(PEER_LIST_PROTOCOL, async ({ stream }) => {
     const connections = server.getConnections();
-    const peerIds = connections.map((conn) => conn.remotePeer.toString());
 
-    await pipe([fromString(JSON.stringify(peerIds))], stream);
+    const peerData = connections.map((conn) => ({
+      peerId: conn.remotePeer.toString(),
+      address: conn.remoteAddr.toString(),
+    }));
+
+    await pipe([fromString(JSON.stringify(peerData))], stream);
   });
   try {
     await server.start();
