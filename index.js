@@ -22,7 +22,6 @@ const PORT = 6006;
 const ROLES = ["chainrelay"];
 const ROLE_PROTOCOL = "/chain/roles/1.0.0";
 const PEER_LIST_PROTOCOL = "/chain/peers/1.0.0";
-const PING_PROTOCOL = "/chain/ping/1.0.0";
 
 async function loadOrCreatePeerId() {
   try {
@@ -73,11 +72,14 @@ async function main() {
     },
   });
 
+  server.register(ROLE_PROTOCOL, {
+    notifyOnLimitedConnection: false,
+  });
+  server.register(PEER_LIST_PROTOCOL, {
+    notifyOnLimitedConnection: false,
+  });
   server.handle(ROLE_PROTOCOL, async ({ stream }) => {
     await pipe([fromString(JSON.stringify(ROLES))], stream);
-  });
-  server.handle(PING_PROTOCOL, async ({ stream }) => {
-    await pipe([fromString("PONG")], stream);
   });
 
   server.handle(PEER_LIST_PROTOCOL, async ({ stream }) => {
