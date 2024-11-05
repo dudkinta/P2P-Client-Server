@@ -2,6 +2,7 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
+import { ping } from "@libp2p/ping";
 import { webSockets } from '@libp2p/websockets'
 import * as filters from '@libp2p/websockets/filters'
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
@@ -57,6 +58,7 @@ async function main() {
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: {
+      ping: ping(),
       identify: identify(),
       relay: circuitRelayServer({
         reservations: {
