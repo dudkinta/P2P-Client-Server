@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
+import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { webSockets } from '@libp2p/websockets'
@@ -41,6 +41,21 @@ async function loadOrCreatePeerId() {
 }
 
 async function main() {
+  const relay = circuitRelayTransport({
+    listen: ['/p2p-circuit'],
+    advertise: {
+      enabled: true,
+    },
+    hop: {
+      enabled: true, // Разрешить релейный сервер выполнять хоп (ретрансляцию)
+      active: true, // Активное ретрансляция (может улучшить производительность)
+    },
+    limit: {
+      duration: Infinity, // Убирает ограничение на время
+      data: Infinity, // Убирает ограничение на объем данных
+    },
+  });
+
   const peerId = await loadOrCreatePeerId();
   console.log("Using Peer ID:", peerId.toString());
   const privateKey = await privateKeyFromProtobuf(peerId.privateKey);
@@ -54,6 +69,7 @@ async function main() {
       webSockets({
         filter: filters.all
       }),
+      relay,
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
