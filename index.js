@@ -41,21 +41,6 @@ async function loadOrCreatePeerId() {
 }
 
 async function main() {
-  const relay = circuitRelayTransport({
-    listen: ['/p2p-circuit'],
-    advertise: {
-      enabled: true,
-    },
-    hop: {
-      enabled: true, // Разрешить релейный сервер выполнять хоп (ретрансляцию)
-      active: true, // Активное ретрансляция (может улучшить производительность)
-    },
-    limit: {
-      duration: Infinity, // Убирает ограничение на время
-      data: Infinity, // Убирает ограничение на объем данных
-    },
-  });
-
   const peerId = await loadOrCreatePeerId();
   console.log("Using Peer ID:", peerId.toString());
   const privateKey = await privateKeyFromProtobuf(peerId.privateKey);
@@ -69,7 +54,12 @@ async function main() {
       webSockets({
         filter: filters.all
       }),
-      relay,
+      circuitRelayTransport({
+        maxInboundStopStreams: 500,
+        maxOutboundStopStreams: 500,
+        stopTimeout: 60000,
+        reservationCompletionTimeout: 20000,
+      }),
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
