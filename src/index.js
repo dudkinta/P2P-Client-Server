@@ -15,8 +15,6 @@ import {
   exportToProtobuf,
 } from "@libp2p/peer-id-factory";
 import { privateKeyFromProtobuf } from "@libp2p/crypto/keys";
-import { pipe } from "it-pipe";
-import { fromString } from "uint8arrays";
 import fs from "fs/promises";
 import path from "path";
 

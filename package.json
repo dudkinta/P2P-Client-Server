@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "set DEBUG=libp2p:peer-list && node src/index.js"
+    "start": "node src/index.js"
   },
   "author": "DudkinTA",
   "license": "MIT",
