@@ -50,7 +50,13 @@ async function main() {
     },
     transports: [
       webSockets({
-        filter: filters.all
+        filter: filters.all,
+      }),
+      circuitRelayTransport({
+        maxInboundStopStreams: 500,
+        maxOutboundStopStreams: 500,
+        stopTimeout: 60000,
+        reservationCompletionTimeout: 20000,
       }),
     ],
     connectionEncrypters: [noise()],
@@ -70,13 +76,6 @@ async function main() {
           defaultDurationLimit: Infinity,
           defaultDataLimit: BigInt(1 << 20), // 1MB
         },
-      }),
-
-      relayTransport: circuitRelayTransport({
-        maxInboundStopStreams: 500,
-        maxOutboundStopStreams: 500,
-        stopTimeout: 60000,
-        reservationCompletionTimeout: 20000,
       }),
       aminoDHT: kadDHT({
         clientMode: false,
