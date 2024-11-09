@@ -65,7 +65,13 @@ async function main() {
         maxInboundHopStreams: 500, // Увеличение количества одновременных входящих hop потоков
         maxOutboundHopStreams: 500, // Увеличение количества одновременных исходящих hop потоков
         maxOutboundStopStreams: 500,
+        reservations: {
+          maxReservations: 128,
+          defaultDurationLimit: Infinity,
+          defaultDataLimit: BigInt(1 << 20), // 1MB
+        },
       }),
+
       relayTransport: circuitRelayTransport({
         maxInboundStopStreams: 500,
         maxOutboundStopStreams: 500,

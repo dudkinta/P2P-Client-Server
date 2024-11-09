@@ -114,8 +114,8 @@ export class PingService {
             const result = await sendAndReceive(stream, jsonString);
 
             const ms = Date.now() - start;
-
-            if (!this.isEquals(result, pingData)) {
+            const resultDate = JSON.parse(result);
+            if (!this.isEquals(resultDate, pingData)) {
                 throw new ProtocolError(`Received wrong ping ack after ${ms}ms`);
             }
 
