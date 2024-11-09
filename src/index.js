@@ -67,14 +67,10 @@ async function main() {
       peerList: peerList(),
       identify: identify(),
       relay: circuitRelayServer({
-        hopTimeout: 60000,
-        maxInboundHopStreams: 500,
-        maxOutboundHopStreams: 500,
-        maxOutboundStopStreams: 500,
         reservations: {
-          maxReservations: 128,
-          defaultDurationLimit: Infinity,
-          defaultDataLimit: BigInt(1 << 20),
+          maxReservations: 64,
+          defaultDurationLimit: 600000,
+          defaultDataLimit: BigInt(1 << 17),
         },
       }),
       aminoDHT: kadDHT({
