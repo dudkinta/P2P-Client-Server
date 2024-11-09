@@ -52,12 +52,12 @@ async function main() {
       webSockets({
         filter: filters.all,
       }),
-      circuitRelayTransport({
+      /*circuitRelayTransport({
         maxInboundStopStreams: 500,
         maxOutboundStopStreams: 500,
         stopTimeout: 60000,
         reservationCompletionTimeout: 20000,
-      }),
+      }),*/
     ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
