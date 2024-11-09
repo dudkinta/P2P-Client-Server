@@ -2,7 +2,9 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer, circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
-import { ping } from "@libp2p/ping";
+import { ping } from './ping/index.js';
+import { roles } from './roles/index.js';
+import { peerList } from './peer-list/index.js';
 import { webSockets } from '@libp2p/websockets'
 import * as filters from '@libp2p/websockets/filters'
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
@@ -20,8 +22,6 @@ import path from "path";
 
 const PEER_ID_FILE = path.resolve("peer-id.bin");
 const PORT = 6006;
-const ROLES = ["chainrelay"];
-const ROLE_PROTOCOL = "/chain/roles/1.0.0";
 const PEER_LIST_PROTOCOL = "/chain/peers/1.0.0";
 
 async function loadOrCreatePeerId() {
@@ -59,6 +59,8 @@ async function main() {
     streamMuxers: [yamux()],
     services: {
       ping: ping(),
+      roles: roles({ roles: ["chainrelay"] }),
+      peerList: peerList(),
       identify: identify(),
       relayServer: circuitRelayServer({
         hopTimeout: 60000, // Увеличение таймаута до 60 секунд для входящих hop-запросов
@@ -81,26 +83,6 @@ async function main() {
     },
   });
 
-  server.register(ROLE_PROTOCOL, {
-    notifyOnLimitedConnection: false,
-  });
-  server.register(PEER_LIST_PROTOCOL, {
-    notifyOnLimitedConnection: false,
-  });
-  server.handle(ROLE_PROTOCOL, async ({ stream }) => {
-    await pipe([fromString(JSON.stringify(ROLES))], stream);
-  });
-
-  server.handle(PEER_LIST_PROTOCOL, async ({ stream }) => {
-    const connections = server.getConnections();
-
-    const peerData = connections.map((conn) => ({
-      peerId: conn.remotePeer.toString(),
-      address: conn.remoteAddr.toString(),
-    }));
-
-    await pipe([fromString(JSON.stringify(peerData))], stream);
-  });
   try {
     await server.start();
     console.log("Server has started. Waiting for addresses...");
