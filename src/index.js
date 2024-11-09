@@ -66,15 +66,15 @@ async function main() {
       roles: roles({ roles: ["chainrelay"] }),
       peerList: peerList(),
       identify: identify(),
-      relayServer: circuitRelayServer({
-        hopTimeout: 60000, // Увеличение таймаута до 60 секунд для входящих hop-запросов
-        maxInboundHopStreams: 500, // Увеличение количества одновременных входящих hop потоков
-        maxOutboundHopStreams: 500, // Увеличение количества одновременных исходящих hop потоков
+      relay: circuitRelayServer({
+        hopTimeout: 60000,
+        maxInboundHopStreams: 500,
+        maxOutboundHopStreams: 500,
         maxOutboundStopStreams: 500,
         reservations: {
           maxReservations: 128,
           defaultDurationLimit: Infinity,
-          defaultDataLimit: BigInt(1 << 20), // 1MB
+          defaultDataLimit: BigInt(1 << 20),
         },
       }),
       aminoDHT: kadDHT({
