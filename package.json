@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node --loader ts-node/esm ./src/index.ts",
-    "relayserver": "set DEBUG=p2p-server && npx tsc && node dist/relay.js",
+    "server": "node dist/relay.js",
+    "relayserver": "DEBUG=p2p-server node dist/relay.js",
     "build": "npx tsc",
     "serve": "set DEBUG=node-strategy && npx tsc && node dist/index.js"
   },
