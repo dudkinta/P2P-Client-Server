@@ -27,7 +27,6 @@ const PEER_ID_FILE = path.resolve("peer-id.bin");
 
 export class P2PServer {
   private node: Libp2p | undefined;
-  private config: any;
   private log = debug("p2p-server");
   localPeer: string | undefined;
   constructor() {}
@@ -138,8 +137,8 @@ export class P2PServer {
         console.log(`${ma.toString()}`);
       });
     } catch (err: any) {
-      this.log(`Error on start client node - ${err}`);
-      console.log(`Error on start client node - ${err}`);
+      this.log(`Error on start server node - ${err}`);
+      console.log(`Error on start server node - ${err}`);
     }
   }
 }
