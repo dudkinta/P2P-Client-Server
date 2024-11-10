@@ -9,7 +9,7 @@
     "server": "node dist/relay.js",
     "relayserver": "DEBUG=p2p-server node dist/relay.js",
     "build": "npx tsc",
-    "serve": "set DEBUG=node-strategy && npx tsc && node dist/index.js"
+    "test": "set DEBUG=node-strategy && npx tsc && node dist/index.js"
   },
   "keywords": [],
   "author": "",
