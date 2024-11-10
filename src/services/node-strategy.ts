@@ -99,7 +99,10 @@ export class NodeStrategy extends Map<string, Node> {
       }
 
       if (connection.limits.bytes && connection.limits.bytes <= 1024) {
-        await this.stopNodeStrategy(key).catch((error) => {
+        await this.stopNodeStrategy(
+          key,
+          `connection limit bytes: ${connection.limits.bytes}`
+        ).catch((error) => {
           this.log(`Error in promise stopNodeStrategy: ${error}`);
         });
       }
@@ -170,15 +173,18 @@ export class NodeStrategy extends Map<string, Node> {
   private removeDeadNodes() {
     for (const [key, node] of this) {
       if (!node) {
+        this.log(`Add penalty for Node ${key}. Node is not found`);
         this.penaltyNodes.push(key);
         continue;
       }
       const connection = node.getOpenedConnection();
       if (!connection) {
+        this.log(`Add penalty for Node ${key}. Connection is not found`);
         this.penaltyNodes.push(key);
         continue;
       }
       if (connection.direction == "outbound" && node.roles.size == 0) {
+        this.log(`Add penalty for Node ${key}. No roles`);
         this.penaltyNodes.push(key);
         continue;
       }
@@ -248,8 +254,8 @@ export class NodeStrategy extends Map<string, Node> {
     );
   }
 
-  async stopNodeStrategy(key: string): Promise<void> {
-    this.log(`Stopping node strategy for ${key}`);
+  async stopNodeStrategy(key: string, cause: string): Promise<void> {
+    this.log(`Stopping node strategy for ${key}. Cause: ${cause}`);
     const node = this.get(key);
     if (!node) {
       return;
@@ -274,7 +280,7 @@ export class NodeStrategy extends Map<string, Node> {
     });
     const connection = node.getOpenedConnection();
     if (!connection) {
-      await this.stopNodeStrategy(key);
+      await this.stopNodeStrategy(key, `not found opened connection`);
       this.log(`Node ${key} is not connected. Self remove`);
       return;
     }
@@ -284,7 +290,7 @@ export class NodeStrategy extends Map<string, Node> {
       this.log(`Error in promise waitRoles: ${error}`);
     });
     if (connection.direction == "outbound" && node.roles.size == 0) {
-      await this.stopNodeStrategy(key);
+      await this.stopNodeStrategy(key, `in outbound connection no roles`);
     }
     node.roles.forEach((role) => {
       this.log(`Node ${key} has role:${role}`);
@@ -294,7 +300,7 @@ export class NodeStrategy extends Map<string, Node> {
         this.log(`Error in promise waitMultiaddrs: ${error}`);
       });
       if (connection.direction == "outbound" && node.addresses.size == 0) {
-        await this.stopNodeStrategy(key);
+        await this.stopNodeStrategy(key, `in outbound connection no addresses`);
       }
       node.addresses.forEach((addr) => {
         this.log(`Node ${key} has address:${addr}`);

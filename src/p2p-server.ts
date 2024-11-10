@@ -77,7 +77,7 @@ export class P2PServer {
           },
         },
         connectionEncrypters: [noise()],
-        streamMuxers: [yamux()],
+        //streamMuxers: [yamux()],
         services: {
           relay: circuitRelayServer({
             reservations: {

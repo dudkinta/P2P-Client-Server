@@ -5,11 +5,9 @@
   "bin": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node --loader ts-node/esm ./src/index.ts",
     "server": "node dist/relay.js",
-    "relayserver": "DEBUG=p2p-server node dist/relay.js",
     "build": "npx tsc",
-    "test": "set DEBUG=node-strategy && npx tsc && node dist/index.js"
+    "node": "set DEBUG=node-strategy && cls && npx tsc && node dist/node.js"
   },
   "keywords": [],
   "author": "",

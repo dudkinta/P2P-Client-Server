@@ -72,7 +72,10 @@ export class NetworkService extends EventEmitter {
           const peerId = event;
           if (!peerId) return;
           this.log(`Connection closed to ${peerId.toString()}`);
-          this.nodeStorage.stopNodeStrategy(peerId.toString());
+          /*this.nodeStorage.stopNodeStrategy(
+            peerId.toString(),
+            `signal from event:peer:disconnect`
+          );*/
         } catch (error) {
           this.log("Error in connection:close event handler", error);
         }

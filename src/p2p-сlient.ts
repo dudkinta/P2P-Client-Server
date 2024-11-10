@@ -59,7 +59,7 @@ export class P2PClient extends EventEmitter {
           },
         },
         connectionEncrypters: [noise()],
-        streamMuxers: [yamux()],
+        //streamMuxers: [yamux()],
         services: {
           aminoDHT: kadDHT({
             clientMode: true,
