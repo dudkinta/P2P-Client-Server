@@ -55,7 +55,6 @@ export class P2PServer {
         this.log("Error loading or creating Peer ID");
         return undefined;
       }
-      console.log("Using Peer ID:", peerId.toString());
 
       const privateKey = await privateKeyFromProtobuf(
         (peerId as any).privateKey
@@ -118,22 +117,29 @@ export class P2PServer {
       this.node = await this.createNode();
       if (!this.node) {
         this.log("Node is not initialized");
+        console.log("Node is not initialized");
         return;
       }
 
       this.node.addEventListener("start", (event: any) => {
         this.log("Libp2p node started");
+        console.log("Libp2p node started");
       });
 
       await this.node.start();
       this.localPeer = this.node.peerId.toString();
       this.log(`Local peer ID: ${this.localPeer}`);
+      console.log(`Local peer ID: ${this.localPeer}`);
       this.log(`Libp2p listening on:`);
+      console.log(`Libp2p listening on:`);
+
       this.node.getMultiaddrs().forEach((ma) => {
         this.log(`${ma.toString()}`);
+        console.log(`${ma.toString()}`);
       });
     } catch (err: any) {
       this.log(`Error on start client node - ${err}`);
+      console.log(`Error on start client node - ${err}`);
     }
   }
 }
