@@ -70,7 +70,7 @@ async function main() {
         reservations: {
           maxReservations: 64,
           defaultDurationLimit: 600000,
-          defaultDataLimit: BigInt(1 << 12),
+          defaultDataLimit: BigInt(1 << 13),
         },
       }),
       aminoDHT: kadDHT({
