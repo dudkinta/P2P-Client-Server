@@ -1,27 +1,41 @@
 {
-  "name": "thegame.blockchain.relayserver",
+  "name": "node",
   "version": "1.0.0",
-  "description": "TheGame.Blockchain.RelayServer",
-  "main": "src/index.js",
+  "main": "index.js",
+  "bin": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node --loader ts-node/esm ./src/index.ts",
+    "relayserver": "set DEBUG=p2p-server && npx tsc && node dist/relay.js",
+    "build": "npx tsc",
+    "serve": "set DEBUG=node-strategy && npx tsc && node dist/index.js"
   },
-  "author": "DudkinTA",
-  "license": "MIT",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@types/debug": "^4.1.12",
+    "@types/node": "^22.8.6",
+    "eslint": "^9.14.0",
+    "globals": "^15.11.0",
+    "prettier": "^3.3.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.12.2"
+  },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^16.0.0",
     "@chainsafe/libp2p-yamux": "^7.0.1",
     "@libp2p/circuit-relay-v2": "^3.1.0",
     "@libp2p/identify": "^3.0.10",
     "@libp2p/kad-dht": "^14.1.0",
+    "@libp2p/peer-id": "^5.0.7",
     "@libp2p/peer-id-factory": "^4.2.4",
-    "@libp2p/ping": "^2.0.10",
-    "@libp2p/tcp": "^10.0.11",
     "@libp2p/websockets": "^9.0.11",
-    "it-byte-stream": "^1.1.0",
-    "libp2p": "^2.2.1",
-    "uint8arraylist": "^2.4.8",
-    "uint8arrays": "^5.1.0"
+    "@multiformats/multiaddr": "^12.3.1",
+    "debug": "^4.3.7",
+    "libp2p": "^2.2.1"
   }
 }
