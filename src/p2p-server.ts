@@ -96,7 +96,7 @@ export class P2PServer {
             },
           }),
           aminoDHT: kadDHT({
-            clientMode: true,
+            clientMode: false,
             protocol: "/ipfs/kad/1.0.0",
             peerInfoMapper: removePrivateAddressesMapper,
           }),
