@@ -3,7 +3,10 @@ import { webSockets } from "@libp2p/websockets";
 import * as filters from "@libp2p/websockets/filters";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
+import {
+  circuitRelayServer,
+  circuitRelayTransport,
+} from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { PeerId } from "@libp2p/interface";
@@ -69,6 +72,12 @@ export class P2PServer {
         transports: [
           webSockets({
             filter: filters.all,
+          }),
+          circuitRelayTransport({
+            maxInboundStopStreams: 500,
+            maxOutboundStopStreams: 500,
+            stopTimeout: 60000,
+            reservationCompletionTimeout: 20000,
           }),
         ],
         connectionGater: {
