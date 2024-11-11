@@ -5,6 +5,7 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
+import { OutOfLimitError } from "./../models/out-of-limit-error.js";
 import pkg from "debug";
 const { debug } = pkg;
 export class NetworkService extends EventEmitter {
@@ -144,7 +145,7 @@ export class NetworkService extends EventEmitter {
     }
   }
   private async RequestRoles(node: Node): Promise<string[] | undefined> {
-    if (!node.isConnect()) return undefined;
+    if (!node.isConnect() || !node.peerId) return undefined;
     try {
       if (node.protocols.has(this.config.protocols.ROLE)) {
         const connection = node.getOpenedConnection();
@@ -154,7 +155,7 @@ export class NetworkService extends EventEmitter {
           .getRolesByAddress(connection)
           .catch((error) => {
             this.log("Error in promise RequestRoles", error);
-            return undefined;
+            throw error;
           });
         if (!rolesStr || rolesStr.length === 0) return undefined;
         try {
@@ -166,12 +167,20 @@ export class NetworkService extends EventEmitter {
         }
       }
     } catch (error) {
-      this.log("Error in RequestRoles", error);
+      if (error instanceof OutOfLimitError) {
+        this.nodeStorage.stopNodeStrategy(
+          node.peerId.toString(),
+          "Out of limit",
+          10000
+        );
+      } else {
+        this.log("Error in RequestRoles", error);
+      }
       return undefined;
     }
   }
   private async RequestMultiaddrrs(node: Node): Promise<string[] | undefined> {
-    if (!node.isConnect()) return undefined;
+    if (!node.isConnect() || !node.peerId) return undefined;
     try {
       if (node.protocols.has(this.config.protocols.MULTIADDRES)) {
         const connection = node.getOpenedConnection();
@@ -181,7 +190,7 @@ export class NetworkService extends EventEmitter {
           .getMultiaddresses(connection)
           .catch((error) => {
             this.log("Error in promise RequestMultiaddrrs", error);
-            return undefined;
+            throw error;
           });
         if (!addrrListStr || addrrListStr.length === 0) return undefined;
         try {
@@ -195,12 +204,20 @@ export class NetworkService extends EventEmitter {
         }
       }
     } catch (error) {
-      this.log("Error in RequestMultiaddrrs", error);
+      if (error instanceof OutOfLimitError) {
+        this.nodeStorage.stopNodeStrategy(
+          node.peerId.toString(),
+          "Out of limit",
+          10000
+        );
+      } else {
+        this.log("Error in RequestMultiaddrrs", error);
+      }
       return undefined;
     }
   }
   private async RequestConnectedPeers(node: Node): Promise<any | undefined> {
-    if (!node.isConnect()) return undefined;
+    if (!node.isConnect() || !node.peerId) return undefined;
     try {
       if (node.protocols.has(this.config.protocols.PEER_LIST)) {
         const connection = node.getOpenedConnection();
@@ -210,7 +227,7 @@ export class NetworkService extends EventEmitter {
           .getPeerList(connection)
           .catch((error) => {
             this.log("Error in promise RequestConnectedPeers", error);
-            return undefined;
+            throw error;
           });
         if (!peersStr || peersStr.length === 0) return undefined;
         try {
@@ -224,25 +241,32 @@ export class NetworkService extends EventEmitter {
         }
       }
     } catch (error) {
-      this.log("Error in RequestConnectedPeers", error);
+      if (error instanceof OutOfLimitError) {
+        this.nodeStorage.stopNodeStrategy(
+          node.peerId.toString(),
+          "Out of limit",
+          10000
+        );
+      } else {
+        this.log("Error in RequestConnectedPeers", error);
+      }
       return undefined;
     }
   }
   private async RequestPing(addrr: string): Promise<number | undefined> {
     try {
-      try {
-        const lat = await this.client.pingByAddress(addrr).catch((error) => {
-          this.log("Error in promise RequestPing", error);
-          return undefined;
-        });
-        this.log(`Ping to ${addrr} is ${lat}ms`);
-        return lat;
-      } catch (error) {
+      const lat = await this.client.pingByAddress(addrr).catch((error) => {
         this.log("Error in promise RequestPing", error);
-        return undefined;
-      }
+        throw error;
+      });
+      this.log(`Ping to ${addrr} is ${lat}ms`);
+      return lat;
     } catch (error) {
-      this.log("Error in RequestPing", error);
+      if (error instanceof OutOfLimitError) {
+        this.log(`Out of limit in connection (${addrr})`);
+      } else {
+        this.log("Error in RequestPing", error);
+      }
       return undefined;
     }
   }

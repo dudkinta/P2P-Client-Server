@@ -89,10 +89,12 @@ export class P2PServer {
         streamMuxers: [yamux()],
         services: {
           relay: circuitRelayServer({
+            maxInboundHopStreams: 512,
+            maxOutboundStopStreams: 515,
             reservations: {
-              maxReservations: 128,
+              maxReservations: 512,
               defaultDurationLimit: 600000,
-              defaultDataLimit: BigInt(1 << 23),
+              defaultDataLimit: BigInt(1 << 16),
             },
           }),
           aminoDHT: kadDHT({

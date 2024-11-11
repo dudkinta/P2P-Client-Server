@@ -1,5 +1,8 @@
 import { sendAndReceive } from "../../helpers/stream-helper.js";
 import { ProtocolError, TimeoutError } from "@libp2p/interface";
+import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
+import type { IncomingStreamData } from "@libp2p/interface-internal";
+import type { Multiaddr } from "@multiformats/multiaddr";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -20,8 +23,6 @@ import type {
   Startable,
   Connection,
 } from "@libp2p/interface";
-import type { IncomingStreamData } from "@libp2p/interface-internal";
-import type { Multiaddr } from "@multiformats/multiaddr";
 
 export class PingService implements Startable, PingServiceInterface {
   public readonly protocol: string;
@@ -122,6 +123,15 @@ export class PingService implements Startable, PingServiceInterface {
       }
       if (connection.status !== "open") {
         throw new Error("connection is not open");
+      }
+
+      if (connection.limits) {
+        if (connection.limits.seconds && connection.limits.seconds < 10000) {
+          throw new OutOfLimitError("connection has time limits");
+        }
+        if (connection.limits.bytes && connection.limits.bytes < 10000) {
+          throw new OutOfLimitError("connection has byte limits");
+        }
       }
 
       if (options.signal == null) {

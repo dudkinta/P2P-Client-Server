@@ -1,4 +1,7 @@
 import { TimeoutError } from "@libp2p/interface";
+import { sendAndReceive } from "../../helpers/stream-helper.js";
+import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
+import type { IncomingStreamData } from "@libp2p/interface-internal";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -19,8 +22,6 @@ import type {
   Startable,
   Connection,
 } from "@libp2p/interface";
-import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { sendAndReceive } from "../../helpers/stream-helper.js";
 
 export class MultiaddressService
   implements Startable, MultiaddressServiceInterface
@@ -123,6 +124,15 @@ export class MultiaddressService
       }
       if (connection.status !== "open") {
         throw new Error("connection is not open");
+      }
+
+      if (connection.limits) {
+        if (connection.limits.seconds && connection.limits.seconds < 10000) {
+          throw new OutOfLimitError("connection has time limits");
+        }
+        if (connection.limits.bytes && connection.limits.bytes < 10000) {
+          throw new OutOfLimitError("connection has byte limits");
+        }
       }
 
       if (options.signal == null) {
