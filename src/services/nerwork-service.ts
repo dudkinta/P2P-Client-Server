@@ -13,7 +13,10 @@ export class NetworkService extends EventEmitter {
   private nodeStorage: NodeStrategy;
   private localPeer: string | undefined;
   private config = ConfigLoader.getInstance().getConfig();
-  private log = debug("network-service");
+  private log = (message: string) => {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    debug("network-service")(`[${timestamp}] ${message}`);
+  };
   constructor(p2pClient: P2PClient) {
     super();
     this.client = p2pClient;
@@ -46,7 +49,9 @@ export class NetworkService extends EventEmitter {
 
           this.getNode(peerId.toString(), peerId, conn);
         } catch (error) {
-          this.log("Error in connection:open event handler", error);
+          this.log(
+            `Error in connection:open event handler ${JSON.stringify(error)}`
+          );
         }
       });
 
@@ -65,7 +70,9 @@ export class NetworkService extends EventEmitter {
             });
           }
         } catch (error) {
-          this.log("Error in updateProtocols event handler", error);
+          this.log(
+            `Error in updateProtocols event handler ${JSON.stringify(error)}`
+          );
         }
       });
       this.client.on("peer:disconnect", async (event) => {
@@ -79,16 +86,18 @@ export class NetworkService extends EventEmitter {
             10000
           );
         } catch (error) {
-          this.log("Error in connection:close event handler", error);
+          this.log(
+            `Error in connection:close event handler ${JSON.stringify(error)}`
+          );
         }
       });
       await this.nodeStorage
         .startStrategy(this.localPeer.toString())
         .catch((error) => {
-          this.log("Error starting nodeStorage", error);
+          this.log(`Error starting nodeStorage ${JSON.stringify(error)}`);
         });
     } catch (error) {
-      this.log("Error in startAsync", error);
+      this.log(`Error in startAsync ${JSON.stringify(error)}`);
     }
   }
 
@@ -112,7 +121,7 @@ export class NetworkService extends EventEmitter {
       }
       return node;
     } catch (error) {
-      this.log("Error in getNode", error);
+      this.log(`Error in getNode ${JSON.stringify(error)}`);
       return undefined;
     }
   }
@@ -122,13 +131,13 @@ export class NetworkService extends EventEmitter {
       const ma = multiaddr(addrr);
       this.log(`Connecting to ${ma.toString()}`);
       const conn = await this.client.connectTo(ma).catch((error) => {
-        this.log("Error in promise RequestConnect", error);
+        this.log(`Error in promise RequestConnect ${JSON.stringify(error)}`);
         return undefined;
       });
       this.log(`Connected to ${ma.toString()}`);
       return conn;
     } catch (error) {
-      this.log("Error in RequestConnect", error);
+      this.log(`Error in RequestConnect ${JSON.stringify(error)}`);
       return undefined;
     }
   }
@@ -138,10 +147,10 @@ export class NetworkService extends EventEmitter {
       const ma = multiaddr(addrr);
       this.log(`Disconnecting from ${ma.toString()}`);
       await this.client.disconnectFromMA(ma).catch((error) => {
-        this.log("Error in promise RequestDisconnect", error);
+        this.log(`Error in promise RequestDisconnect ${JSON.stringify(error)}`);
       });
     } catch (error) {
-      this.log("Error in RequestDisconnect", error);
+      this.log(`Error in RequestDisconnect ${JSON.stringify(error)}`);
     }
   }
   private async RequestRoles(node: Node): Promise<string[] | undefined> {
@@ -154,7 +163,7 @@ export class NetworkService extends EventEmitter {
         let rolesStr = await this.client
           .getRolesByAddress(connection)
           .catch((error) => {
-            this.log("Error in promise RequestRoles", error);
+            this.log(`Error in promise RequestRoles ${JSON.stringify(error)}`);
             throw error;
           });
         if (!rolesStr || rolesStr.length === 0) return undefined;
@@ -162,7 +171,7 @@ export class NetworkService extends EventEmitter {
           this.log(`Roles for ${node.peerId?.toString()} is: ${rolesStr}`);
           return JSON.parse(rolesStr);
         } catch (parseError) {
-          this.log("Error parsing roleList JSON", parseError);
+          this.log(`Error parsing roleList JSON ${JSON.stringify(parseError)}`);
           return undefined;
         }
       }
@@ -174,7 +183,7 @@ export class NetworkService extends EventEmitter {
           10000
         );
       } else {
-        this.log("Error in RequestRoles", error);
+        this.log(`Error in RequestRoles ${JSON.stringify(error)}`);
       }
       return undefined;
     }
@@ -189,7 +198,9 @@ export class NetworkService extends EventEmitter {
         let addrrListStr = await this.client
           .getMultiaddresses(connection)
           .catch((error) => {
-            this.log("Error in promise RequestMultiaddrrs", error);
+            this.log(
+              `Error in promise RequestMultiaddrrs ${JSON.stringify(error)}`
+            );
             throw error;
           });
         if (!addrrListStr || addrrListStr.length === 0) return undefined;
@@ -199,7 +210,9 @@ export class NetworkService extends EventEmitter {
           );
           return JSON.parse(addrrListStr);
         } catch (parseError) {
-          this.log("Error parsing addrrListStr JSON", parseError);
+          this.log(
+            `Error parsing addrrListStr JSON ${JSON.stringify(parseError)}`
+          );
           return undefined;
         }
       }
@@ -211,7 +224,7 @@ export class NetworkService extends EventEmitter {
           10000
         );
       } else {
-        this.log("Error in RequestMultiaddrrs", error);
+        this.log(`Error in RequestMultiaddrrs ${JSON.stringify(error)}`);
       }
       return undefined;
     }
@@ -226,7 +239,9 @@ export class NetworkService extends EventEmitter {
         let peersStr = await this.client
           .getPeerList(connection)
           .catch((error) => {
-            this.log("Error in promise RequestConnectedPeers", error);
+            this.log(
+              `Error in promise RequestConnectedPeers ${JSON.stringify(error)}`
+            );
             throw error;
           });
         if (!peersStr || peersStr.length === 0) return undefined;
@@ -236,7 +251,7 @@ export class NetworkService extends EventEmitter {
           );
           return JSON.parse(peersStr);
         } catch (parseError) {
-          this.log("Error parsing peersStr JSON", parseError);
+          this.log(`Error parsing peersStr JSON ${JSON.stringify(parseError)}`);
           return undefined;
         }
       }
@@ -248,7 +263,7 @@ export class NetworkService extends EventEmitter {
           10000
         );
       } else {
-        this.log("Error in RequestConnectedPeers", error);
+        this.log(`Error in RequestConnectedPeers ${JSON.stringify(error)}`);
       }
       return undefined;
     }
@@ -256,7 +271,7 @@ export class NetworkService extends EventEmitter {
   private async RequestPing(addrr: string): Promise<number | undefined> {
     try {
       const lat = await this.client.pingByAddress(addrr).catch((error) => {
-        this.log("Error in promise RequestPing", error);
+        this.log(`Error in promise RequestPing ${JSON.stringify(error)}`);
         throw error;
       });
       this.log(`Ping to ${addrr} is ${lat}ms`);
@@ -265,7 +280,7 @@ export class NetworkService extends EventEmitter {
       if (error instanceof OutOfLimitError) {
         this.log(`Out of limit in connection (${addrr})`);
       } else {
-        this.log("Error in RequestPing", error);
+        this.log(`Error in RequestPing ${JSON.stringify(error)}`);
       }
       return undefined;
     }

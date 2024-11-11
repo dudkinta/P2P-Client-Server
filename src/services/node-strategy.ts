@@ -3,6 +3,7 @@ import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection } from "@libp2p/interface";
 import pkg from "debug";
+import { multiaddr } from "@multiformats/multiaddr";
 const { debug } = pkg;
 type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
 type RequestDisconnect = (addrr: string) => Promise<void>;
@@ -26,7 +27,10 @@ export class NodeStrategy extends Map<string, Node> {
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
   private requestPing: RequestPing;
-  private log = debug("node-strategy");
+  private log = (message: string) => {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    debug("node-strategy")(`[${timestamp}] ${message}`);
+  };
   private localPeer: string | undefined;
 
   constructor(
@@ -67,7 +71,7 @@ export class NodeStrategy extends Map<string, Node> {
   private async connectToMainRelay(): Promise<void> {
     const relay = this.config.relay[0];
     const address = `/ip4/${relay.ADDRESS}/tcp/${relay.PORT}/ws/p2p/${relay.PEER}`;
-    const connRelay = await this.requestConnect(address).catch((error) => {
+    const connRelay = await this.tryConnect(address).catch((error) => {
       this.log(`Error in promise requestConnect: ${error}`);
     });
     if (!connRelay) {
@@ -134,19 +138,10 @@ export class NodeStrategy extends Map<string, Node> {
         break;
       }
 
-      this.log(`Trying to ping candidate ${key} (${address})`);
-      const ping = await this.requestPing(address).catch((error) => {
-        this.log(`Error in promise requestPing: ${error}`);
+      await this.tryConnect(address).catch((error) => {
+        this.log(`Error in promise requestConnect: ${error}`);
         return undefined;
       });
-      this.candidatePeers.delete(key);
-      if (ping) {
-        this.log(`Candidate ${key} (${address}) ping: ${ping}`);
-        await this.requestConnect(address).catch((error) => {
-          this.log(`Error in promise requestConnect: ${error}`);
-          return undefined;
-        });
-      }
     }
 
     // поиск прямых адресов у пиров
@@ -160,13 +155,12 @@ export class NodeStrategy extends Map<string, Node> {
       }
 
       if (node.roles.has(this.config.roles.NODE)) {
-        this.log(`Checking addresses for node: ${key}`);
         node.addresses.forEach(async (address) => {
           if (isDirect(address) && !isLocalAddress(address)) {
             await this.stopNodeStrategy(key, `found direct address`, 0);
             setTimeout(async () => {
               this.log(`Try connect to direct address ${address}`);
-              await this.requestConnect(address).catch((error) => {
+              await this.tryConnect(address).catch((error) => {
                 this.log(`Error in promise requestConnect: ${error}`);
               });
             }, 500);
@@ -301,8 +295,10 @@ export class NodeStrategy extends Map<string, Node> {
         );
       }
     });
+    this.log(`Ban Node ${key} on ${banTimer} ms`);
     this.banList.add(key);
     setTimeout(() => {
+      this.log(`Unban Node ${key}`);
       this.banList.delete(key);
     }, banTimer);
     this.delete(key);
@@ -310,6 +306,9 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async startNodeStrategy(key: string, node: Node): Promise<void> {
+    if (this.candidatePeers.has(key)) {
+      this.candidatePeers.delete(key);
+    }
     this.log(`Starting node strategy for ${key}`);
     await this.waitConnect(node).catch((error) => {
       this.log(`Error in promise waitConnect: ${error}`);
@@ -320,8 +319,7 @@ export class NodeStrategy extends Map<string, Node> {
       this.log(`Node ${key} is not connected. Self remove`);
       return;
     }
-
-    this.log(`Node ${key} is connected`);
+    this.log(`Node ${key} is connected. Direction: ${connection.direction}`);
     await this.waitRoles(node).catch((error) => {
       this.log(`Error in promise waitRoles: ${error}`);
     });
@@ -372,7 +370,10 @@ export class NodeStrategy extends Map<string, Node> {
           if (!connection) return;
           const relayAddress = connection.remoteAddr.toString();
           const fullAddress = `${relayAddress}/p2p-circuit/p2p/${peerInfo.peerId}`;
-          if (!this.candidatePeers.has(peerInfo.peerId)) {
+          if (
+            !this.has(peerInfo.peerId) &&
+            !this.candidatePeers.has(peerInfo.peerId)
+          ) {
             this.candidatePeers.set(peerInfo.peerId, fullAddress);
             this.log(
               `Candidate peer ${peerInfo.peerId} added (${fullAddress})`
@@ -381,7 +382,10 @@ export class NodeStrategy extends Map<string, Node> {
         }
         if (node.roles.has(this.config.roles.NODE)) {
           if (isDirect(peerInfo.address) && !isLocalAddress(peerInfo.address)) {
-            if (!this.candidatePeers.has(peerInfo.peerId)) {
+            if (
+              !this.has(peerInfo.peerId) &&
+              !this.candidatePeers.has(peerInfo.peerId)
+            ) {
               this.candidatePeers.set(peerInfo.peerId, peerInfo.address);
               this.log(
                 `Candidate peer ${peerInfo.peerId} added (${peerInfo.address})`
@@ -478,6 +482,25 @@ export class NodeStrategy extends Map<string, Node> {
     }
   }
 
+  private async tryConnect(address: string): Promise<Connection | undefined> {
+    const ma = multiaddr(address);
+    this.log(
+      `Trying to connect to ${ma.toString()} (PeerId: ${ma.getPeerId()?.toString()})`
+    );
+    const peerId = ma.getPeerId();
+    if (!peerId) {
+      return undefined;
+    }
+    if (this.banList.has(peerId.toString())) {
+      this.log(`Node ${address} is banned`);
+      return undefined;
+    }
+    const conn = await this.requestConnect(address).catch((error) => {
+      this.log(`Error in promise requestConnect: ${error}`);
+      return undefined;
+    });
+    return conn;
+  }
   private async delay(ms: number): Promise<void> {
     try {
       return new Promise((resolve) => setTimeout(resolve, ms));
