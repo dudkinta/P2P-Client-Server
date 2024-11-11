@@ -77,13 +77,13 @@ export class P2PServer {
           },
         },
         connectionEncrypters: [noise()],
-        //streamMuxers: [yamux()],
+        streamMuxers: [yamux()],
         services: {
           relay: circuitRelayServer({
             reservations: {
               maxReservations: 64,
               defaultDurationLimit: 3600,
-              defaultDataLimit: BigInt(100) * BigInt(1024) * BigInt(1024),
+              defaultDataLimit: BigInt(1024) * BigInt(1024),
             },
           }),
           aminoDHT: kadDHT({
