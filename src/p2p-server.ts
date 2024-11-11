@@ -90,7 +90,7 @@ export class P2PServer {
         services: {
           relay: circuitRelayServer({
             reservations: {
-              maxReservations: 64,
+              maxReservations: 128,
               defaultDurationLimit: 3600,
               defaultDataLimit: BigInt(1024) * BigInt(1024),
             },
@@ -110,7 +110,7 @@ export class P2PServer {
           maList: maList(),
         },
         connectionManager: {
-          maxConnections: 20,
+          maxConnections: 128,
         },
       });
       return node;
