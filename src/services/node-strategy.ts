@@ -82,7 +82,7 @@ export class NodeStrategy extends Map<string, Node> {
 
   private async selfDiag(): Promise<void> {
     this.removeDeadNodes();
-    this.counterByRoles();
+    this.counterConnections();
     // если никого нет, то подключаемся к релейному узлу
     if (this.size == 0) {
       this.log(`No nodes in storage`);
@@ -156,7 +156,12 @@ export class NodeStrategy extends Map<string, Node> {
 
       if (node.roles.has(this.config.roles.NODE)) {
         node.addresses.forEach(async (address) => {
-          if (isDirect(address) && !isLocalAddress(address)) {
+          const conn = node.getOpenedConnection();
+          if (
+            isDirect(address) &&
+            !isLocalAddress(address) &&
+            conn?.remoteAddr.toString() != address
+          ) {
             await this.stopNodeStrategy(key, `found direct address`, 0);
             setTimeout(async () => {
               this.log(`Try connect to direct address ${address}`);
@@ -229,12 +234,14 @@ export class NodeStrategy extends Map<string, Node> {
     );
   }
 
-  private counterByRoles(): void {
+  private counterConnections(): void {
     let rCount = 0;
     let nCount = 0;
     let uCount = 0;
     let inBoundCount = 0;
     let ouBboundCount = 0;
+    let relayConnections = 0;
+    let directConnections = 0;
     for (const [key, node] of this) {
       if (!node) {
         uCount++;
@@ -264,15 +271,25 @@ export class NodeStrategy extends Map<string, Node> {
       ) {
         uCount++;
       }
+      if (isDirect(connection.remoteAddr.toString())) {
+        directConnections++;
+      }
+      if (isRelay(connection.remoteAddr.toString())) {
+        relayConnections++;
+      }
     }
     this.relayCount = rCount;
     this.nodeCount = nCount;
     this.unknownCount = uCount;
+
     this.log(
-      `Counter-> Relay count: ${this.relayCount}, Node count: ${this.nodeCount}, Unknown count: ${this.unknownCount}`
+      `Counter --> Relay count: ${this.relayCount}, Node count: ${this.nodeCount}, Unknown count: ${this.unknownCount}`
     );
     this.log(
-      `Counter-> Inbouund count: ${inBoundCount}, Outbound count: ${ouBboundCount}`
+      `Counter --> Inbouund count: ${inBoundCount}, Outbound count: ${ouBboundCount}`
+    );
+    this.log(
+      `Counter --> Direct connections: ${directConnections}, Relay connections: ${relayConnections}`
     );
   }
 

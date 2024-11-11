@@ -94,7 +94,7 @@ export class P2PServer {
             reservations: {
               maxReservations: 512,
               defaultDurationLimit: 600000,
-              defaultDataLimit: BigInt(1 << 16),
+              defaultDataLimit: BigInt(1 << 24),
             },
           }),
           aminoDHT: kadDHT({
