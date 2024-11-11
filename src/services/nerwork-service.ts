@@ -67,14 +67,15 @@ export class NetworkService extends EventEmitter {
           this.log("Error in updateProtocols event handler", error);
         }
       });
-      this.client.on("peer:disconnect", (event) => {
+      this.client.on("peer:disconnect", async (event) => {
         try {
           const peerId = event;
           if (!peerId) return;
           this.log(`Connection closed to ${peerId.toString()}`);
-          this.nodeStorage.stopNodeStrategy(
+          await this.nodeStorage.stopNodeStrategy(
             peerId.toString(),
-            `signal from event:peer:disconnect`
+            `signal from event:peer:disconnect`,
+            10000
           );
         } catch (error) {
           this.log("Error in connection:close event handler", error);

@@ -18,6 +18,8 @@ export class NodeStrategy extends Map<string, Node> {
   private nodeCount: number = 0;
   private unknownCount: number = 0;
   private penaltyNodes: string[] = [];
+  private candidatePeers: Map<string, string> = new Map();
+  private banList: Set<string> = new Set();
   private requestConnect: RequestConnect;
   private requestDisconnect: RequestDisconnect;
   private requestRoles: RequestRoles;
@@ -26,7 +28,7 @@ export class NodeStrategy extends Map<string, Node> {
   private requestPing: RequestPing;
   private log = debug("node-strategy");
   private localPeer: string | undefined;
-  private candidatePeers: Map<string, string> = new Map();
+
   constructor(
     requestConnect: RequestConnect,
     requestDisconnect: RequestDisconnect,
@@ -80,6 +82,7 @@ export class NodeStrategy extends Map<string, Node> {
     // если никого нет, то подключаемся к релейному узлу
     if (this.size == 0) {
       this.log(`No nodes in storage`);
+      this.banList.clear();
       await this.connectToMainRelay().catch((error) => {
         this.log(`Error in promise connectToMainRelay: ${error}`);
       });
@@ -101,7 +104,8 @@ export class NodeStrategy extends Map<string, Node> {
       if (connection.limits.bytes && connection.limits.bytes <= 1024) {
         await this.stopNodeStrategy(
           key,
-          `connection limit bytes: ${connection.limits.bytes}`
+          `connection limit bytes: ${connection.limits.bytes}`,
+          5000
         ).catch((error) => {
           this.log(`Error in promise stopNodeStrategy: ${error}`);
         });
@@ -159,10 +163,34 @@ export class NodeStrategy extends Map<string, Node> {
         this.log(`Checking addresses for node: ${key}`);
         node.addresses.forEach(async (address) => {
           if (isDirect(address) && !isLocalAddress(address)) {
-            this.log(`Address ${address}`);
+            await this.stopNodeStrategy(key, `found direct address`, 0);
+            setTimeout(async () => {
+              this.log(`Try connect to direct address ${address}`);
+              await this.requestConnect(address).catch((error) => {
+                this.log(`Error in promise requestConnect: ${error}`);
+              });
+            }, 500);
           }
         });
       }
+    }
+
+    //отключение от релейных узлов если достаточно подключенных нод
+    if (this.size > 5) {
+      const relayNodes = Array.from(this.values()).filter((node) => {
+        node.roles.has(this.config.roles.RELAY) &&
+          !node.roles.has(this.config.roles.NODE);
+      });
+      relayNodes.forEach(async (node) => {
+        if (!node || !node.peerId) {
+          return;
+        }
+        await this.stopNodeStrategy(
+          node.peerId.toString(),
+          `too many connected nodes`,
+          60 * 1000 * 5
+        );
+      });
     }
 
     setTimeout(async () => {
@@ -254,7 +282,11 @@ export class NodeStrategy extends Map<string, Node> {
     );
   }
 
-  async stopNodeStrategy(key: string, cause: string): Promise<void> {
+  async stopNodeStrategy(
+    key: string,
+    cause: string,
+    banTimer: number
+  ): Promise<void> {
     this.log(`Stopping node strategy for ${key}. Cause: ${cause}`);
     const node = this.get(key);
     if (!node) {
@@ -269,6 +301,10 @@ export class NodeStrategy extends Map<string, Node> {
         );
       }
     });
+    this.banList.add(key);
+    setTimeout(() => {
+      this.banList.delete(key);
+    }, banTimer);
     this.delete(key);
     this.log(`Node ${key} removed from storage`);
   }
@@ -280,7 +316,7 @@ export class NodeStrategy extends Map<string, Node> {
     });
     const connection = node.getOpenedConnection();
     if (!connection) {
-      await this.stopNodeStrategy(key, `not found opened connection`);
+      await this.stopNodeStrategy(key, `not found opened connection`, 5000);
       this.log(`Node ${key} is not connected. Self remove`);
       return;
     }
@@ -290,7 +326,7 @@ export class NodeStrategy extends Map<string, Node> {
       this.log(`Error in promise waitRoles: ${error}`);
     });
     if (connection.direction == "outbound" && node.roles.size == 0) {
-      await this.stopNodeStrategy(key, `in outbound connection no roles`);
+      await this.stopNodeStrategy(key, `in outbound connection no roles`, 5000);
     }
     node.roles.forEach((role) => {
       this.log(`Node ${key} has role:${role}`);
@@ -300,7 +336,11 @@ export class NodeStrategy extends Map<string, Node> {
         this.log(`Error in promise waitMultiaddrs: ${error}`);
       });
       if (connection.direction == "outbound" && node.addresses.size == 0) {
-        await this.stopNodeStrategy(key, `in outbound connection no addresses`);
+        await this.stopNodeStrategy(
+          key,
+          `in outbound connection no addresses`,
+          5000
+        );
       }
       node.addresses.forEach((addr) => {
         this.log(`Node ${key} has address:${addr}`);
@@ -321,7 +361,8 @@ export class NodeStrategy extends Map<string, Node> {
       connectedPeers.forEach(async (peerInfo: any) => {
         if (
           peerInfo.peerId == node.peerId ||
-          peerInfo.peerId == this.localPeer
+          peerInfo.peerId == this.localPeer ||
+          this.banList.has(peerInfo.peerId)
         ) {
           return;
         }
