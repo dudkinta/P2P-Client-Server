@@ -91,8 +91,8 @@ export class P2PServer {
           relay: circuitRelayServer({
             reservations: {
               maxReservations: 128,
-              defaultDurationLimit: 3600,
-              defaultDataLimit: BigInt(1024) * BigInt(1024),
+              defaultDurationLimit: 600000,
+              defaultDataLimit: BigInt(1 << 23),
             },
           }),
           aminoDHT: kadDHT({
