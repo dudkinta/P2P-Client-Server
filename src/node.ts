@@ -2,8 +2,12 @@ import { P2PClient } from "./p2p-сlient.js";
 import { NetworkService } from "./services/nerwork-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
 
-import express, { Request, Response } from "express";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+import express, { Request, Response } from "express";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
