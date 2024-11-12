@@ -1,30 +1,23 @@
 import { P2PClient } from "./p2p-сlient.js";
 import { NetworkService } from "./services/nerwork-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
-import pkg from "debug";
-const { debug } = pkg;
-import * as readline from "readline";
 
-// Инициализация логгеров при запуске
-debug.enable(process.env.DEBUG || "");
+import express, { Request, Response } from "express";
+import path from "path";
 
-// Настройка интерфейса для ввода команд
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Указываем Express, где находить статические файлы Vue
+app.use(express.static(path.join(__dirname, "public")));
+
+// Обработка всех маршрутов и отправка файла index.html
+app.get("*", (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-rl.on("line", (input: string) => {
-  if (input.startsWith("debug ")) {
-    const namespaces = input.slice(6);
-    debug.enable(namespaces);
-    console.log(`Включено логгирование для: ${namespaces}`);
-  } else if (input === "debug off") {
-    debug.disable();
-    console.log("Логгирование отключено");
-  } else {
-    console.log(`Неизвестная команда: ${input}`);
-  }
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
 
 async function main(): Promise<void> {
