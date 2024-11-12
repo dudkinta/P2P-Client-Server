@@ -1,12 +1,8 @@
 import { createLibp2p, Libp2p } from "libp2p";
-import { webSockets } from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
+import { tcp } from "@libp2p/tcp";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import {
-  circuitRelayServer,
-  circuitRelayTransport,
-} from "@libp2p/circuit-relay-v2";
+import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { PeerId } from "@libp2p/interface";
@@ -67,19 +63,9 @@ export class P2PServer {
         start: false,
         privateKey: privateKey,
         addresses: {
-          listen: [`/ip4/${listenIp}/tcp/${PORT}/ws`, "/p2p-circuit"],
+          listen: [`/ip4/${listenIp}/tcp/${PORT}`],
         },
-        transports: [
-          webSockets({
-            filter: filters.all,
-          }),
-          circuitRelayTransport({
-            maxInboundStopStreams: 500,
-            maxOutboundStopStreams: 500,
-            stopTimeout: 60000,
-            reservationCompletionTimeout: 20000,
-          }),
-        ],
+        transports: [tcp()],
         connectionGater: {
           denyDialMultiaddr: () => {
             return false;

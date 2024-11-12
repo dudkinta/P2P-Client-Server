@@ -7,8 +7,7 @@ import { peerList, PeerListService } from "./services/peer-list/index.js";
 import { maList, MultiaddressService } from "./services/multiadress/index.js";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { webSockets } from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
+import { tcp } from "@libp2p/tcp";
 import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { identify, identifyPush } from "@libp2p/identify";
@@ -35,7 +34,7 @@ export class P2PClient extends EventEmitter {
     try {
       const port = this.config.port ?? 0;
       let listenAddrs: string[] = this.config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-      listenAddrs = listenAddrs.map((addr: string) => `${addr}${port}/ws`);
+      listenAddrs = listenAddrs.map((addr: string) => `${addr}${port}`);
       listenAddrs.push("/p2p-circuit");
       const node = await createLibp2p({
         start: false,
@@ -43,9 +42,7 @@ export class P2PClient extends EventEmitter {
           listen: listenAddrs,
         },
         transports: [
-          webSockets({
-            filter: filters.all,
-          }),
+          tcp(),
           circuitRelayTransport({
             maxInboundStopStreams: 500,
             maxOutboundStopStreams: 500,

@@ -21,6 +21,7 @@ export class NodeStrategy extends Map<string, Node> {
   private penaltyNodes: string[] = [];
   private candidatePeers: Map<string, string> = new Map();
   private banList: Set<string> = new Set();
+  private banDirectAddress: Set<string> = new Set();
   private requestConnect: RequestConnect;
   private requestDisconnect: RequestDisconnect;
   private requestRoles: RequestRoles;
@@ -70,7 +71,7 @@ export class NodeStrategy extends Map<string, Node> {
 
   private async connectToMainRelay(): Promise<void> {
     const relay = this.config.relay[0];
-    const address = `/ip4/${relay.ADDRESS}/tcp/${relay.PORT}/ws/p2p/${relay.PEER}`;
+    const address = `/ip4/${relay.ADDRESS}/tcp/${relay.PORT}/p2p/${relay.PEER}`;
     const connRelay = await this.tryConnect(address).catch((error) => {
       this.log(`Error in promise requestConnect: ${error}`);
     });
@@ -155,22 +156,29 @@ export class NodeStrategy extends Map<string, Node> {
       }
 
       if (node.roles.has(this.config.roles.NODE)) {
-        node.addresses.forEach(async (address) => {
-          const conn = node.getOpenedConnection();
-          if (
+        const directAddresses = Array.from(node.addresses).find((address) => {
+          return (
+            !this.banDirectAddress.has(address) &&
             isDirect(address) &&
             !isLocalAddress(address) &&
-            conn?.remoteAddr.toString() != address
-          ) {
-            await this.stopNodeStrategy(key, `found direct address`, 0);
-            setTimeout(async () => {
-              this.log(`Try connect to direct address ${address}`);
-              await this.tryConnect(address).catch((error) => {
-                this.log(`Error in promise requestConnect: ${error}`);
-              });
-            }, 500);
-          }
+            connection.remoteAddr.toString() != address
+          );
         });
+        if (directAddresses) {
+          await this.stopNodeStrategy(key, `found direct address`, 0);
+          setTimeout(async () => {
+            this.log(`Try connect to direct address ${directAddresses}`);
+            const conn = await this.tryConnect(directAddresses).catch(
+              (error) => {
+                this.log(`Error in promise requestConnect: ${error}`);
+              }
+            );
+            if (!conn || conn.status != "open") {
+              this.log(`Ban direct address ${directAddresses}`);
+              this.banDirectAddress.add(directAddresses);
+            }
+          }, 500);
+        }
       }
     }
 
@@ -518,6 +526,7 @@ export class NodeStrategy extends Map<string, Node> {
     });
     return conn;
   }
+
   private async delay(ms: number): Promise<void> {
     try {
       return new Promise((resolve) => setTimeout(resolve, ms));
