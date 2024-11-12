@@ -14,6 +14,7 @@ import { identify, identifyPush } from "@libp2p/identify";
 import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
+import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
@@ -24,9 +25,9 @@ export interface ConnectionOpenEvent {
 export class P2PClient extends EventEmitter {
   private node: Libp2p | undefined;
   private config: any;
-  private log = (message: string) => {
+  private log = (level: LogLevel, message: string) => {
     const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("p2p-client", `[${timestamp}] ${message}`);
+    sendDebug("p2p-client", level, `[${timestamp}] ${message}`);
     debug("p2p-client")(`[${timestamp}] ${message}`);
   };
   localPeer: string | undefined;
@@ -84,7 +85,7 @@ export class P2PClient extends EventEmitter {
       });
       return node;
     } catch (error) {
-      this.log(`Error during createLibp2p: ${error}`);
+      this.log(LogLevel.Critical, `Error during createLibp2p: ${error}`);
       return undefined;
     }
   }
@@ -96,14 +97,17 @@ export class P2PClient extends EventEmitter {
     try {
       const addr = multiaddr(peerAddress);
       const ping = this.node.services.ping as PingService;
-      this.log(`Пингуем ${peerAddress}`);
+      this.log(LogLevel.Info, `Пингуем ${peerAddress}`);
       const latency = await ping.ping(addr);
-      this.log(`Пинг ${peerAddress}: ${latency}ms`);
+      this.log(LogLevel.Info, `Пинг ${peerAddress}: ${latency}ms`);
       return latency;
     } catch (error) {
-      this.log(`Ошибка при пинге: ${JSON.stringify(error)}`);
+      this.log(LogLevel.Error, `Ошибка при пинге: ${JSON.stringify(error)}`);
       if (error instanceof TimeoutError) {
-        this.log(`Ошибка таймаута при пинге: ${JSON.stringify(error)}`);
+        this.log(
+          LogLevel.Error,
+          `Ошибка таймаута при пинге: ${JSON.stringify(error)}`
+        );
       }
       throw error;
     }
@@ -118,12 +122,21 @@ export class P2PClient extends EventEmitter {
       const result = await roleService.roles(conn, {
         signal: AbortSignal.timeout(5000),
       });
-      this.log(`Роли пира (${conn.remotePeer.toString()}): ${result}`);
+      this.log(
+        LogLevel.Info,
+        `Роли пира (${conn.remotePeer.toString()}): ${result}`
+      );
       return result;
     } catch (error) {
-      this.log(`Ошибка при запросе ролей: ${JSON.stringify(error)}`);
+      this.log(
+        LogLevel.Error,
+        `Ошибка при запросе ролей: ${JSON.stringify(error)}`
+      );
       if (error instanceof TimeoutError) {
-        this.log(`Ошибка таймаута при запросе ролей: ${JSON.stringify(error)}`);
+        this.log(
+          LogLevel.Error,
+          `Ошибка таймаута при запросе ролей: ${JSON.stringify(error)}`
+        );
       }
       throw error;
     }
@@ -139,15 +152,18 @@ export class P2PClient extends EventEmitter {
         signal: AbortSignal.timeout(5000),
       });
       this.log(
+        LogLevel.Info,
         `Подключенные пиры к пиру: (${conn.remotePeer.toString()}): ${result}`
       );
       return result;
     } catch (error) {
       this.log(
+        LogLevel.Error,
         `Ошибка при запросе подключеных пиров: ${JSON.stringify(error)}`
       );
       if (error instanceof TimeoutError) {
         this.log(
+          LogLevel.Error,
           `Ошибка таймаута при запросе подключеных пиров: ${JSON.stringify(error)}`
         );
       }
@@ -164,12 +180,19 @@ export class P2PClient extends EventEmitter {
       const result = await maListService.getMultiaddress(conn, {
         signal: AbortSignal.timeout(5000),
       });
-      this.log(`Мультиадреса пира: (${conn.remotePeer.toString()}): ${result}`);
+      this.log(
+        LogLevel.Info,
+        `Мультиадреса пира: (${conn.remotePeer.toString()}): ${result}`
+      );
       return result;
     } catch (error) {
-      this.log(`Ошибка при запросе мультиадресов: ${JSON.stringify(error)}`);
+      this.log(
+        LogLevel.Error,
+        `Ошибка при запросе мультиадресов: ${JSON.stringify(error)}`
+      );
       if (error instanceof TimeoutError) {
         this.log(
+          LogLevel.Error,
           `Ошибка таймаута при запросе мультиадресов: ${JSON.stringify(error)}`
         );
       }
@@ -183,16 +206,17 @@ export class P2PClient extends EventEmitter {
       if (!this.node) {
         return undefined;
       }
-      this.log(`Connecting to ${ma.toString()}`);
+      this.log(LogLevel.Info, `Connecting to ${ma.toString()}`);
       const conn = await this.node.dial(ma, { signal });
       if (conn) {
         this.log(
+          LogLevel.Info,
           `Connect to ${conn.remoteAddr.toString()} Status: ${conn.status}`
         );
       }
       return conn;
     } catch (error) {
-      this.log(`Error in connectTo ${JSON.stringify(error)}`);
+      this.log(LogLevel.Error, `Error in connectTo ${JSON.stringify(error)}`);
       return undefined;
     }
   }
@@ -203,11 +227,14 @@ export class P2PClient extends EventEmitter {
     }
     const signal = AbortSignal.timeout(5000);
     try {
-      this.log(`Disconnecting from ${ma.toString()}`);
+      this.log(LogLevel.Info, `Disconnecting from ${ma.toString()}`);
       await this.node.hangUp(ma, { signal });
-      this.log(`Disconnected from ${ma.toString()}`);
+      this.log(LogLevel.Info, `Disconnected from ${ma.toString()}`);
     } catch (error) {
-      this.log(`Error in disconnectFromMA: ${JSON.stringify(error)}`);
+      this.log(
+        LogLevel.Error,
+        `Error in disconnectFromMA: ${JSON.stringify(error)}`
+      );
     }
   }
 
@@ -215,13 +242,14 @@ export class P2PClient extends EventEmitter {
     try {
       this.node = await this.createNode();
       if (!this.node) {
-        this.log("Node is not initialized");
+        this.log(LogLevel.Error, "Node is not initialized");
         return;
       }
 
       this.localPeer = this.node.peerId.toString();
       this.node.addEventListener("connection:open", (event: any) => {
         this.log(
+          LogLevel.Info,
           `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
         );
         this.emit("connection:open", event.detail);
@@ -251,16 +279,16 @@ export class P2PClient extends EventEmitter {
         }
       });
       this.node.addEventListener("start", (event: any) => {
-        this.log("Libp2p node started");
+        this.log(LogLevel.Info, "Libp2p node started");
       });
 
       await this.node.start();
-      this.log(`Libp2p listening on:`);
+      this.log(LogLevel.Info, `Libp2p listening on:`);
       this.node.getMultiaddrs().forEach((ma) => {
-        this.log(`${ma.toString()}`);
+        this.log(LogLevel.Info, `${ma.toString()}`);
       });
     } catch (err: any) {
-      this.log(`Error on start client node - ${err}`);
+      this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }
   }
 }

@@ -1,6 +1,6 @@
 // socket-service.ts
 import { Server, Socket } from "socket.io";
-
+import { LogLevel } from "./../helpers/log-level.js";
 let io: Server | undefined = undefined; // Экземпляр io
 
 export function setupSocketIO(server: any) {
@@ -28,9 +28,13 @@ export function setupSocketIO(server: any) {
 }
 
 // Функция для отправки сообщений всем клиентам
-export function sendDebug(service: string, logMessage: string) {
+export function sendDebug(
+  service: string,
+  level: LogLevel,
+  logMessage: string
+) {
   if (io) {
-    io.emit("debug", { service: service, message: logMessage });
+    io.emit("logs", { service: service, level: level, message: logMessage });
   } else {
     console.error("Socket.IO не инициализирован");
   }

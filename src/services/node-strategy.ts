@@ -5,6 +5,8 @@ import { Connection } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
 import { sendDebug } from "./socket-service.js";
+import { LogLevel } from "../helpers/log-level.js";
+
 const { debug } = pkg;
 type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
 type RequestDisconnect = (addrr: string) => Promise<void>;
@@ -30,9 +32,9 @@ export class NodeStrategy extends Map<string, Node> {
   private requestConnectedPeers: RequestConnectedPeers;
   private requestPing: RequestPing;
 
-  private log = (message: string) => {
+  private log = (level: LogLevel, message: string) => {
     const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("node-strategy", `[${timestamp}] ${message}`);
+    sendDebug("node-strategy", level, `[${timestamp}] ${message}`);
     debug("node-strategy")(`[${timestamp}] ${message}`);
   };
   private localPeer: string | undefined;
@@ -57,16 +59,16 @@ export class NodeStrategy extends Map<string, Node> {
 
   set(key: string, value: Node): this {
     super.set(key, value);
-    this.log(`Node ${key} added to storage`);
+    this.log(LogLevel.Info, `Node ${key} added to storage`);
     this.startNodeStrategy(key, value);
     return this;
   }
 
   async startStrategy(localPeer: string): Promise<void> {
-    this.log(`Starting global strategy`);
+    this.log(LogLevel.Info, `Starting global strategy`);
     this.localPeer = localPeer;
     await this.connectToMainRelay().catch((error) => {
-      this.log(`Error in promise connectToMainRelay: ${error}`);
+      this.log(LogLevel.Error, `Error in promise connectToMainRelay: ${error}`);
     });
     setTimeout(async () => {
       await this.selfDiag();
@@ -77,10 +79,10 @@ export class NodeStrategy extends Map<string, Node> {
     const relay = this.config.relay[0];
     const address = `/ip4/${relay.ADDRESS}/tcp/${relay.PORT}/p2p/${relay.PEER}`;
     const connRelay = await this.tryConnect(address).catch((error) => {
-      this.log(`Error in promise requestConnect: ${error}`);
+      this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
     });
     if (!connRelay) {
-      this.log(`Relay not connected`);
+      this.log(LogLevel.Warning, `Relay not connected`);
       return;
     }
   }
@@ -90,10 +92,13 @@ export class NodeStrategy extends Map<string, Node> {
     this.counterConnections();
     // если никого нет, то подключаемся к релейному узлу
     if (this.size == 0) {
-      this.log(`No nodes in storage`);
+      this.log(LogLevel.Warning, `No nodes in storage`);
       this.banList.clear();
       await this.connectToMainRelay().catch((error) => {
-        this.log(`Error in promise connectToMainRelay: ${error}`);
+        this.log(
+          LogLevel.Error,
+          `Error in promise connectToMainRelay: ${error}`
+        );
       });
     }
 
@@ -116,10 +121,14 @@ export class NodeStrategy extends Map<string, Node> {
           `connection limit bytes: ${connection.limits.bytes}`,
           5000
         ).catch((error) => {
-          this.log(`Error in promise stopNodeStrategy: ${error}`);
+          this.log(
+            LogLevel.Error,
+            `Error in promise stopNodeStrategy: ${error}`
+          );
         });
       }
       this.log(
+        LogLevel.Info,
         `Limits connection ${connection.remoteAddr.toString()} \r\nLimits bytes:${connection.limits.bytes}  Limits second:${connection.limits.seconds}`
       );
     }
@@ -127,7 +136,10 @@ export class NodeStrategy extends Map<string, Node> {
     // обновляем список кандидатов
     for (const [key, node] of this) {
       await this.getConnectedPeers(node).catch((error) => {
-        this.log(`Error in promise getConnectedPeers: ${error}`);
+        this.log(
+          LogLevel.Error,
+          `Error in promise getConnectedPeers: ${error}`
+        );
       });
     }
 
@@ -138,13 +150,14 @@ export class NodeStrategy extends Map<string, Node> {
       }
       if (this.size >= this.config.MAX_NODES) {
         this.log(
+          LogLevel.Info,
           `Max nodes limit reached. Current nodes: ${this.size}, Max nodes: ${this.config.MAX_NODES}`
         );
         break;
       }
 
       await this.tryConnect(address).catch((error) => {
-        this.log(`Error in promise requestConnect: ${error}`);
+        this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
         return undefined;
       });
     }
@@ -171,14 +184,23 @@ export class NodeStrategy extends Map<string, Node> {
         if (directAddresses) {
           await this.stopNodeStrategy(key, `found direct address`, 0);
           setTimeout(async () => {
-            this.log(`Try connect to direct address ${directAddresses}`);
+            this.log(
+              LogLevel.Info,
+              `Try connect to direct address ${directAddresses}`
+            );
             const conn = await this.tryConnect(directAddresses).catch(
               (error) => {
-                this.log(`Error in promise requestConnect: ${error}`);
+                this.log(
+                  LogLevel.Error,
+                  `Error in promise requestConnect: ${error}`
+                );
               }
             );
             if (!conn || conn.status != "open") {
-              this.log(`Ban direct address ${directAddresses}`);
+              this.log(
+                LogLevel.Warning,
+                `Ban direct address ${directAddresses}`
+              );
               this.banDirectAddress.add(directAddresses);
             }
           }, 500);
@@ -212,18 +234,24 @@ export class NodeStrategy extends Map<string, Node> {
   private removeDeadNodes() {
     for (const [key, node] of this) {
       if (!node) {
-        this.log(`Add penalty for Node ${key}. Node is not found`);
+        this.log(
+          LogLevel.Warning,
+          `Add penalty for Node ${key}. Node is not found`
+        );
         this.penaltyNodes.push(key);
         continue;
       }
       const connection = node.getOpenedConnection();
       if (!connection) {
-        this.log(`Add penalty for Node ${key}. Connection is not found`);
+        this.log(
+          LogLevel.Warning,
+          `Add penalty for Node ${key}. Connection is not found`
+        );
         this.penaltyNodes.push(key);
         continue;
       }
       if (connection.direction == "outbound" && node.roles.size == 0) {
-        this.log(`Add penalty for Node ${key}. No roles`);
+        this.log(LogLevel.Warning, `Add penalty for Node ${key}. No roles`);
         this.penaltyNodes.push(key);
         continue;
       }
@@ -238,7 +266,7 @@ export class NodeStrategy extends Map<string, Node> {
       .map(([node]) => node);
 
     keysForDelete.forEach((key) => {
-      this.log(`NetworkStrategy-> Delete node: ${key}`);
+      this.log(LogLevel.Warning, `NetworkStrategy-> Delete node: ${key}`);
       this.delete(key);
     });
     this.penaltyNodes = this.penaltyNodes.filter(
@@ -295,12 +323,15 @@ export class NodeStrategy extends Map<string, Node> {
     this.unknownCount = uCount;
 
     this.log(
+      LogLevel.Info,
       `Counter --> Relay count: ${this.relayCount}, Node count: ${this.nodeCount}, Unknown count: ${this.unknownCount}`
     );
     this.log(
+      LogLevel.Info,
       `Counter --> Inbouund count: ${inBoundCount}, Outbound count: ${ouBboundCount}`
     );
     this.log(
+      LogLevel.Info,
       `Counter --> Direct connections: ${directConnections}, Relay connections: ${relayConnections}`
     );
   }
@@ -310,7 +341,10 @@ export class NodeStrategy extends Map<string, Node> {
     cause: string,
     banTimer: number
   ): Promise<void> {
-    this.log(`Stopping node strategy for ${key}. Cause: ${cause}`);
+    this.log(
+      LogLevel.Info,
+      `Stopping node strategy for ${key}. Cause: ${cause}`
+    );
     const node = this.get(key);
     if (!node) {
       return;
@@ -319,48 +353,54 @@ export class NodeStrategy extends Map<string, Node> {
       if (conn.status != "closed") {
         await this.requestDisconnect(conn.remoteAddr.toString()).catch(
           (error) => {
-            this.log(`Error in promise requestDisconnect: ${error}`);
+            this.log(
+              LogLevel.Error,
+              `Error in promise requestDisconnect: ${error}`
+            );
           }
         );
       }
     });
-    this.log(`Ban Node ${key} on ${banTimer} ms`);
+    this.log(LogLevel.Info, `Ban Node ${key} on ${banTimer} ms`);
     this.banList.add(key);
     setTimeout(() => {
-      this.log(`Unban Node ${key}`);
+      this.log(LogLevel.Info, `Unban Node ${key}`);
       this.banList.delete(key);
     }, banTimer);
     this.delete(key);
-    this.log(`Node ${key} removed from storage`);
+    this.log(LogLevel.Warning, `Node ${key} removed from storage`);
   }
 
   private async startNodeStrategy(key: string, node: Node): Promise<void> {
     if (this.candidatePeers.has(key)) {
       this.candidatePeers.delete(key);
     }
-    this.log(`Starting node strategy for ${key}`);
+    this.log(LogLevel.Info, `Starting node strategy for ${key}`);
     await this.waitConnect(node).catch((error) => {
-      this.log(`Error in promise waitConnect: ${error}`);
+      this.log(LogLevel.Error, `Error in promise waitConnect: ${error}`);
     });
     const connection = node.getOpenedConnection();
     if (!connection) {
       await this.stopNodeStrategy(key, `not found opened connection`, 5000);
-      this.log(`Node ${key} is not connected. Self remove`);
+      this.log(LogLevel.Warning, `Node ${key} is not connected. Self remove`);
       return;
     }
-    this.log(`Node ${key} is connected. Direction: ${connection.direction}`);
+    this.log(
+      LogLevel.Info,
+      `Node ${key} is connected. Direction: ${connection.direction}`
+    );
     await this.waitRoles(node).catch((error) => {
-      this.log(`Error in promise waitRoles: ${error}`);
+      this.log(LogLevel.Error, `Error in promise waitRoles: ${error}`);
     });
     if (connection.direction == "outbound" && node.roles.size == 0) {
       await this.stopNodeStrategy(key, `in outbound connection no roles`, 5000);
     }
     node.roles.forEach((role) => {
-      this.log(`Node ${key} has role:${role}`);
+      this.log(LogLevel.Info, `Node ${key} has role:${role}`);
     });
     if (node.roles.has(this.config.roles.NODE)) {
       await this.waitMultiaddrs(node).catch((error) => {
-        this.log(`Error in promise waitMultiaddrs: ${error}`);
+        this.log(LogLevel.Error, `Error in promise waitMultiaddrs: ${error}`);
       });
       if (connection.direction == "outbound" && node.addresses.size == 0) {
         await this.stopNodeStrategy(
@@ -370,17 +410,23 @@ export class NodeStrategy extends Map<string, Node> {
         );
       }
       node.addresses.forEach((addr) => {
-        this.log(`Node ${key} has address:${addr}`);
+        this.log(LogLevel.Info, `Node ${key} has address:${addr}`);
       });
     }
-    this.log(`Node ${key} with direction:${connection.direction} is ready`);
+    this.log(
+      LogLevel.Info,
+      `Node ${key} with direction:${connection.direction} is ready`
+    );
   }
 
   private async getConnectedPeers(node: Node): Promise<void> {
-    this.log(`Getting connected peers for ${node.peerId}`);
+    this.log(LogLevel.Info, `Getting connected peers for ${node.peerId}`);
     const connectedPeers = await this.requestConnectedPeers(node).catch(
       (error) => {
-        this.log(`Error in promise requestConnectedPeers: ${error}`);
+        this.log(
+          LogLevel.Error,
+          `Error in promise requestConnectedPeers: ${error}`
+        );
         return undefined;
       }
     );
@@ -405,6 +451,7 @@ export class NodeStrategy extends Map<string, Node> {
           ) {
             this.candidatePeers.set(peerInfo.peerId, fullAddress);
             this.log(
+              LogLevel.Info,
               `Candidate peer ${peerInfo.peerId} added (${fullAddress})`
             );
           }
@@ -417,6 +464,7 @@ export class NodeStrategy extends Map<string, Node> {
             ) {
               this.candidatePeers.set(peerInfo.peerId, peerInfo.address);
               this.log(
+                LogLevel.Info,
                 `Candidate peer ${peerInfo.peerId} added (${peerInfo.address})`
               );
             }
@@ -430,9 +478,9 @@ export class NodeStrategy extends Map<string, Node> {
     try {
       let countDelay = 0;
       while (node.addresses.size == 0 && countDelay < 10) {
-        this.log(`Waiting for multiaddrs`);
+        this.log(LogLevel.Info, `Waiting for multiaddrs`);
         await this.getMultiaddrs(node).catch((error) => {
-          this.log(`Error in promise getMultiaddrs: ${error}`);
+          this.log(LogLevel.Error, `Error in promise getMultiaddrs: ${error}`);
         });
         if (node.addresses.size == 0) {
           await this.delay(500);
@@ -440,7 +488,7 @@ export class NodeStrategy extends Map<string, Node> {
         countDelay++;
       }
     } catch (error) {
-      this.log(`Error in waitMultiaddrs: ${error}`);
+      this.log(LogLevel.Error, `Error in waitMultiaddrs: ${error}`);
     }
   }
 
@@ -448,9 +496,9 @@ export class NodeStrategy extends Map<string, Node> {
     try {
       let countDelay = 0;
       while (node.roles.size == 0 && countDelay < 10) {
-        this.log(`Waiting for roles`);
+        this.log(LogLevel.Info, `Waiting for roles`);
         await this.getRoles(node).catch((error) => {
-          this.log(`Error in promise getRoles: ${error}`);
+          this.log(LogLevel.Error, `Error in promise getRoles: ${error}`);
         });
         if (node.roles.size == 0) {
           await this.delay(500);
@@ -458,7 +506,7 @@ export class NodeStrategy extends Map<string, Node> {
         countDelay++;
       }
     } catch (error) {
-      this.log(`Error in waitConnect: ${error}`);
+      this.log(LogLevel.Error, `Error in waitConnect: ${error}`);
     }
   }
 
@@ -466,12 +514,12 @@ export class NodeStrategy extends Map<string, Node> {
     try {
       let countDelay = 0;
       while (!node.isConnect() && countDelay < 10) {
-        this.log(`Waiting for connect`);
+        this.log(LogLevel.Info, `Waiting for connect`);
         await this.delay(500);
         countDelay++;
       }
     } catch (error) {
-      this.log(`Error in waitConnect: ${error}`);
+      this.log(LogLevel.Error, `Error in waitConnect: ${error}`);
     }
   }
 
@@ -479,7 +527,7 @@ export class NodeStrategy extends Map<string, Node> {
     try {
       let roles: string[] | undefined;
       roles = await this.requestRoles(node).catch((error) => {
-        this.log(`Error in promise getRoles: ${error}`);
+        this.log(LogLevel.Error, `Error in promise getRoles: ${error}`);
         return undefined;
       });
       if (roles != undefined) {
@@ -488,14 +536,17 @@ export class NodeStrategy extends Map<string, Node> {
         });
       }
     } catch (error) {
-      this.log(`Error in getRoles: ${error}`);
+      this.log(LogLevel.Error, `Error in getRoles: ${error}`);
     }
   }
 
   private async getMultiaddrs(node: Node): Promise<void> {
     try {
       const addresses = await this.requestMultiaddrs(node).catch((error) => {
-        this.log(`Error in promise requestMultiaddrs: ${error}`);
+        this.log(
+          LogLevel.Error,
+          `Error in promise requestMultiaddrs: ${error}`
+        );
       });
       if (!addresses) {
         return;
@@ -507,13 +558,14 @@ export class NodeStrategy extends Map<string, Node> {
         }
       });
     } catch (error) {
-      this.log(`Error in getRoles: ${error}`);
+      this.log(LogLevel.Error, `Error in getRoles: ${error}`);
     }
   }
 
   private async tryConnect(address: string): Promise<Connection | undefined> {
     const ma = multiaddr(address);
     this.log(
+      LogLevel.Info,
       `Trying to connect to ${ma.toString()} (PeerId: ${ma.getPeerId()?.toString()})`
     );
     const peerId = ma.getPeerId();
@@ -521,11 +573,11 @@ export class NodeStrategy extends Map<string, Node> {
       return undefined;
     }
     if (this.banList.has(peerId.toString())) {
-      this.log(`Node ${address} is banned`);
+      this.log(LogLevel.Warning, `Node ${address} is banned`);
       return undefined;
     }
     const conn = await this.requestConnect(address).catch((error) => {
-      this.log(`Error in promise requestConnect: ${error}`);
+      this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
       return undefined;
     });
     return conn;
@@ -535,7 +587,7 @@ export class NodeStrategy extends Map<string, Node> {
     try {
       return new Promise((resolve) => setTimeout(resolve, ms));
     } catch (error) {
-      this.log(`Error in delay: ${error}`);
+      this.log(LogLevel.Error, `Error in delay: ${error}`);
     }
   }
 }

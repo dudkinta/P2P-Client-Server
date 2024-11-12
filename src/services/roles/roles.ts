@@ -2,6 +2,7 @@ import { TimeoutError } from "@libp2p/interface";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendAndReceive } from "../../helpers/stream-helper.js";
 import { sendDebug } from "./../../services/socket-service.js";
+import { LogLevel } from "../../helpers/log-level.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -32,9 +33,9 @@ export class RolesService implements Startable, RolesServiceInterface {
   private readonly maxOutboundStreams: number;
   private readonly runOnLimitedConnection: boolean;
   private readonly logger: Logger;
-  private readonly log = (message: string) => {
+  private readonly log = (level: LogLevel, message: string) => {
     const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("libp2p/roles", `[${timestamp}] ${message}`);
+    sendDebug("libp2p/roles", level, `[${timestamp}] ${message}`);
     this.logger(`[${timestamp}] ${message}`);
   };
   private readonly roleList: string[];
@@ -75,7 +76,10 @@ export class RolesService implements Startable, RolesServiceInterface {
   }
 
   handleMessage(data: IncomingStreamData): void {
-    this.log(`incoming getRoles from ${data.connection.remotePeer.toString()}`);
+    this.log(
+      LogLevel.Info,
+      `incoming getRoles from ${data.connection.remotePeer.toString()}`
+    );
 
     const { stream } = data;
     Promise.resolve()
@@ -87,18 +91,23 @@ export class RolesService implements Startable, RolesServiceInterface {
 
         const jsonString = JSON.stringify(this.roleList);
         await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log(`send roles to %p failed with error ${JSON.stringify(err)}`);
+          this.log(
+            LogLevel.Error,
+            `send roles to %p failed with error ${JSON.stringify(err)}`
+          );
           stream?.abort(err);
         });
       })
       .catch((err) => {
         this.log(
+          LogLevel.Error,
           `incoming roles from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
         );
         stream?.abort(err);
       })
       .finally(() => {
         this.log(
+          LogLevel.Info,
           `incoming roles from %p completed ${data.connection.remotePeer.toString()}`
         );
       });
@@ -108,7 +117,7 @@ export class RolesService implements Startable, RolesServiceInterface {
     connection: Connection,
     options: AbortOptions = {}
   ): Promise<string> {
-    this.log(`send roles ${connection.remotePeer.toString()}`);
+    this.log(LogLevel.Info, `send roles ${connection.remotePeer.toString()}`);
     let stream: Stream | undefined;
     try {
       if (connection == null) {
@@ -131,15 +140,19 @@ export class RolesService implements Startable, RolesServiceInterface {
         ...options,
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
-      this.log(`send request to ${connection.remotePeer}`);
+      this.log(LogLevel.Info, `send request to ${connection.remotePeer}`);
       const result = await sendAndReceive(stream, "").catch((err) => {
-        this.log(`send roles to %p failed with error ${JSON.stringify(err)}`);
+        this.log(
+          LogLevel.Error,
+          `send roles to %p failed with error ${JSON.stringify(err)}`
+        );
         throw err;
       });
-      this.log(`received answer: ${result}`);
+      this.log(LogLevel.Info, `received answer: ${result}`);
       return result;
     } catch (err: any) {
       this.log(
+        LogLevel.Error,
         `error while roling ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
       );
 
