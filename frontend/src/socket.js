@@ -8,12 +8,8 @@ socket.on('connect', () => {
     console.log('Подключен к серверу Socket.IO');
 });
 
-socket.on('welcome', (message) => {
-    console.log(message); // Приветственное сообщение с сервера
-});
-
-socket.on('data', (data) => {
-    console.log('Получены данные с сервера:', data);
+socket.on('debug', (data) => {
+    console.log('debug:', data);
 });
 
 export default socket;

@@ -13,6 +13,7 @@ import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { identify, identifyPush } from "@libp2p/identify";
 import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "./helpers/config-loader.js";
+import { sendDebug } from "./services/socket-service.js";
 import pkg from "debug";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
@@ -23,11 +24,16 @@ export interface ConnectionOpenEvent {
 export class P2PClient extends EventEmitter {
   private node: Libp2p | undefined;
   private config: any;
-  private log = debug("p2p-client");
+  private log = (message: string) => {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    sendDebug("p2p-client", `[${timestamp}] ${message}`);
+    debug("p2p-client")(`[${timestamp}] ${message}`);
+  };
   localPeer: string | undefined;
   constructor() {
     super();
     this.config = ConfigLoader.getInstance().getConfig();
+    debug.enable("p2p-client");
   }
 
   private async createNode(): Promise<Libp2p | undefined> {
@@ -95,9 +101,9 @@ export class P2PClient extends EventEmitter {
       this.log(`Пинг ${peerAddress}: ${latency}ms`);
       return latency;
     } catch (error) {
-      this.log("Ошибка при пинге:", error);
+      this.log(`Ошибка при пинге: ${JSON.stringify(error)}`);
       if (error instanceof TimeoutError) {
-        this.log("Ошибка таймаута при пинге:", error);
+        this.log(`Ошибка таймаута при пинге: ${JSON.stringify(error)}`);
       }
       throw error;
     }
@@ -115,9 +121,9 @@ export class P2PClient extends EventEmitter {
       this.log(`Роли пира (${conn.remotePeer.toString()}): ${result}`);
       return result;
     } catch (error) {
-      this.log("Ошибка при запросе ролей:", error);
+      this.log(`Ошибка при запросе ролей: ${JSON.stringify(error)}`);
       if (error instanceof TimeoutError) {
-        this.log("Ошибка таймаута при запросе ролей:", error);
+        this.log(`Ошибка таймаута при запросе ролей: ${JSON.stringify(error)}`);
       }
       throw error;
     }
@@ -137,9 +143,13 @@ export class P2PClient extends EventEmitter {
       );
       return result;
     } catch (error) {
-      this.log("Ошибка при запросе подключеных пиров:", error);
+      this.log(
+        `Ошибка при запросе подключеных пиров: ${JSON.stringify(error)}`
+      );
       if (error instanceof TimeoutError) {
-        this.log("Ошибка таймаута при запросе подключеных пиров:", error);
+        this.log(
+          `Ошибка таймаута при запросе подключеных пиров: ${JSON.stringify(error)}`
+        );
       }
       throw error;
     }
@@ -157,9 +167,11 @@ export class P2PClient extends EventEmitter {
       this.log(`Мультиадреса пира: (${conn.remotePeer.toString()}): ${result}`);
       return result;
     } catch (error) {
-      this.log("Ошибка при запросе мультиадресов:", error);
+      this.log(`Ошибка при запросе мультиадресов: ${JSON.stringify(error)}`);
       if (error instanceof TimeoutError) {
-        this.log("Ошибка таймаута при запросе мультиадресов:", error);
+        this.log(
+          `Ошибка таймаута при запросе мультиадресов: ${JSON.stringify(error)}`
+        );
       }
       throw error;
     }
@@ -180,8 +192,7 @@ export class P2PClient extends EventEmitter {
       }
       return conn;
     } catch (error) {
-      this.log("Error in connectTo");
-      this.log(error);
+      this.log(`Error in connectTo ${JSON.stringify(error)}`);
       return undefined;
     }
   }
@@ -196,7 +207,7 @@ export class P2PClient extends EventEmitter {
       await this.node.hangUp(ma, { signal });
       this.log(`Disconnected from ${ma.toString()}`);
     } catch (error) {
-      this.log("Error in disconnectFromMA: ", error);
+      this.log(`Error in disconnectFromMA: ${JSON.stringify(error)}`);
     }
   }
 

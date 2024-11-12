@@ -4,6 +4,7 @@ import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
+import { sendDebug } from "./socket-service.js";
 const { debug } = pkg;
 type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
 type RequestDisconnect = (addrr: string) => Promise<void>;
@@ -28,8 +29,10 @@ export class NodeStrategy extends Map<string, Node> {
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
   private requestPing: RequestPing;
+
   private log = (message: string) => {
     const timestamp = new Date().toISOString().slice(11, 23);
+    sendDebug("node-strategy", `[${timestamp}] ${message}`);
     debug("node-strategy")(`[${timestamp}] ${message}`);
   };
   private localPeer: string | undefined;
@@ -49,6 +52,7 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
     this.requestPing = requestPing;
+    debug.enable("node-strategy");
   }
 
   set(key: string, value: Node): this {

@@ -2,6 +2,7 @@ import { TimeoutError } from "@libp2p/interface";
 import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendAndReceive } from "../../helpers/stream-helper.js";
+import { sendDebug } from "./../../services/socket-service.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -31,13 +32,19 @@ export class PeerListService implements Startable, PeerListServiceInterface {
   private readonly maxInboundStreams: number;
   private readonly maxOutboundStreams: number;
   private readonly runOnLimitedConnection: boolean;
-  private readonly log: Logger;
+  private readonly logger: Logger;
+  private readonly log = (message: string) => {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    sendDebug("libp2p:peer-list", `[${timestamp}] ${message}`);
+    this.logger(`[${timestamp}] ${message}`);
+  };
   constructor(
     components: PeerListServiceComponents,
     init: PeerListServiceInit = {}
   ) {
     this.components = components;
-    this.log = components.logger.forComponent("libp2p:peer-list");
+    this.logger = components.logger.forComponent("libp2p:peer-list");
+    this.logger.enabled = true;
     this.started = false;
     this.protocol = `/${
       init.protocolPrefix ?? PROTOCOL_PREFIX
@@ -70,7 +77,9 @@ export class PeerListService implements Startable, PeerListServiceInterface {
   }
 
   handleMessage(data: IncomingStreamData): void {
-    this.log("incoming getPeerList from %p", data.connection.remotePeer);
+    this.log(
+      `incoming getPeerList from ${data.connection.remotePeer.toString()}`
+    );
 
     const { stream } = data;
     Promise.resolve()
@@ -90,22 +99,19 @@ export class PeerListService implements Startable, PeerListServiceInterface {
           }));
         const jsonString = JSON.stringify(connectedPeers);
         await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log("error while sending peerList %p", err);
+          this.log(`error while sending peerList ${JSON.stringify(err)}`);
           throw err;
         });
       })
       .catch((err) => {
-        this.log.error(
-          "incoming peers from %p failed with error",
-          data.connection.remotePeer,
-          err
+        this.log(
+          `incoming peers from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
         );
         stream?.abort(err);
       })
       .finally(() => {
         this.log(
-          "incoming peers from %p completed",
-          data.connection.remotePeer
+          `incoming peers from ${data.connection.remotePeer.toString()} completed`
         );
       });
   }
@@ -114,7 +120,7 @@ export class PeerListService implements Startable, PeerListServiceInterface {
     connection: Connection,
     options: AbortOptions = {}
   ): Promise<string> {
-    this.log("send peers %p", connection.remotePeer);
+    this.log(`send peers ${connection.remotePeer.toString()}`);
     let stream: Stream | undefined;
     try {
       if (connection == null) {
@@ -148,13 +154,15 @@ export class PeerListService implements Startable, PeerListServiceInterface {
       });
       this.log(`send request to ${connection.remotePeer}`);
       const result = await sendAndReceive(stream, "").catch((err) => {
-        this.log("error while receiving peerList %p", err);
+        this.log(`error while receiving peerList ${JSON.stringify(err)}`);
         throw err;
       });
       this.log(`received answer: ${result}`);
       return result;
     } catch (err: any) {
-      this.log.error("error while roling %p", connection.remotePeer, err);
+      this.log(
+        `error while roling ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
+      );
 
       stream?.abort(err);
 

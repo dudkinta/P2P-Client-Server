@@ -1,9 +1,12 @@
+// socket-service.ts
 import { Server, Socket } from "socket.io";
 
+let io: Server | undefined = undefined; // Экземпляр io
+
 export function setupSocketIO(server: any) {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173", // URL вашего фронтенд-сервера
+      origin: "http://localhost:5173",
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -11,11 +14,6 @@ export function setupSocketIO(server: any) {
 
   io.on("connection", (socket: Socket) => {
     console.log("Клиент подключен:", socket.id);
-    socket.emit("welcome", "Добро пожаловать на сервер Socket.IO");
-
-    setInterval(() => {
-      socket.emit("data", { message: "Обновленные данные с сервера" });
-    }, 5000);
 
     socket.on("client-event", (data) => {
       console.log("Сообщение от клиента:", data);
@@ -27,4 +25,27 @@ export function setupSocketIO(server: any) {
   });
 
   return io;
+}
+
+// Функция для отправки сообщений всем клиентам
+export function sendDebug(service: string, logMessage: string) {
+  if (io) {
+    io.emit("debug", { service: service, message: logMessage });
+  } else {
+    console.error("Socket.IO не инициализирован");
+  }
+}
+
+// Функция для отправки сообщения конкретному клиенту по его ID
+export function sendLogToClient(clientId: string, logMessage: string) {
+  if (io) {
+    const socketClient = io.sockets.sockets.get(clientId);
+    if (socketClient) {
+      socketClient.emit("log", { message: logMessage });
+    } else {
+      console.error(`Клиент с ID ${clientId} не найден`);
+    }
+  } else {
+    console.error("Socket.IO не инициализирован");
+  }
 }

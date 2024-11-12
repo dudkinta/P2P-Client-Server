@@ -6,6 +6,7 @@ import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
 import { OutOfLimitError } from "./../models/out-of-limit-error.js";
+import { sendDebug } from "./socket-service.js";
 import pkg from "debug";
 const { debug } = pkg;
 export class NetworkService extends EventEmitter {
@@ -15,6 +16,7 @@ export class NetworkService extends EventEmitter {
   private config = ConfigLoader.getInstance().getConfig();
   private log = (message: string) => {
     const timestamp = new Date().toISOString().slice(11, 23);
+    sendDebug("network-service", `[${timestamp}] ${message}`);
     debug("network-service")(`[${timestamp}] ${message}`);
   };
   constructor(p2pClient: P2PClient) {
@@ -28,6 +30,7 @@ export class NetworkService extends EventEmitter {
       this.RequestConnectedPeers.bind(this),
       this.RequestPing.bind(this)
     );
+    debug.enable("network-service");
   }
 
   async startAsync(): Promise<void> {

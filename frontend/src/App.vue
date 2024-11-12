@@ -15,7 +15,7 @@ export default {
 
     // Получение данных с сервера при подключении
     onMounted(() => {
-      socket.on("data", (data) => {
+      socket.on("debug", (data) => {
         message.value = data.message;
       });
     });
