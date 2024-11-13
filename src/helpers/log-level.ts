@@ -3,6 +3,6 @@ export enum LogLevel {
   Error = "ERROR",
   Warning = "WARNING",
   Info = "INFO",
-  Debug = "DEGUN",
+  Debug = "DEBUG",
   Trace = "TRACE",
 }
