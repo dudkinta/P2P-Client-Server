@@ -8,7 +8,6 @@ dist/
 .env
 
 # Логи и временные файлы
-logs/
 *.log
 npm-debug.log*
 
