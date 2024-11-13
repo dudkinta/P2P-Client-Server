@@ -1,10 +1,13 @@
 <template>
-  <div></div>
+  <div id="app">
+    <Menu />
+    <router-view />
+  </div>
 </template>
 
-<script>
-import socket from "./../shared/socket";
+<script setup>
+import Menu from "./../widgets/menu/ui/menu.vue";
+import { initializeSocket } from "./../shared/socket";
 
-export default {};
+const socket = initializeSocket();
 </script>
-<style scoped></style>

@@ -1,15 +1,22 @@
 import { io } from 'socket.io-client';
+import { useLogStore } from './../entities/logs/model/log-store';
 
-// Подключение к серверу socket.io
-const socket = io('http://localhost:3000'); // Укажите порт вашего бэкенда
+let socket;
 
-// Обработка событий
-socket.on('connect', () => {
-    console.log('Подключен к серверу Socket.IO');
-});
+export function initializeSocket() {
+    const logStore = useLogStore();
 
-socket.on('logs', (data) => {
-    console.log('logs:', data);
-});
+    if (!socket) {
+        socket = io('http://localhost:3000');
 
-export default socket;
+        socket.on('connect', () => {
+            console.log('Подключен к серверу Socket.IO');
+        });
+
+        socket.on('logs', (data) => {
+            logStore.addLine(data);
+        });
+    }
+
+    return socket;
+}
