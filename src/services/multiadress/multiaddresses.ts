@@ -2,6 +2,8 @@ import { TimeoutError } from "@libp2p/interface";
 import { sendAndReceive } from "../../helpers/stream-helper.js";
 import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
+import { sendDebug } from "./../../services/socket-service.js";
+import { LogLevel } from "../../helpers/log-level.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -33,13 +35,18 @@ export class MultiaddressService
   private readonly maxInboundStreams: number;
   private readonly maxOutboundStreams: number;
   private readonly runOnLimitedConnection: boolean;
-  private readonly log: Logger;
+  private readonly logger: Logger;
+  private readonly log = (level: LogLevel, message: string) => {
+    const timestamp = new Date();
+    sendDebug("libp2p:multiaddresses", level, timestamp, message);
+    this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
+  };
   constructor(
     components: MultiaddressServiceComponents,
     init: MultiaddressServiceInit = {}
   ) {
     this.components = components;
-    this.log = components.logger.forComponent("libp2p:multiaddresses");
+    this.logger = components.logger.forComponent("libp2p:multiaddresses");
     this.started = false;
     this.protocol = `/${
       init.protocolPrefix ?? PROTOCOL_PREFIX
@@ -72,7 +79,10 @@ export class MultiaddressService
   }
 
   handleMessage(data: IncomingStreamData): void {
-    this.log("incoming multiaddresses from %p", data.connection.remotePeer);
+    this.log(
+      LogLevel.Info,
+      `incoming multiaddresses from ${data.connection.remotePeer.toString()}`
+    );
 
     const { stream } = data;
     Promise.resolve()
@@ -85,29 +95,31 @@ export class MultiaddressService
         const connections = await this.components.addressManager.getAddresses();
 
         connections.forEach((addr) => {
-          this.log("send multiaddress %p", addr.toString());
+          this.log(LogLevel.Info, `send multiaddress ${addr.toString()}`);
         });
         const addresses = Array.from(connections).map((conn) =>
           conn.toString()
         );
         const jsonString = JSON.stringify(addresses);
         await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log("error while sending multiaddresses %p", err);
+          this.log(
+            LogLevel.Error,
+            `error while sending multiaddresses${JSON.stringify(err)}`
+          );
           throw err;
         });
       })
       .catch((err) => {
-        this.log.error(
-          "incoming multiaddresses from %p failed with error",
-          data.connection.remotePeer,
-          err
+        this.log(
+          LogLevel.Error,
+          `incoming multiaddresses from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
         );
         stream?.abort(err);
       })
       .finally(() => {
         this.log(
-          "incoming multiaddresses from %p completed",
-          data.connection.remotePeer
+          LogLevel.Info,
+          `incoming multiaddresses from ${data.connection.remotePeer.toString()} completed`
         );
       });
   }
@@ -116,7 +128,10 @@ export class MultiaddressService
     connection: Connection,
     options: AbortOptions = {}
   ): Promise<string> {
-    this.log("send multiaddresses %p", connection.remotePeer);
+    this.log(
+      LogLevel.Info,
+      `send multiaddresses ${connection.remotePeer.toString()}`
+    );
     let stream: Stream | undefined;
     try {
       if (connection == null) {
@@ -148,15 +163,21 @@ export class MultiaddressService
         ...options,
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
-      this.log(`send request to ${connection.remotePeer}`);
+      this.log(LogLevel.Info, `send request to ${connection.remotePeer}`);
       const result = await sendAndReceive(stream, "").catch((err) => {
-        this.log("error while receiving multiaddresses %p", err);
+        this.log(
+          LogLevel.Error,
+          `error while receiving multiaddresses ${JSON.stringify(err)}`
+        );
         throw err;
       });
-      this.log(`received answer: ${result}`);
+      this.log(LogLevel.Info, `received answer: ${result}`);
       return result;
     } catch (err: any) {
-      this.log.error("error while roling %p", connection.remotePeer, err);
+      this.log(
+        LogLevel.Error,
+        `error while roling ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
+      );
 
       stream?.abort(err);
 
