@@ -31,10 +31,16 @@ export function setupSocketIO(server: any) {
 export function sendDebug(
   service: string,
   level: LogLevel,
+  timestamp: Date,
   logMessage: string
 ) {
   if (io) {
-    io.emit("logs", { service: service, level: level, message: logMessage });
+    io.emit("logs", {
+      timestamp: timestamp,
+      service: service,
+      level: level,
+      message: logMessage,
+    });
   } else {
     console.error("Socket.IO не инициализирован");
   }

@@ -26,9 +26,11 @@ export class P2PClient extends EventEmitter {
   private node: Libp2p | undefined;
   private config: any;
   private log = (level: LogLevel, message: string) => {
-    const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("p2p-client", level, `[${timestamp}] ${message}`);
-    debug("p2p-client")(`[${timestamp}] ${message}`);
+    const timestamp = new Date();
+    sendDebug("p2p-client", level, timestamp, message);
+    debug("p2p-client")(
+      `[${timestamp.toISOString().slice(11, 23)}] ${message}`
+    );
   };
   localPeer: string | undefined;
   constructor() {

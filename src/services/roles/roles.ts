@@ -34,9 +34,9 @@ export class RolesService implements Startable, RolesServiceInterface {
   private readonly runOnLimitedConnection: boolean;
   private readonly logger: Logger;
   private readonly log = (level: LogLevel, message: string) => {
-    const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("libp2p/roles", level, `[${timestamp}] ${message}`);
-    this.logger(`[${timestamp}] ${message}`);
+    const timestamp = new Date();
+    sendDebug("libp2p/roles", level, timestamp, message);
+    this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
   private readonly roleList: string[];
   constructor(components: RolesServiceComponents, init: RolesServiceInit = {}) {

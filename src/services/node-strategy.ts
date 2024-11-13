@@ -33,9 +33,11 @@ export class NodeStrategy extends Map<string, Node> {
   private requestPing: RequestPing;
 
   private log = (level: LogLevel, message: string) => {
-    const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("node-strategy", level, `[${timestamp}] ${message}`);
-    debug("node-strategy")(`[${timestamp}] ${message}`);
+    const timestamp = new Date();
+    sendDebug("node-strategy", level, timestamp, message);
+    debug("node-strategy")(
+      `[${timestamp.toISOString().slice(11, 23)}] ${message}`
+    );
   };
   private localPeer: string | undefined;
 

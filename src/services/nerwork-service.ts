@@ -16,9 +16,11 @@ export class NetworkService extends EventEmitter {
   private localPeer: string | undefined;
   private config = ConfigLoader.getInstance().getConfig();
   private log = (level: LogLevel, message: string) => {
-    const timestamp = new Date().toISOString().slice(11, 23);
-    sendDebug("network-service", level, `[${timestamp}] ${message}`);
-    debug("network-service")(`[${timestamp}] ${message}`);
+    const timestamp = new Date();
+    sendDebug("network-service", level, timestamp, message);
+    debug("network-service")(
+      `[${timestamp.toISOString().slice(11, 23)}] ${message}`
+    );
   };
   constructor(p2pClient: P2PClient) {
     super();

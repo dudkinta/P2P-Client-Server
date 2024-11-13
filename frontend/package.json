@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "pinia": "^2.2.6",
     "socket.io-client": "^4.8.1",
     "vue": "^3.5.12",
