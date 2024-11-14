@@ -33,25 +33,21 @@
   </div>
 </template>
 <script>
-import { useLogStore } from "./../../../entities/logs/model/log-store";
+import { useDebugInfoStore } from "../../../entities/debug-info/model/debug-store";
 export default {
   name: "Filter",
   data() {
     return {
-      services: useLogStore().services,
-      levels: useLogStore().levels,
+      services: useDebugInfoStore().services,
+      levels: useDebugInfoStore().levels,
     };
   },
   methods: {
     toggleService(service, isChecked) {
-      console.log(service, isChecked);
       this.services.set(service, isChecked);
-      console.log(this.services);
     },
     toggleLevel(level, isChecked) {
-      console.log(level, isChecked);
       this.levels.set(level, isChecked);
-      console.log(this.levels);
     },
   },
 };

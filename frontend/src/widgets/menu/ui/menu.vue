@@ -5,14 +5,12 @@
       <router-link to="/nodes" class="menu-item">Узлы</router-link>
     </div>
     <div class="menu-right">
-      <router-link to="/logs" class="menu-item">Логи</router-link>
+      <router-link to="/debug-info" class="menu-item">Логи</router-link>
     </div>
   </nav>
 </template>
 
-<script setup>
-// Здесь могут быть дополнительные настройки или композиционные хуки
-</script>
+<script setup></script>
 
 <style scoped>
 .menu {

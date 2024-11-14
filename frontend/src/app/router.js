@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Network from './../pages/network.vue';
 import Nodes from './../pages/nodes.vue';
-import Logs from './../pages/logs.vue';
+import DebugInfo from './../pages/debug-info.vue';
 
 const routes = [
     {
@@ -15,9 +15,9 @@ const routes = [
         component: Nodes,
     },
     {
-        path: '/logs',
-        name: 'Logs',
-        component: Logs,
+        path: '/debug-info',
+        name: 'DebugInfo',
+        component: DebugInfo,
     },
 ];
 

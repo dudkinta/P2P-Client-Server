@@ -4,7 +4,12 @@ import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
-import { sendDebug } from "./socket-service.js";
+import {
+  sendDebug as SendLogToSocket,
+  addNode as AddNodeToSocket,
+  updateNode as UpdateNodeInSocket,
+  removeNode as RemoveNodeFromSocket,
+} from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 
 const { debug } = pkg;
@@ -34,7 +39,7 @@ export class NodeStrategy extends Map<string, Node> {
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
-    sendDebug("node-strategy", level, timestamp, message);
+    SendLogToSocket("node-strategy", level, timestamp, message);
     debug("node-strategy")(
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
@@ -63,7 +68,19 @@ export class NodeStrategy extends Map<string, Node> {
     super.set(key, value);
     this.log(LogLevel.Info, `Node ${key} added to storage`);
     this.startNodeStrategy(key, value);
+    AddNodeToSocket(value);
     return this;
+  }
+
+  delete(key: string): boolean {
+    const node = this.get(key);
+    if (!node) {
+      return false;
+    }
+
+    RemoveNodeFromSocket(node);
+    const res = super.delete(key);
+    return res;
   }
 
   async startStrategy(localPeer: string): Promise<void> {
@@ -226,6 +243,14 @@ export class NodeStrategy extends Map<string, Node> {
           60 * 1000 * 5
         );
       });
+    }
+
+    //отправляем все ноды в сокет
+    for (const [key, node] of this) {
+      if (!node) {
+        continue;
+      }
+      UpdateNodeInSocket(node);
     }
 
     setTimeout(async () => {

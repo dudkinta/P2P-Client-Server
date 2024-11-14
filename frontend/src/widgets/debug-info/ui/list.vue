@@ -28,15 +28,15 @@
 </template>
 
 <script>
-import { useLogStore } from "./../../../entities/logs/model/log-store";
+import { useDebugInfoStore } from "../../../entities/debug-info/model/debug-store";
 import { format } from "date-fns";
 export default {
   name: "LogsList",
   data() {
     return {
-      services: useLogStore().services,
-      levels: useLogStore().levels,
-      logs: useLogStore().logs,
+      services: useDebugInfoStore().services,
+      levels: useDebugInfoStore().levels,
+      logs: useDebugInfoStore().logs,
       serviceColors: new Map(),
     };
   },
@@ -104,7 +104,7 @@ export default {
 .log-info {
   display: flex;
   gap: 10px;
-  width: 280px; /* Установлена фиксированная ширина для выравнивания */
+  width: 320px; /* Установлена фиксированная ширина для выравнивания */
 }
 .log-level,
 .log-timestamp {

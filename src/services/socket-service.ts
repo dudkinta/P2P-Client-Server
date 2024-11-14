@@ -1,4 +1,4 @@
-// socket-service.ts
+import { Node } from "./../models/node.js";
 import { Server, Socket } from "socket.io";
 import { LogLevel } from "./../helpers/log-level.js";
 let io: Server | undefined = undefined; // Экземпляр io
@@ -27,7 +27,7 @@ export function setupSocketIO(server: any) {
   return io;
 }
 
-// Функция для отправки сообщений всем клиентам
+// Функция для отправки логов
 export function sendDebug(
   service: string,
   level: LogLevel,
@@ -46,6 +46,28 @@ export function sendDebug(
   }
 }
 
+export function addNode(node: Node) {
+  if (io) {
+    io.emit("addnode", node.toJSON());
+  } else {
+    console.error("Socket.IO не инициализирован");
+  }
+}
+export function removeNode(node: Node) {
+  if (io) {
+    io.emit("removenode", node.toJSON());
+  } else {
+    console.error("Socket.IO не инициализирован");
+  }
+}
+export function updateNode(node: Node) {
+  if (io) {
+    io.emit("updatenode", node.toJSON());
+  } else {
+    console.error("Socket.IO не инициализирован");
+  }
+}
+/*
 // Функция для отправки сообщения конкретному клиенту по его ID
 export function sendLogToClient(clientId: string, logMessage: string) {
   if (io) {
@@ -58,4 +80,4 @@ export function sendLogToClient(clientId: string, logMessage: string) {
   } else {
     console.error("Socket.IO не инициализирован");
   }
-}
+}*/

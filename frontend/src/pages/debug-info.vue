@@ -3,10 +3,10 @@
   <LogsList />
 </template>
 <script>
-import LogsList from "./../widgets/logs/ui/list.vue";
-import Filter from "./../widgets/logs/ui/filter.vue";
+import LogsList from "./../widgets/debug-info/ui/list.vue";
+import Filter from "./../widgets/debug-info/ui/filter.vue";
 export default {
-  name: "Logs",
+  name: "DebugInfo",
   components: {
     LogsList,
     Filter,

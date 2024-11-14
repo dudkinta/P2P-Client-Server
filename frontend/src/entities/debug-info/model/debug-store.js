@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 
-export const useLogStore = defineStore('logs', {
+export const useDebugInfoStore = defineStore('debug-info', {
     state: () => ({
         logs: [],
         services: new Map(),

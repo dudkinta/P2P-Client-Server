@@ -49,4 +49,14 @@ export class Node {
     );
     return allConnections;
   }
+
+  toJSON(): string {
+    return JSON.stringify({
+      peerId: this.peerId,
+      connections: Array.from(this.connections),
+      addresses: Array.from(this.addresses),
+      protocols: Array.from(this.protocols),
+      roles: Array.from(this.roles),
+    });
+  }
 }
