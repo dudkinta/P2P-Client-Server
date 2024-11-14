@@ -10,13 +10,17 @@ export function initializeSocket() {
         socket = io('http://localhost:3000');
 
         socket.on('connect', () => {
-            console.log('Подключен к серверу Socket.IO');
+            socket.emit('getroot');
         });
 
         socket.on('logs', (data) => {
             debugInfoStore.addLine(data);
         });
-
+        socket.on('root', (data) => {
+            const root = JSON.parse(data);
+            root.isRoot = true;
+            nodeInfoStore.addRootNode(root);
+        });
         socket.on('addnode', (data) => {
             const node = JSON.parse(data);
             nodeInfoStore.addNode(node);

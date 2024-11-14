@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "cytoscape": "^3.30.3",
     "date-fns": "^4.1.0",
     "pinia": "^2.2.6",
     "socket.io-client": "^4.8.1",

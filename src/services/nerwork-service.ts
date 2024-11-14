@@ -13,7 +13,7 @@ const { debug } = pkg;
 export class NetworkService extends EventEmitter {
   private client: P2PClient;
   private nodeStorage: NodeStrategy;
-  private localPeer: string | undefined;
+  private localPeer: PeerId | undefined;
   private config = ConfigLoader.getInstance().getConfig();
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -39,7 +39,7 @@ export class NetworkService extends EventEmitter {
   async startAsync(): Promise<void> {
     try {
       await this.client.startNode();
-      this.localPeer = this.client.localPeer;
+      this.localPeer = this.client.localPeerId;
       if (!this.localPeer) {
         this.log(LogLevel.Warning, "Local peer not found");
         return;
@@ -103,14 +103,12 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
-      await this.nodeStorage
-        .startStrategy(this.localPeer.toString())
-        .catch((error) => {
-          this.log(
-            LogLevel.Error,
-            `Error starting nodeStorage ${JSON.stringify(error)}`
-          );
-        });
+      await this.nodeStorage.startStrategy(this.localPeer).catch((error) => {
+        this.log(
+          LogLevel.Error,
+          `Error starting nodeStorage ${JSON.stringify(error)}`
+        );
+      });
     } catch (error) {
       this.log(LogLevel.Error, `Error in startAsync ${JSON.stringify(error)}`);
     }
@@ -343,5 +341,9 @@ export class NetworkService extends EventEmitter {
       }
       return undefined;
     }
+  }
+
+  getRoot(): Node | undefined {
+    return this.nodeStorage?.getRoot();
   }
 }

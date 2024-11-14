@@ -3,11 +3,13 @@ import { NetworkService } from "./services/nerwork-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
 import { createServer } from "./services/web-server.js";
 
-createServer();
-
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
   const networkService = new NetworkService(new P2PClient());
+  const argv = process.argv.slice(2);
+  if (!argv.includes("--no-webserver")) {
+    createServer(networkService);
+  }
   await networkService.startAsync();
 }
 

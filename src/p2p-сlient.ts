@@ -33,6 +33,7 @@ export class P2PClient extends EventEmitter {
     );
   };
   localPeer: string | undefined;
+  localPeerId: PeerId | undefined;
   constructor() {
     super();
     this.config = ConfigLoader.getInstance().getConfig();
@@ -249,6 +250,7 @@ export class P2PClient extends EventEmitter {
       }
 
       this.localPeer = this.node.peerId.toString();
+      this.localPeerId = this.node.peerId;
       this.node.addEventListener("connection:open", (event: any) => {
         this.log(
           LogLevel.Info,

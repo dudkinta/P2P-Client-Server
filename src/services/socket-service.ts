@@ -1,9 +1,10 @@
 import { Node } from "./../models/node.js";
 import { Server, Socket } from "socket.io";
 import { LogLevel } from "./../helpers/log-level.js";
-let io: Server | undefined = undefined; // Экземпляр io
+import { NetworkService } from "./nerwork-service.js";
+let io: Server | undefined = undefined;
 
-export function setupSocketIO(server: any) {
+export function setupSocketIO(server: any, ns: NetworkService) {
   io = new Server(server, {
     cors: {
       origin: "http://localhost:5173",
@@ -15,8 +16,11 @@ export function setupSocketIO(server: any) {
   io.on("connection", (socket: Socket) => {
     console.log("Клиент подключен:", socket.id);
 
-    socket.on("client-event", (data) => {
-      console.log("Сообщение от клиента:", data);
+    socket.on("getroot", () => {
+      const root = ns.getRoot();
+      if (root) {
+        socket.emit("root", root.toJSON());
+      }
     });
 
     socket.on("disconnect", () => {
@@ -41,30 +45,22 @@ export function sendDebug(
       level: level,
       message: logMessage,
     });
-  } else {
-    console.error("Socket.IO не инициализирован");
   }
 }
 
 export function addNode(node: Node) {
   if (io) {
     io.emit("addnode", node.toJSON());
-  } else {
-    console.error("Socket.IO не инициализирован");
   }
 }
 export function removeNode(node: Node) {
   if (io) {
     io.emit("removenode", node.toJSON());
-  } else {
-    console.error("Socket.IO не инициализирован");
   }
 }
 export function updateNode(node: Node) {
   if (io) {
     io.emit("updatenode", node.toJSON());
-  } else {
-    console.error("Socket.IO не инициализирован");
   }
 }
 /*

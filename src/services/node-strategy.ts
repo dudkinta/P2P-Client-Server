@@ -1,7 +1,7 @@
 import { Node } from "../models/node.js";
 import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
-import { Connection } from "@libp2p/interface";
+import { Connection, PeerId } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
 import {
@@ -45,6 +45,7 @@ export class NodeStrategy extends Map<string, Node> {
     );
   };
   private localPeer: string | undefined;
+  private PeerId: PeerId | undefined;
 
   constructor(
     requestConnect: RequestConnect,
@@ -83,9 +84,10 @@ export class NodeStrategy extends Map<string, Node> {
     return res;
   }
 
-  async startStrategy(localPeer: string): Promise<void> {
+  async startStrategy(localPeer: PeerId): Promise<void> {
     this.log(LogLevel.Info, `Starting global strategy`);
-    this.localPeer = localPeer;
+    this.localPeer = localPeer.toString();
+    this.PeerId = localPeer;
     await this.connectToMainRelay().catch((error) => {
       this.log(LogLevel.Error, `Error in promise connectToMainRelay: ${error}`);
     });
@@ -154,12 +156,23 @@ export class NodeStrategy extends Map<string, Node> {
 
     // обновляем список кандидатов
     for (const [key, node] of this) {
-      await this.getConnectedPeers(node).catch((error) => {
-        this.log(
-          LogLevel.Error,
-          `Error in promise getConnectedPeers: ${error}`
-        );
-      });
+      const connectedPeers = await this.getConnectedPeers(node).catch(
+        (error) => {
+          this.log(
+            LogLevel.Error,
+            `Error in promise getConnectedPeers: ${error}`
+          );
+        }
+      );
+      if (connectedPeers) {
+        connectedPeers.forEach((peerInfo: any) => {
+          this.log(
+            LogLevel.Debug,
+            `Connected peers for ${JSON.stringify(peerInfo)}`
+          );
+          node.connectedPeers.set(peerInfo.peerId, peerInfo.address);
+        });
+      }
     }
 
     // тест кандидатов и подключение к ним
@@ -446,7 +459,9 @@ export class NodeStrategy extends Map<string, Node> {
     );
   }
 
-  private async getConnectedPeers(node: Node): Promise<void> {
+  private async getConnectedPeers(
+    node: Node
+  ): Promise<Map<string, string> | undefined> {
     this.log(LogLevel.Info, `Getting connected peers for ${node.peerId}`);
     const connectedPeers = await this.requestConnectedPeers(node).catch(
       (error) => {
@@ -499,6 +514,7 @@ export class NodeStrategy extends Map<string, Node> {
         }
       });
     }
+    return connectedPeers;
   }
 
   private async waitMultiaddrs(node: Node): Promise<void> {
@@ -616,5 +632,13 @@ export class NodeStrategy extends Map<string, Node> {
     } catch (error) {
       this.log(LogLevel.Error, `Error in delay: ${error}`);
     }
+  }
+
+  getRoot(): Node | undefined {
+    if (!this.PeerId) {
+      return undefined;
+    }
+    const rootNode = new Node(this.PeerId, undefined);
+    return rootNode;
   }
 }

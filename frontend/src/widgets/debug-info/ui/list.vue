@@ -64,7 +64,8 @@ export default {
 
           return serviceMatch && levelMatch;
         })
-        .reverse();
+        .reverse()
+        .slice(0, 100);
     },
   },
   methods: {

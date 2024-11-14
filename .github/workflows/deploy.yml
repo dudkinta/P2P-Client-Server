@@ -3,7 +3,7 @@ name: Deploy RelayServer
 on:
   push:
     branches:
-      - master
+      - server
 
 jobs:
   build-and-deploy:

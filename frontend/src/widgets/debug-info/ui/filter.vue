@@ -2,7 +2,7 @@
   <div class="filter-container">
     <div class="filter-services">
       <h3>Сервисы</h3>
-      <ul>
+      <ul class="no-bullets">
         <li v-for="service in services" :key="service[0]">
           <label>
             <input
@@ -17,7 +17,7 @@
     </div>
     <div class="filter-levels">
       <h3>Уровни</h3>
-      <ul>
+      <ul class="no-bullets">
         <li v-for="level in levels" :key="level[0]">
           <label>
             <input
@@ -63,5 +63,9 @@ export default {
 }
 .filtered-logs {
   margin-top: 20px;
+}
+.no-bullets {
+  list-style-type: none;
+  padding: 0;
 }
 </style>
