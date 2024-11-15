@@ -36,7 +36,7 @@ export default {
 }
 
 .node-list {
-  flex: 0 0 70%;
+  flex: 0 0 62%;
   overflow-y: auto;
 }
 

@@ -25,7 +25,8 @@ export default {
   },
   methods: {
     selectNode(node) {
-      this.$emit("node-click", node);
+      const store = useNodeInfoStore();
+      this.$emit("node-click", store.nodes.get(node.id));
     },
   },
 };
