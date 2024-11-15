@@ -37,7 +37,6 @@ export class P2PClient extends EventEmitter {
   constructor() {
     super();
     this.config = ConfigLoader.getInstance().getConfig();
-    debug.enable("p2p-client");
   }
 
   private async createNode(): Promise<Libp2p | undefined> {

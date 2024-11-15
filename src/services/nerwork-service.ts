@@ -33,7 +33,6 @@ export class NetworkService extends EventEmitter {
       this.RequestConnectedPeers.bind(this),
       this.RequestPing.bind(this)
     );
-    debug.enable("network-service");
   }
 
   async startAsync(): Promise<void> {

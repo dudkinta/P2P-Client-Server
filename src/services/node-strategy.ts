@@ -60,7 +60,6 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
     this.requestPing = requestPing;
-    debug.enable("node-strategy");
   }
 
   set(key: string, value: Node): this {

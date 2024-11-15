@@ -22,7 +22,7 @@ export default {
       }),
     },
   },
-  setup(props) {
+  setup(props, { emit }) {
     const cyContainer = ref(null);
     let cyInstance = null;
 
@@ -42,16 +42,32 @@ export default {
               "text-halign": "center",
               "background-color": "#555",
               "text-outline-color": "#555",
-              "text-outline-width": "1px",
+              "text-outline-width": "0.5px",
               color: "#fff",
             },
           },
           {
-            selector: "node[?root]",
+            selector: "node[?isRoot]",
             style: {
               "background-clip": "none",
               "background-fit": "contain",
-              "background-color": "#77828C",
+              "background-color": "#03fc39",
+            },
+          },
+          {
+            selector: "node[?isRelayRole]",
+            style: {
+              "background-clip": "none",
+              "background-fit": "contain",
+              "background-color": "#fc9d03",
+            },
+          },
+          {
+            selector: "node[?isNodeRole]",
+            style: {
+              "background-clip": "none",
+              "background-fit": "contain",
+              "background-color": "#03fcc2",
             },
           },
           {
@@ -60,7 +76,6 @@ export default {
               "border-width": "6px",
               "border-color": "#AAD8FF",
               "border-opacity": "0.5",
-              "background-color": "#77828C",
               "text-outline-color": "#77828C",
             },
           },
@@ -68,8 +83,8 @@ export default {
             selector: "edge",
             style: {
               "curve-style": "bezier",
-              opacity: "0.4",
-              "line-color": "#bbb",
+              opacity: "1",
+              "line-color": "#0394fc",
               "overlay-padding": "3px",
               width: "0.5px",
             },
@@ -82,6 +97,7 @@ export default {
       cyInstance.on("tap", "node", (evt) => {
         const node = evt.target;
         console.log("Нажат узел", node.id());
+        emit("node-click", node.data());
         // Дополнительные действия при нажатии на узел
       });
     };
@@ -115,8 +131,8 @@ export default {
         if (cyInstance) {
           cyInstance.layout(newLayout).run();
         }
-      },
-      { deep: true }
+      }
+      //{ deep: true }
     );
 
     return {

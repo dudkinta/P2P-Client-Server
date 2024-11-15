@@ -1,6 +1,6 @@
 <template>
   <div class="graphbox">
-    <Graph :elements="graphData" />
+    <Graph :elements="graphData" @node-click="selectNode" />
   </div>
 </template>
 
@@ -22,6 +22,11 @@ export default {
     return {
       graphData,
     };
+  },
+  methods: {
+    selectNode(node) {
+      console.log("Selected node:", node);
+    },
   },
 };
 </script>

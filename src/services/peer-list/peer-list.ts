@@ -44,8 +44,7 @@ export class PeerListService implements Startable, PeerListServiceInterface {
     init: PeerListServiceInit = {}
   ) {
     this.components = components;
-    this.logger = components.logger.forComponent("libp2p:peer-list");
-    this.logger.enabled = true;
+    this.logger = components.logger.forComponent("@libp2p/peer-list");
     this.started = false;
     this.protocol = `/${
       init.protocolPrefix ?? PROTOCOL_PREFIX
