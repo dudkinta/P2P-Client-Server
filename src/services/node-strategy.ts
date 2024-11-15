@@ -6,9 +6,7 @@ import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
 import {
   sendDebug as SendLogToSocket,
-  addNode as AddNodeToSocket,
-  updateNode as UpdateNodeInSocket,
-  removeNode as RemoveNodeFromSocket,
+  sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 
@@ -69,7 +67,6 @@ export class NodeStrategy extends Map<string, Node> {
     super.set(key, value);
     this.log(LogLevel.Info, `Node ${key} added to storage`);
     this.startNodeStrategy(key, value);
-    AddNodeToSocket(value);
     return this;
   }
 
@@ -78,8 +75,6 @@ export class NodeStrategy extends Map<string, Node> {
     if (!node) {
       return false;
     }
-
-    RemoveNodeFromSocket(node);
     const res = super.delete(key);
     return res;
   }
@@ -164,15 +159,6 @@ export class NodeStrategy extends Map<string, Node> {
           );
         }
       );
-      if (connectedPeers) {
-        connectedPeers.forEach((peerInfo: any) => {
-          this.log(
-            LogLevel.Debug,
-            `Connected peers for ${JSON.stringify(peerInfo)}`
-          );
-          node.connectedPeers.set(peerInfo.peerId, peerInfo.address);
-        });
-      }
     }
 
     // тест кандидатов и подключение к ним
@@ -259,12 +245,7 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     //отправляем все ноды в сокет
-    for (const [key, node] of this) {
-      if (!node) {
-        continue;
-      }
-      UpdateNodeInSocket(node);
-    }
+    SendNodesToSocket(Array.from(this.values()));
 
     setTimeout(async () => {
       await this.selfDiag();
@@ -634,11 +615,17 @@ export class NodeStrategy extends Map<string, Node> {
     }
   }
 
-  getRoot(): Node | undefined {
+  getRoot(): { root: Node; connections: Connection[] } | undefined {
     if (!this.PeerId) {
       return undefined;
     }
     const rootNode = new Node(this.PeerId, undefined);
-    return rootNode;
+    rootNode.isRoot = true;
+    const openConnections = Array.from(this.values())
+      .map((node) => {
+        return node.getOpenedConnection();
+      })
+      .filter((conn) => conn != undefined);
+    return { root: rootNode, connections: openConnections };
   }
 }

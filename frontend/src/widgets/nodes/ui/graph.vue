@@ -67,10 +67,11 @@ export default {
           {
             selector: "edge",
             style: {
+              "curve-style": "bezier",
               opacity: "0.4",
               "line-color": "#bbb",
-              width: 0.3,
-              "overlay-padding": "1px",
+              "overlay-padding": "3px",
+              width: "0.5px",
             },
           },
         ],

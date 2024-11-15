@@ -3,8 +3,9 @@ import { Server, Socket } from "socket.io";
 import { LogLevel } from "./../helpers/log-level.js";
 import { NetworkService } from "./nerwork-service.js";
 let io: Server | undefined = undefined;
-
+let networkService: NetworkService | undefined = undefined;
 export function setupSocketIO(server: any, ns: NetworkService) {
+  networkService = ns;
   io = new Server(server, {
     cors: {
       origin: "http://localhost:5173",
@@ -15,13 +16,6 @@ export function setupSocketIO(server: any, ns: NetworkService) {
 
   io.on("connection", (socket: Socket) => {
     console.log("Клиент подключен:", socket.id);
-
-    socket.on("getroot", () => {
-      const root = ns.getRoot();
-      if (root) {
-        socket.emit("root", root.toJSON());
-      }
-    });
 
     socket.on("disconnect", () => {
       console.log("Клиент отключен:", socket.id);
@@ -48,19 +42,19 @@ export function sendDebug(
   }
 }
 
-export function addNode(node: Node) {
+export function sendNodes(nodes: Node[]) {
   if (io) {
-    io.emit("addnode", node.toJSON());
-  }
-}
-export function removeNode(node: Node) {
-  if (io) {
-    io.emit("removenode", node.toJSON());
-  }
-}
-export function updateNode(node: Node) {
-  if (io) {
-    io.emit("updatenode", node.toJSON());
+    const rootNodeInfo = networkService?.getRoot();
+    if (rootNodeInfo) {
+      nodes.push(rootNodeInfo.root);
+    }
+    io.emit(
+      "nodes",
+      nodes.map((n) => n.toJSON())
+    );
+    if (rootNodeInfo) {
+      io.emit("connections", rootNodeInfo.connections);
+    }
   }
 }
 /*

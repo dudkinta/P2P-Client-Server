@@ -343,7 +343,7 @@ export class NetworkService extends EventEmitter {
     }
   }
 
-  getRoot(): Node | undefined {
+  getRoot(): { root: Node; connections: Connection[] } | undefined {
     return this.nodeStorage?.getRoot();
   }
 }

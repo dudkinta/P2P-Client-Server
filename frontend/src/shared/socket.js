@@ -10,28 +10,17 @@ export function initializeSocket() {
         socket = io('http://localhost:3000');
 
         socket.on('connect', () => {
-            socket.emit('getroot');
+
         });
 
         socket.on('logs', (data) => {
             debugInfoStore.addLine(data);
         });
-        socket.on('root', (data) => {
-            const root = JSON.parse(data);
-            root.isRoot = true;
-            nodeInfoStore.addRootNode(root);
+        socket.on('nodes', (data) => {
+            nodeInfoStore.updateNodes(data);
         });
-        socket.on('addnode', (data) => {
-            const node = JSON.parse(data);
-            nodeInfoStore.addNode(node);
-        });
-        socket.on('updatenode', (data) => {
-            const node = JSON.parse(data);
-            nodeInfoStore.updateNode(node);
-        });
-        socket.on('removenode', (data) => {
-            const node = JSON.parse(data);
-            nodeInfoStore.removeNode(node);
+        socket.on('connections', (data) => {
+            nodeInfoStore.updateConnections(data);
         });
     }
 

@@ -5,7 +5,7 @@ export class Node {
   addresses: Set<string>;
   protocols: Set<string>;
   roles: Set<string>;
-  connectedPeers: Map<string, string>;
+  isRoot: boolean;
   constructor(peerId: PeerId | undefined, connection: Connection | undefined) {
     this.peerId = peerId;
     this.connections = new Set();
@@ -15,7 +15,7 @@ export class Node {
     this.addresses = new Set();
     this.protocols = new Set();
     this.roles = new Set();
-    this.connectedPeers = new Map();
+    this.isRoot = false;
   }
 
   isConnect(): boolean {
@@ -59,10 +59,7 @@ export class Node {
       addresses: Array.from(this.addresses),
       protocols: Array.from(this.protocols),
       roles: Array.from(this.roles),
-      connectedPeers: Array.from(this.connectedPeers).map(([peerId, addr]) => ({
-        peerId: peerId,
-        addr: addr,
-      })),
+      isRoot: this.isRoot,
     });
   }
 }
