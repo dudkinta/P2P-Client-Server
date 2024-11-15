@@ -96,7 +96,6 @@ export default {
       // Пример добавления слушателя событий
       cyInstance.on("tap", "node", (evt) => {
         const node = evt.target;
-        console.log("Нажат узел", node.id());
         emit("node-click", node.data());
         // Дополнительные действия при нажатии на узел
       });

@@ -1,7 +1,6 @@
 <template>
   <nav class="menu">
     <div class="menu-left">
-      <router-link to="/network" class="menu-item">Сеть</router-link>
       <router-link to="/nodes" class="menu-item">Узлы</router-link>
     </div>
     <div class="menu-right">

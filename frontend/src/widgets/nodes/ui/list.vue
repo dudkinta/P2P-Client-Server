@@ -25,7 +25,7 @@ export default {
   },
   methods: {
     selectNode(node) {
-      console.log("Selected node:", node);
+      this.$emit("node-click", node);
     },
   },
 };
