@@ -5,15 +5,10 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
-import { PeerId } from "@libp2p/interface";
-import {
-  createFromProtobuf,
-  createEd25519PeerId,
-  exportToProtobuf,
-} from "@libp2p/peer-id-factory";
+import { PeerId, Connection } from "@libp2p/interface";
+import { Multiaddr } from "@multiformats/multiaddr";
 
 import { loadOrCreatePeerId } from "./helpers/peer-helper.js";
-import fs from "fs/promises";
 import { LogLevel } from "./helpers/log-level.js";
 import { ping } from "./services/ping/index.js";
 import { roles } from "./services/roles/index.js";
@@ -26,9 +21,11 @@ const { debug } = pkg;
 export class P2PServer {
   private config = ConfigLoader.getInstance().getConfig();
   private node: Libp2p | undefined;
+  localPeerId: PeerId | undefined;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     console.log(
+      "p2p-server",
       `${level} [${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
     debug("p2p-server")(
@@ -102,7 +99,26 @@ export class P2PServer {
       return undefined;
     }
   }
-
+  async connectTo(ma: Multiaddr): Promise<Connection | undefined> {
+    const signal = AbortSignal.timeout(5000);
+    try {
+      if (!this.node) {
+        return undefined;
+      }
+      this.log(LogLevel.Info, `Connecting to ${ma.toString()}`);
+      const conn = await this.node.dial(ma, { signal });
+      if (conn) {
+        this.log(
+          LogLevel.Info,
+          `Connect to ${conn.remoteAddr.toString()} Status: ${conn.status}`
+        );
+      }
+      return conn;
+    } catch (error) {
+      this.log(LogLevel.Error, `Error in connectTo ${JSON.stringify(error)}`);
+      return undefined;
+    }
+  }
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -110,7 +126,7 @@ export class P2PServer {
         this.log(LogLevel.Error, "Node is not initialized");
         return;
       }
-
+      this.localPeerId = this.node.peerId;
       this.node.addEventListener("start", (event: any) => {
         this.log(LogLevel.Info, "Libp2p node started");
       });

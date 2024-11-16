@@ -14,15 +14,15 @@ if (typeof global.CustomEvent === "undefined") {
 }
 
 import { P2PServer } from "./p2p-server.js";
+import { RelayService } from "./services/relay-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
   const config = ConfigLoader.getInstance().getConfig();
   let port = config.port ?? 6006;
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-
-  const server = new P2PServer(port, listenAddrs);
-  await server.startNode();
+  const networkService = new RelayService(new P2PServer(port, listenAddrs));
+  await networkService.startAsync();
 }
 
 process.on("uncaughtException", (err) => {
