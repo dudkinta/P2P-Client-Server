@@ -15,6 +15,7 @@ import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
+import { loadOrCreatePeerId } from "./helpers/peer-helper.js";
 import pkg from "debug";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
@@ -23,8 +24,8 @@ export interface ConnectionOpenEvent {
 }
 
 export class P2PClient extends EventEmitter {
+  private config = ConfigLoader.getInstance().getConfig();
   private node: Libp2p | undefined;
-  private config: any;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("p2p-client", level, timestamp, message);
@@ -34,21 +35,31 @@ export class P2PClient extends EventEmitter {
   };
   localPeer: string | undefined;
   localPeerId: PeerId | undefined;
-  constructor() {
+  private port: number;
+  private listenAddrs: string[];
+  constructor(port: number, listenAddrs: string[]) {
     super();
-    this.config = ConfigLoader.getInstance().getConfig();
+    this.port = port;
+    this.listenAddrs = listenAddrs;
   }
 
   private async createNode(): Promise<Libp2p | undefined> {
     try {
-      const port = this.config.port ?? 0;
-      let listenAddrs: string[] = this.config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-      listenAddrs = listenAddrs.map((addr: string) => `${addr}${port}`);
-      listenAddrs.push("/p2p-circuit");
+      const privateKey = await loadOrCreatePeerId("peer-id.bin");
+      if (!privateKey) {
+        this.log(LogLevel.Error, "Error loading or creating Peer ID");
+        return undefined;
+      }
+
+      const addrs = this.listenAddrs.map(
+        (addr: string) => `${addr}${this.port}`
+      );
+      addrs.push("/p2p-circuit");
       const node = await createLibp2p({
         start: false,
+        privateKey: privateKey,
         addresses: {
-          listen: listenAddrs,
+          listen: addrs,
         },
         transports: [
           tcp(),

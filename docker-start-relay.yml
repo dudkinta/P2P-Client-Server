@@ -1,16 +1,13 @@
 version: "3.8"
 
 services:
-  app:
+  relay:
     container_name: RelayApp
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: dudkinta/tgbc:latest
     ports:
-      - "6007:6006"
+      - "6006:6006"
     volumes:
-      - .:/app
-      - /app/node_modules
+      - ./knows:/app/knows
     environment:
       NODE_ENV: production
     command: npm run server

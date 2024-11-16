@@ -1,23 +1,15 @@
 {
+  "port": 9876,
   "listen": ["/ip4/0.0.0.0/tcp/"],
   "protocols": {
+    "PING": "/chain/ping/1.0.0",
     "ROLE": "/chain/roles/1.0.0",
     "PEER_LIST": "/chain/peers/1.0.0",
-    "CHAT": "/chain/chat/1.0.0",
-    "RECONNECT": "/chain/reconnect/1.0.0",
-    "MULTIADDRES": "/chain/multiadres/1.0.0",
-    "CIRCUIT_HOP": "/libp2p/circuit/relay/0.2.0/hop"
+    "MULTIADDRES": "/chain/multiadres/1.0.0"
   },
   "roles": {
     "RELAY": "chainrelay",
     "NODE": "chainnode"
   },
-  "relay": [
-    {
-      "PEER": "12D3KooWKQ8DqitPP7ivNFn8QJtA6K3fa8Zsd4M7ea8CFjqxQQcr",
-      "ADDRESS": "31.172.66.148",
-      "PORT": 6006
-    }
-  ],
-  "MAX_NODES": 20
+  "MAX_NODES": 3
 }

@@ -8,6 +8,7 @@ import {
   sendDebug as SendLogToSocket,
   sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
+import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
 
 const { debug } = pkg;
@@ -21,6 +22,7 @@ type RequestConnectedPeers = (
 type RequestPing = (addrr: string) => Promise<number | undefined>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance().getConfig();
+  private knowsRelay = ConfigLoader.getInstance().getRelays();
   private relayCount: number = 0;
   private nodeCount: number = 0;
   private unknownCount: number = 0;
@@ -91,14 +93,17 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async connectToMainRelay(): Promise<void> {
-    const relay = this.config.relay[0];
-    const address = `/ip4/${relay.ADDRESS}/tcp/${relay.PORT}/p2p/${relay.PEER}`;
-    const connRelay = await this.tryConnect(address).catch((error) => {
+    const relay = getRandomElement(this.knowsRelay);
+    if (!relay) {
+      this.log(LogLevel.Critical, `No relay in knowsRelay`);
+      return;
+    }
+    this.log(LogLevel.Info, `Trying connect to know relay ${relay}`);
+    const connRelay = await this.tryConnect(relay).catch((error) => {
       this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
     });
     if (!connRelay) {
       this.log(LogLevel.Warning, `Relay not connected`);
-      return;
     }
   }
 
@@ -226,7 +231,7 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     //отключение от релейных узлов если достаточно подключенных нод
-    if (this.size > 5) {
+    if (this.size > this.config.MAX_NODES) {
       const relayNodes = Array.from(this.values()).filter((node) => {
         node.roles.has(this.config.roles.RELAY) &&
           !node.roles.has(this.config.roles.NODE);
