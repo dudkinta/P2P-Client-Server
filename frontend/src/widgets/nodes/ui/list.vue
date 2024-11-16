@@ -7,7 +7,7 @@
 <script>
 import { ref } from "vue";
 import { useNodeInfoStore } from "../../../entities/node-info/model/node-store";
-import Graph from "./Graph.vue";
+import Graph from "./graph.vue";
 
 export default {
   name: "LogsList",

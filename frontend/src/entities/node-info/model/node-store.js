@@ -79,7 +79,7 @@ export const useNodeInfoStore = defineStore('node-info', {
                 return {
                     data: {
                         id: key,
-                        label: node.isRoot ? 'root' : '...' + key.slice(-5),
+                        label: node.isRoot ? 'root' : node.roles.includes('chainrelay') ? 'Relay' : '...' + key.slice(-5),
                         isNode: true,
                         isRelayRole: node.roles.includes('chainrelay'),
                         isNodeRole: node.roles.includes('chainnode'),

@@ -7,6 +7,7 @@
   "scripts": {
     "server": "node dist/relay.js",
     "build": "npx tsc",
+    "start": "node dist/node.js",
     "node": "npx tsc && node dist/node.js",
     "node:no-webserver": "npx tsc && node dist/node.js --no-webserver",
     "dev": "concurrently \"npm run node\" \"npm run vite\"",

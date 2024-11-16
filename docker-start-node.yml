@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  node:
+    container_name: NodeApp
+    image: dudkinta/tgbc:latest
+    ports:
+      - "6006:6006"
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    command: npm run start
