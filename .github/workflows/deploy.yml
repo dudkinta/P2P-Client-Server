@@ -3,7 +3,7 @@ name: Deploy RelayServer
 on:
   push:
     branches:
-      - server
+      - server.old
 
 jobs:
   build-and-deploy:
@@ -16,19 +16,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: "18.x"
 
       - name: Copy files to server
         env:
-            SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-            SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
-            echo "$SSH_PRIVATE_KEY" | tr -d '\r' > private_key
-            chmod 600 private_key
-            
-            echo "Copying files to server..."
-            scp -o StrictHostKeyChecking=no -i private_key -r ./* root@31.172.66.148:/root/relay.server/
-            echo "Files copied. Running remote script..."
-            ssh -o StrictHostKeyChecking=no -i private_key root@31.172.66.148 'bash /root/restart_relayserver.sh'
-            echo "Remote script executed. Cleaning up..."
-            rm private_key
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' > private_key
+          chmod 600 private_key
+
+          echo "Copying files to server..."
+          scp -o StrictHostKeyChecking=no -i private_key -r ./* root@31.172.66.148:/root/relay.server/
+          echo "Files copied. Running remote script..."
+          ssh -o StrictHostKeyChecking=no -i private_key root@31.172.66.148 'bash /root/restart_relayserver.sh'
+          echo "Remote script executed. Cleaning up..."
+          rm private_key
