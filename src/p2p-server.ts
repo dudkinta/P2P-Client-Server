@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import { createLibp2p, Libp2p } from "libp2p";
 import { tcp } from "@libp2p/tcp";
 import { noise } from "@chainsafe/libp2p-noise";
@@ -5,20 +6,20 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
-import { PeerId, Connection } from "@libp2p/interface";
+import { TimeoutError, type Connection, type PeerId } from "@libp2p/interface";
 import { Multiaddr } from "@multiformats/multiaddr";
 
 import { loadOrCreatePeerId } from "./helpers/peer-helper.js";
 import { LogLevel } from "./helpers/log-level.js";
 import { ping } from "./services/ping/index.js";
-import { roles } from "./services/roles/index.js";
+import { roles, RolesService } from "./services/roles/index.js";
 import { peerList } from "./services/peer-list/index.js";
 import { maList } from "./services/multiadress/index.js";
 import ConfigLoader from "./helpers/config-loader.js";
 import pkg from "debug";
 const { debug } = pkg;
 
-export class P2PServer {
+export class P2PServer extends EventEmitter {
   private config = ConfigLoader.getInstance().getConfig();
   private node: Libp2p | undefined;
   localPeerId: PeerId | undefined;
@@ -36,6 +37,7 @@ export class P2PServer {
   private port: number;
   private listenAddrs: string[];
   constructor(port: number, listenAddrs: string[]) {
+    super();
     this.port = port;
     this.listenAddrs = listenAddrs;
   }
@@ -99,6 +101,7 @@ export class P2PServer {
       return undefined;
     }
   }
+
   async connectTo(ma: Multiaddr): Promise<Connection | undefined> {
     const signal = AbortSignal.timeout(5000);
     try {
@@ -119,6 +122,36 @@ export class P2PServer {
       return undefined;
     }
   }
+
+  async getRolesByAddress(conn: Connection): Promise<string> {
+    if (!this.node) {
+      throw new Error("Node is not initialized for getRoles");
+    }
+    try {
+      const roleService = this.node.services.roles as RolesService;
+      const result = await roleService.roles(conn, {
+        signal: AbortSignal.timeout(5000),
+      });
+      this.log(
+        LogLevel.Info,
+        `Роли пира (${conn.remotePeer.toString()}): ${result}`
+      );
+      return result;
+    } catch (error) {
+      this.log(
+        LogLevel.Error,
+        `Ошибка при запросе ролей: ${JSON.stringify(error)}`
+      );
+      if (error instanceof TimeoutError) {
+        this.log(
+          LogLevel.Error,
+          `Ошибка таймаута при запросе ролей: ${JSON.stringify(error)}`
+        );
+      }
+      throw error;
+    }
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -127,6 +160,37 @@ export class P2PServer {
         return;
       }
       this.localPeerId = this.node.peerId;
+      this.node.addEventListener("connection:open", (event: any) => {
+        this.log(
+          LogLevel.Info,
+          `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
+        );
+        this.emit("connection:open", event.detail);
+      });
+      this.node.addEventListener("connection:close", (event: any) => {
+        const conn: Connection = event.detail;
+        const peerId: PeerId = conn.remotePeer;
+        this.emit("connection:close", { peerId, conn });
+      });
+      this.node.addEventListener("peer:connect", (event: any) => {
+        const peerId = event.detail;
+        if (peerId) {
+          this.emit("peer:connect", peerId);
+        }
+      });
+      this.node.addEventListener("peer:disconnect", (event: any) => {
+        const peerId = event.detail;
+        if (peerId) {
+          this.emit("peer:disconnect", peerId);
+        }
+      });
+      this.node.addEventListener("peer:update", (event: any) => {
+        const protocols = event.detail.peer.protocols;
+        const peerId: PeerId = event.detail.peer.id;
+        if (protocols && peerId) {
+          this.emit("updateProtocols", { peerId, protocols });
+        }
+      });
       this.node.addEventListener("start", (event: any) => {
         this.log(LogLevel.Info, "Libp2p node started");
       });

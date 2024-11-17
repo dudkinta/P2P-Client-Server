@@ -54,6 +54,10 @@ class ConfigLoader {
   public getRelays(): string[] {
     return this.knowsRelay;
   }
+  public saveRelay(addr: string): void {
+    this.knowsRelay.push(addr);
+    fs.writeFile("./knows/relay.knows", addr + "\r\n", { flag: "a" });
+  }
 }
 
 export default ConfigLoader;
