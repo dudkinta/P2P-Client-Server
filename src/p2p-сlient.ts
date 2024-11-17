@@ -79,7 +79,7 @@ export class P2PClient extends EventEmitter {
         streamMuxers: [yamux()],
         services: {
           aminoDHT: kadDHT({
-            allowQueryWithZeroPeers: true,
+            //allowQueryWithZeroPeers: true,
             peerInfoMapper: removePrivateAddressesMapper,
           }),
           identify: identify(),

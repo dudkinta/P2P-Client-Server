@@ -89,7 +89,7 @@ export class P2PServer extends EventEmitter {
             },
           }),
           aminoDHT: kadDHT({
-            allowQueryWithZeroPeers: true,
+            //allowQueryWithZeroPeers: true,
             peerInfoMapper: removePrivateAddressesMapper,
           }),
           identify: identify(),
