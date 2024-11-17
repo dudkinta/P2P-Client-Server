@@ -3,7 +3,10 @@ import { createLibp2p, Libp2p } from "libp2p";
 import { tcp } from "@libp2p/tcp";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
+import {
+  circuitRelayServer,
+  circuitRelayTransport,
+} from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
 import { TimeoutError, type Connection, type PeerId } from "@libp2p/interface";
@@ -59,7 +62,15 @@ export class P2PServer extends EventEmitter {
         addresses: {
           listen: addrs,
         },
-        transports: [tcp()],
+        transports: [
+          tcp(),
+          circuitRelayTransport({
+            maxInboundStopStreams: 500,
+            maxOutboundStopStreams: 500,
+            stopTimeout: 60000,
+            reservationCompletionTimeout: 20000,
+          }),
+        ],
         connectionGater: {
           denyDialMultiaddr: () => {
             return false;
@@ -78,7 +89,6 @@ export class P2PServer extends EventEmitter {
             },
           }),
           aminoDHT: kadDHT({
-            clientMode: false,
             allowQueryWithZeroPeers: true,
             peerInfoMapper: removePrivateAddressesMapper,
           }),

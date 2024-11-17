@@ -79,8 +79,7 @@ export class P2PClient extends EventEmitter {
         streamMuxers: [yamux()],
         services: {
           aminoDHT: kadDHT({
-            clientMode: true,
-            protocol: "/ipfs/kad/1.0.0",
+            allowQueryWithZeroPeers: true,
             peerInfoMapper: removePrivateAddressesMapper,
           }),
           identify: identify(),
@@ -93,7 +92,7 @@ export class P2PClient extends EventEmitter {
           maList: maList(),
         },
         connectionManager: {
-          maxConnections: 20,
+          maxConnections: 128,
         },
       });
       return node;
