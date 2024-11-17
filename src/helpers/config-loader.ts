@@ -31,9 +31,9 @@ class ConfigLoader {
 
   public static async initialize(): Promise<void> {
     if (!ConfigLoader.instance) {
-      const data = await fs.readFile("./config.json", "utf-8");
+      const data = await fs.readFile("./data/config.json", "utf-8");
       const parsedConfig = JSON.parse(data);
-      const relaysStr = await fs.readFile("./knows/relay.knows", "utf-8");
+      const relaysStr = await fs.readFile("./data/relay.knows", "utf-8");
       const relaysArr: string[] = relaysStr.split("\r\n");
       ConfigLoader.instance = new ConfigLoader(parsedConfig, relaysArr);
     }
@@ -56,7 +56,7 @@ class ConfigLoader {
   }
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
-    fs.writeFile("./knows/relay.knows", addr + "\r\n", { flag: "a" });
+    fs.writeFile("./data/relay.knows", addr + "\r\n", { flag: "a" });
   }
 }
 

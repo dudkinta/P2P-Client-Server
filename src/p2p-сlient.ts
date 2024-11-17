@@ -45,7 +45,7 @@ export class P2PClient extends EventEmitter {
 
   private async createNode(): Promise<Libp2p | undefined> {
     try {
-      const privateKey = await loadOrCreatePeerId("peer-id.bin");
+      const privateKey = await loadOrCreatePeerId("./data/peer-id.bin");
       if (!privateKey) {
         this.log(LogLevel.Error, "Error loading or creating Peer ID");
         return undefined;
