@@ -90,7 +90,7 @@ async function getExternalIPv4(): Promise<string | null> {
 
 async function getExternalIPv6(): Promise<string | null> {
   try {
-    const response = await axios.get("https://api64.ipify.org?format=json");
+    const response = await axios.get("https://api6.ipify.org?format=json");
     return response.data.ip;
   } catch (error) {
     console.error("Ошибка при получении IPv6:", error);
