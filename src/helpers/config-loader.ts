@@ -35,7 +35,7 @@ class ConfigLoader {
       const data = await fs.readFile("./data/config.json", "utf-8");
       const parsedConfig = JSON.parse(data);
       const relaysStr = await fs.readFile("./data/relay.knows", "utf-8");
-      const relaysArr: string[] = relaysStr.split("\r\n");
+      const relaysArr: string[] = JSON.parse(relaysStr);
       ConfigLoader.instance = new ConfigLoader(parsedConfig, relaysArr);
     }
   }
@@ -57,7 +57,7 @@ class ConfigLoader {
   }
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
-    fs.writeFile("./data/relay.knows", addr + "\r\n", { flag: "a" });
+    fs.writeFile("./data/relay.knows", JSON.stringify(this.knowsRelay));
   }
 
   public isKnownRelay(peer: string): boolean {
