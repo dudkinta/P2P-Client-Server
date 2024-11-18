@@ -11,5 +11,5 @@
     "RELAY": "chainrelay",
     "NODE": "chainnode"
   },
-  "MAX_NODES": 3
+  "MAX_NODES": 64
 }
