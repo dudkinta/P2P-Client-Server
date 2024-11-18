@@ -11,6 +11,7 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
+import { getIpAndCheckPort } from "./helpers/check-ip.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -20,9 +21,16 @@ export interface ConnectionOpenEvent {
 export class P2PClient extends EventEmitter {
   private config = ConfigLoader.getInstance().getConfig();
   private node: Libp2p | undefined;
+  private useWebsockets: boolean = false;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
-    sendDebug("p2p-client", level, timestamp, message);
+    if (this.useWebsockets) {
+      sendDebug("p2p-client", level, timestamp, message);
+    } else {
+      console.log(
+        `${level} [${timestamp.toISOString().slice(11, 23)}] ${message}`
+      );
+    }
     debug("p2p-client")(
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
@@ -36,6 +44,10 @@ export class P2PClient extends EventEmitter {
     this.port = port;
     this.listenAddrs = listenAddrs;
     this.mainRole = role;
+    const argv = process.argv.slice(2);
+    if (role == this.config.roles.NODE && !argv.includes("--no-webserver")) {
+      this.useWebsockets = true;
+    }
   }
 
   private async createNode(): Promise<Libp2p | undefined> {
@@ -258,6 +270,12 @@ export class P2PClient extends EventEmitter {
       this.node.getMultiaddrs().forEach((ma) => {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
+
+      const checkResult = await getIpAndCheckPort(this.port).catch((err) => {
+        this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
+        return undefined;
+      });
+      this.log(LogLevel.Info, `Check result: ${JSON.stringify(checkResult)}`);
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

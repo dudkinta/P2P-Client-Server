@@ -1,4 +1,6 @@
 import { Multiaddr } from "@multiformats/multiaddr";
+import axios from "axios";
+import net from "net";
 
 export function isLocalMultiAddress(addr: Multiaddr): boolean {
   // Парсим мультиадрес в строку
@@ -67,4 +69,101 @@ export function isWEBRTC(address: string): boolean {
 export function isRelay(address: string): boolean {
   const regex = /^\/p2p-circuit\/p2p\/[A-Za-z0-9]+$/;
   return regex.test(address);
+}
+
+export interface CheckResult {
+  ipv4: string | null;
+  ipv6: string | null;
+  portOpen: boolean;
+  error?: string;
+}
+
+async function getExternalIPv4(): Promise<string | null> {
+  try {
+    const response = await axios.get("https://api.ipify.org?format=json");
+    return response.data.ip;
+  } catch (error) {
+    console.error("Ошибка при получении IPv4:", error);
+    return null;
+  }
+}
+
+async function getExternalIPv6(): Promise<string | null> {
+  try {
+    const response = await axios.get("https://api64.ipify.org?format=json");
+    return response.data.ip;
+  } catch (error) {
+    console.error("Ошибка при получении IPv6:", error);
+    return null;
+  }
+}
+
+async function isPortOpen(
+  port: number,
+  host: string,
+  timeout: number = 5000
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let isResolved = false;
+
+    socket.setTimeout(timeout);
+
+    socket.on("connect", () => {
+      isResolved = true;
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.on("timeout", () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(false);
+      }
+    });
+
+    socket.on("error", () => {
+      if (!isResolved) {
+        isResolved = true;
+        resolve(false);
+      }
+    });
+
+    socket.connect(port, host);
+  });
+}
+
+export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
+  try {
+    // Получаем IPv4 и IPv6 адреса
+    const [ipv4, ipv6] = await Promise.all([
+      getExternalIPv4(),
+      getExternalIPv6(),
+    ]);
+
+    // Проверяем доступность порта для IPv4
+    let portOpen = false;
+    if (ipv4) {
+      portOpen = await isPortOpen(port, ipv4);
+    }
+
+    // Если IPv6 доступен, можно дополнительно проверить и его
+    if (!portOpen && ipv6) {
+      portOpen = await isPortOpen(port, ipv6);
+    }
+
+    return {
+      ipv4,
+      ipv6,
+      portOpen,
+    };
+  } catch (error) {
+    return {
+      ipv4: null,
+      ipv6: null,
+      portOpen: false,
+      error: (error as Error).message,
+    };
+  }
 }

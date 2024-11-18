@@ -1,6 +1,6 @@
 {
   "port": 6006,
-  "listen": ["/ip4/0.0.0.0/tcp/"],
+  "listen": ["/ip4/0.0.0.0/tcp/", "/ip6/::/tcp/"],
   "protocols": {
     "PING": "/chain/ping/1.0.0",
     "ROLE": "/chain/roles/1.0.0",

@@ -8,7 +8,7 @@
     "server": "node dist/relay.js",
     "build": "npx tsc",
     "start": "node dist/node.js",
-    "node": "set DEBUG=p2p-client,network-service,node-strategy,libp2p:* && npx tsc && node dist/node.js",
+    "node": "set DEBUG=p2p-client && npx tsc && node dist/node.js",
     "node:no-webserver": "npx tsc && node dist/node.js --no-webserver",
     "dev": "concurrently \"npm run node\" \"npm run vite\"",
     "vite": "cd frontend && npm run dev"
@@ -42,6 +42,7 @@
     "@libp2p/tcp": "^10.0.11",
     "@libp2p/websockets": "^9.0.11",
     "@multiformats/multiaddr": "^12.3.1",
+    "axios": "^1.7.7",
     "cytoscape": "^3.30.3",
     "debug": "^4.3.7",
     "express": "^4.21.1",
