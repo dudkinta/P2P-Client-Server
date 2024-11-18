@@ -1,4 +1,4 @@
-import { P2PServer } from "../p2p-server.js";
+import { P2PClient } from "./../p2p-сlient.js";
 import { Connection, PeerId } from "@libp2p/interface";
 import { multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "../helpers/config-loader.js";
@@ -8,7 +8,7 @@ import pkg from "debug";
 const { debug } = pkg;
 
 export class RelayService {
-  private client: P2PServer;
+  private client: P2PClient;
   private localPeer: PeerId | undefined;
   private config = ConfigLoader.getInstance();
   private log = (level: LogLevel, message: string) => {
@@ -27,7 +27,7 @@ export class RelayService {
   private relayList: Map<string, Relay> = new Map();
   private banList: Set<string> = new Set();
 
-  constructor(client: P2PServer) {
+  constructor(client: P2PClient) {
     this.client = client;
   }
   async startAsync(): Promise<void> {

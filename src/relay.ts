@@ -1,27 +1,14 @@
-// Полифил для CustomEvent в Node.js
-if (typeof global.CustomEvent === "undefined") {
-  global.CustomEvent = class CustomEvent<T = any> extends Event {
-    detail: T | null;
-
-    constructor(
-      event: string,
-      params?: { bubbles?: boolean; cancelable?: boolean; detail?: T }
-    ) {
-      super(event, params);
-      this.detail = params?.detail ?? null;
-    }
-  } as unknown as typeof CustomEvent;
-}
-
-import { P2PServer } from "./p2p-server.js";
 import { RelayService } from "./services/relay-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
+import { P2PClient } from "./p2p-сlient.js";
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
   const config = ConfigLoader.getInstance().getConfig();
   let port = config.port ?? 6006;
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-  const networkService = new RelayService(new P2PServer(port, listenAddrs));
+  const networkService = new RelayService(
+    new P2PClient(listenAddrs, port, config.roles.RELAY)
+  );
   await networkService.startAsync();
 }
 

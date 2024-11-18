@@ -13,7 +13,9 @@ async function main(): Promise<void> {
     port = 0;
   }
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-  const networkService = new NetworkService(new P2PClient(port, listenAddrs));
+  const networkService = new NetworkService(
+    new P2PClient(listenAddrs, port, config.roles.NODE)
+  );
 
   if (!argv.includes("--no-webserver")) {
     createServer(networkService);
