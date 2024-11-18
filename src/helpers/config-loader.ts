@@ -1,3 +1,4 @@
+import { multiaddr } from "@multiformats/multiaddr";
 import { promises as fs } from "fs";
 
 export interface Protocols {
@@ -57,6 +58,14 @@ class ConfigLoader {
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
     fs.writeFile("./data/relay.knows", addr + "\r\n", { flag: "a" });
+  }
+
+  public isKnownRelay(peer: string): boolean {
+    const relayIds = this.knowsRelay.map((element) => {
+      const ma = multiaddr(element);
+      return ma.getPeerId();
+    });
+    return relayIds.includes(peer);
   }
 }
 

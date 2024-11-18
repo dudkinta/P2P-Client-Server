@@ -5,12 +5,12 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
-import { OutOfLimitError } from "./../models/out-of-limit-error.js";
+import { OutOfLimitError } from "../models/out-of-limit-error.js";
 import { sendDebug } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 import pkg from "debug";
 const { debug } = pkg;
-export class NetworkService extends EventEmitter {
+export class NodeService extends EventEmitter {
   private client: P2PClient;
   private nodeStorage: NodeStrategy;
   private localPeer: PeerId | undefined;

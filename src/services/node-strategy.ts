@@ -21,8 +21,7 @@ type RequestConnectedPeers = (
 ) => Promise<Map<string, string> | undefined>;
 type RequestPing = (addrr: string) => Promise<number | undefined>;
 export class NodeStrategy extends Map<string, Node> {
-  private config = ConfigLoader.getInstance().getConfig();
-  private knowsRelay = ConfigLoader.getInstance().getRelays();
+  private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
   private nodeCount: number = 0;
   private unknownCount: number = 0;
@@ -93,7 +92,7 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async connectToMainRelay(): Promise<void> {
-    const relay = getRandomElement(this.knowsRelay);
+    const relay = getRandomElement(this.config.getRelays());
     if (!relay) {
       this.log(LogLevel.Critical, `No relay in knowsRelay`);
       return;
@@ -170,10 +169,10 @@ export class NodeStrategy extends Map<string, Node> {
       if (this.has(key)) {
         continue;
       }
-      if (this.size >= this.config.MAX_NODES) {
+      if (this.size >= this.config.getConfig().MAX_NODES) {
         this.log(
           LogLevel.Info,
-          `Max nodes limit reached. Current nodes: ${this.size}, Max nodes: ${this.config.MAX_NODES}`
+          `Max nodes limit reached. Current nodes: ${this.size}, Max nodes: ${this.config.getConfig().MAX_NODES}`
         );
         break;
       }
@@ -194,7 +193,7 @@ export class NodeStrategy extends Map<string, Node> {
         continue;
       }
 
-      if (node.roles.has(this.config.roles.NODE)) {
+      if (node.roles.has(this.config.getConfig().roles.NODE)) {
         const directAddresses = Array.from(node.addresses).find((address) => {
           return (
             !this.banDirectAddress.has(address) &&
@@ -231,10 +230,10 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     //отключение от релейных узлов если достаточно подключенных нод
-    if (this.size > this.config.MAX_NODES) {
+    if (this.size > this.config.getConfig().MAX_NODES) {
       const relayNodes = Array.from(this.values()).filter((node) => {
-        node.roles.has(this.config.roles.RELAY) &&
-          !node.roles.has(this.config.roles.NODE);
+        node.roles.has(this.config.getConfig().roles.RELAY) &&
+          !node.roles.has(this.config.getConfig().roles.NODE);
       });
       relayNodes.forEach(async (node) => {
         if (!node || !node.peerId) {
@@ -324,15 +323,15 @@ export class NodeStrategy extends Map<string, Node> {
         ouBboundCount++;
       }
 
-      if (node.roles.has(this.config.roles.RELAY)) {
+      if (node.roles.has(this.config.getConfig().roles.RELAY)) {
         rCount++;
       }
-      if (node.roles.has(this.config.roles.NODE)) {
+      if (node.roles.has(this.config.getConfig().roles.NODE)) {
         nCount++;
       }
       if (
-        !node.roles.has(this.config.roles.RELAY) &&
-        !node.roles.has(this.config.roles.NODE)
+        !node.roles.has(this.config.getConfig().roles.RELAY) &&
+        !node.roles.has(this.config.getConfig().roles.NODE)
       ) {
         uCount++;
       }
@@ -423,7 +422,7 @@ export class NodeStrategy extends Map<string, Node> {
     node.roles.forEach((role) => {
       this.log(LogLevel.Info, `Node ${key} has role:${role}`);
     });
-    if (node.roles.has(this.config.roles.NODE)) {
+    if (node.roles.has(this.config.getConfig().roles.NODE)) {
       await this.waitMultiaddrs(node).catch((error) => {
         this.log(LogLevel.Error, `Error in promise waitMultiaddrs: ${error}`);
       });
@@ -467,7 +466,11 @@ export class NodeStrategy extends Map<string, Node> {
           return;
         }
 
-        if (node.roles.has(this.config.roles.RELAY)) {
+        if (this.config.isKnownRelay(peerInfo.peerId)) {
+          return;
+        }
+
+        if (node.roles.has(this.config.getConfig().roles.RELAY)) {
           const connection = node.getOpenedConnection();
           if (!connection) return;
           const relayAddress = connection.remoteAddr.toString();
@@ -483,7 +486,7 @@ export class NodeStrategy extends Map<string, Node> {
             );
           }
         }
-        if (node.roles.has(this.config.roles.NODE)) {
+        if (node.roles.has(this.config.getConfig().roles.NODE)) {
           if (isDirect(peerInfo.address) && !isLocalAddress(peerInfo.address)) {
             if (
               !this.has(peerInfo.peerId) &&

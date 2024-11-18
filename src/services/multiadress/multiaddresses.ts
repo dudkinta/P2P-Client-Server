@@ -4,6 +4,7 @@ import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendDebug } from "./../../services/socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
+import { CheckResult } from "../../helpers/check-ip.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -24,6 +25,8 @@ import type {
   Startable,
   Connection,
 } from "@libp2p/interface";
+import { multiaddr } from "@multiformats/multiaddr";
+import { dir } from "console";
 
 export class MultiaddressService
   implements Startable, MultiaddressServiceInterface
@@ -36,6 +39,7 @@ export class MultiaddressService
   private readonly maxOutboundStreams: number;
   private readonly runOnLimitedConnection: boolean;
   private readonly logger: Logger;
+  private checkIpResult: CheckResult | undefined;
   private readonly log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("libp2p:multiaddresses", level, timestamp, message);
@@ -92,15 +96,37 @@ export class MultiaddressService
           stream?.abort(new TimeoutError("send multiaddresses timeout"));
         });
 
+        const directAddrrs = new Set<string>();
         const connections = await this.components.addressManager.getAddresses();
+        const check = this.checkIpResult;
+        if (check && check.portOpen) {
+          if (check.ipv4) {
+            connections.forEach((addr) => {
+              const peerId = addr.getPeerId();
+              const ip = check.ipv4;
+              const ma = multiaddr(`/ip4/${ip}/tcp/${check.port}/${peerId}`);
+              directAddrrs.add(ma.toString());
+            });
+          }
+          if (check.ipv6) {
+            connections.forEach((addr) => {
+              const peerId = addr.getPeerId();
+              const ip = check.ipv6;
+              const ma = multiaddr(`/ip6/${ip}/tcp/${check.port}/${peerId}`);
+              directAddrrs.add(ma.toString());
+            });
+          }
+        }
 
-        connections.forEach((addr) => {
-          this.log(LogLevel.Info, `send multiaddress ${addr.toString()}`);
-        });
         const addresses = Array.from(connections).map((conn) =>
           conn.toString()
         );
-        const jsonString = JSON.stringify(addresses);
+        let jsonString: string;
+        if (directAddrrs.size > 0) {
+          jsonString = JSON.stringify(directAddrrs);
+        } else {
+          jsonString = JSON.stringify(addresses);
+        }
         await sendAndReceive(stream, jsonString).catch((err) => {
           this.log(
             LogLevel.Error,
@@ -187,5 +213,9 @@ export class MultiaddressService
         await stream.close(options);
       }
     }
+  }
+
+  setCheckIpResult(check: CheckResult): void {
+    this.checkIpResult = check;
   }
 }

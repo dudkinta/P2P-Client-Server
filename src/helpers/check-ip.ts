@@ -74,6 +74,7 @@ export function isRelay(address: string): boolean {
 export interface CheckResult {
   ipv4: string | null;
   ipv6: string | null;
+  port: number;
   portOpen: boolean;
   error?: string;
 }
@@ -156,12 +157,14 @@ export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
     return {
       ipv4,
       ipv6,
+      port,
       portOpen,
     };
   } catch (error) {
     return {
       ipv4: null,
       ipv6: null,
+      port: port,
       portOpen: false,
       error: (error as Error).message,
     };

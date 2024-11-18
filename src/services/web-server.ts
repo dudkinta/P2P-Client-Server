@@ -2,11 +2,11 @@ import express, { Request, Response } from "express";
 import path from "path";
 import http from "http";
 import { setupSocketIO } from "./socket-service.js";
-import { NetworkService } from "./nerwork-service.js";
+import { NodeService } from "./node-service.js";
 
 const __dirname = path.resolve();
 
-export function createServer(ns: NetworkService): http.Server {
+export function createServer(ns: NodeService): http.Server {
   const app = express();
   const PORT = process.env.PORT || 3000;
   const server = http.createServer(app);

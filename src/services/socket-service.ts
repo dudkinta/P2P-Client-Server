@@ -1,10 +1,10 @@
 import { Node } from "./../models/node.js";
 import { Server, Socket } from "socket.io";
 import { LogLevel } from "./../helpers/log-level.js";
-import { NetworkService } from "./nerwork-service.js";
+import { NodeService } from "./node-service.js";
 let io: Server | undefined = undefined;
-let networkService: NetworkService | undefined = undefined;
-export function setupSocketIO(server: any, ns: NetworkService) {
+let networkService: NodeService | undefined = undefined;
+export function setupSocketIO(server: any, ns: NodeService) {
   networkService = ns;
   io = new Server(server, {
     cors: {

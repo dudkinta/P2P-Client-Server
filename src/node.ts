@@ -1,5 +1,5 @@
 import { P2PClient } from "./p2p-сlient.js";
-import { NetworkService } from "./services/nerwork-service.js";
+import { NodeService } from "./services/node-service.js";
 import ConfigLoader from "./helpers/config-loader.js";
 import { createServer } from "./services/web-server.js";
 
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
     port = 0;
   }
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-  const networkService = new NetworkService(
+  const networkService = new NodeService(
     new P2PClient(listenAddrs, port, config.roles.NODE)
   );
 

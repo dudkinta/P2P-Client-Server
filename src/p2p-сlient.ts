@@ -11,7 +11,7 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
-import { getIpAndCheckPort } from "./helpers/check-ip.js";
+import { CheckResult, getIpAndCheckPort } from "./helpers/check-ip.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -271,11 +271,14 @@ export class P2PClient extends EventEmitter {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
 
-      const checkResult = await getIpAndCheckPort(this.port).catch((err) => {
+      const checkIPResult = await getIpAndCheckPort(this.port).catch((err) => {
         this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
         return undefined;
       });
-      this.log(LogLevel.Info, `Check result: ${JSON.stringify(checkResult)}`);
+      const maListService = this.node.services.maList as MultiaddressService;
+      if (checkIPResult) {
+        maListService.setCheckIpResult(checkIPResult);
+      }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }
