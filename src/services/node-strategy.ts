@@ -19,7 +19,7 @@ type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
 type RequestConnectedPeers = (
   node: Node
 ) => Promise<Map<string, string> | undefined>;
-type RequestPing = (addrr: string) => Promise<number | undefined>;
+type RequestDHT = (dhtKey: string) => Promise<any>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
@@ -34,7 +34,7 @@ export class NodeStrategy extends Map<string, Node> {
   private requestRoles: RequestRoles;
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
-  private requestPing: RequestPing;
+  private requestDHT: RequestDHT;
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -52,7 +52,7 @@ export class NodeStrategy extends Map<string, Node> {
     requestRoles: RequestRoles,
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
-    requestPing: RequestPing
+    requestDHT: RequestDHT
   ) {
     super();
     this.requestConnect = requestConnect;
@@ -60,7 +60,7 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestRoles = requestRoles;
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
-    this.requestPing = requestPing;
+    this.requestDHT = requestDHT;
   }
 
   set(key: string, value: Node): this {
@@ -107,7 +107,9 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async selfDiag(): Promise<void> {
+    // удаляем мертвые ноды
     this.removeDeadNodes();
+
     this.counterConnections();
     // если никого нет, то подключаемся к релейному узлу
     if (this.size == 0) {
@@ -245,6 +247,25 @@ export class NodeStrategy extends Map<string, Node> {
           60 * 1000 * 5
         );
       });
+    }
+
+    // проверка DHT
+    for (const [key, node] of this) {
+      if (!node) {
+        continue;
+      }
+      if (!node.peerId) {
+        continue;
+      }
+
+      const dhtKey = `/port-check/${node.peerId?.toString()}`;
+      const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
+        this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
+        return undefined;
+      });
+      if (dhtResult) {
+        this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
+      }
     }
 
     //отправляем все ноды в сокет

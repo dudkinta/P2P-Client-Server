@@ -31,7 +31,7 @@ export class NodeService extends EventEmitter {
       this.RequestRoles.bind(this),
       this.RequestMultiaddrrs.bind(this),
       this.RequestConnectedPeers.bind(this),
-      this.RequestPing.bind(this)
+      this.RequestDHT.bind(this)
     );
   }
 
@@ -338,6 +338,23 @@ export class NodeService extends EventEmitter {
           `Error in RequestPing ${JSON.stringify(error)}`
         );
       }
+      return undefined;
+    }
+  }
+
+  async RequestDHT(dhtKey: string): Promise<any> {
+    try {
+      const dhtValue = await this.client.getFromDHT(dhtKey).catch((error) => {
+        this.log(
+          LogLevel.Error,
+          `Error in promise RequestDHT ${JSON.stringify(error)}`
+        );
+        throw error;
+      });
+      this.log(LogLevel.Info, `DHT value for ${dhtKey} is ${dhtValue}`);
+      return dhtValue;
+    } catch (error) {
+      this.log(LogLevel.Error, `Error in RequestDHT ${JSON.stringify(error)}`);
       return undefined;
     }
   }

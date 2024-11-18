@@ -11,7 +11,8 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
-import { CheckResult, getIpAndCheckPort } from "./helpers/check-ip.js";
+import { getIpAndCheckPort } from "./helpers/check-ip.js";
+import { KadDHT } from "@libp2p/kad-dht";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -221,6 +222,57 @@ export class P2PClient extends EventEmitter {
     }
   }
 
+  async getFromDHT(dhtKey: string): Promise<any> {
+    if (!this.node) {
+      return undefined;
+    }
+    try {
+      const dht = this.node.services.aminoDHT as KadDHT;
+      if (!dht) {
+        throw new Error("getFromDHT. DHT service is not initialized");
+      }
+      const value = await dht.get(new TextEncoder().encode(dhtKey));
+      if (value) {
+        for await (const event of value) {
+          if (event.name === "VALUE") {
+            const decodedValue = JSON.parse(
+              new TextDecoder().decode(event.value)
+            );
+            return decodedValue;
+          }
+        }
+      }
+      return undefined;
+    } catch (err) {
+      this.log(LogLevel.Error, `Failed to get from DHT: ${err}`);
+      return undefined;
+    }
+  }
+
+  private async sendToDHT(dhtKey: string, dhtData: any): Promise<void> {
+    if (!this.node) {
+      return;
+    }
+    try {
+      const dht = this.node.services.aminoDHT as KadDHT;
+      if (!dht) {
+        throw new Error("sendToDHT. DHT service is not initialized");
+      }
+
+      await dht.put(
+        new TextEncoder().encode(dhtKey),
+        new TextEncoder().encode(dhtData)
+      );
+
+      this.log(
+        LogLevel.Info,
+        `Successfully published port info to DHT: ${dhtKey}`
+      );
+    } catch (err) {
+      this.log(LogLevel.Error, `Failed to publish port info to DHT: ${err}`);
+    }
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -278,6 +330,24 @@ export class P2PClient extends EventEmitter {
       const maListService = this.node.services.maList as MultiaddressService;
       if (checkIPResult) {
         maListService.setCheckIpResult(checkIPResult);
+        if (checkIPResult.portOpen) {
+          this.log(
+            LogLevel.Info,
+            `Send to DHT: Port ${checkIPResult.port} is open on ${checkIPResult.ipv4}`
+          );
+          const dhtData = JSON.stringify({
+            ipv4: checkIPResult.ipv4,
+            ipv6: checkIPResult.ipv6,
+            port: checkIPResult.port,
+            timestamp: Date.now(),
+          });
+
+          // Генерируем ключ для записи в DHT
+          const dhtKey = `/port-check/${this.localPeerId.toString()}`;
+          this.sendToDHT(dhtKey, dhtData).catch((err) => {
+            this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
+          });
+        }
       }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
