@@ -99,8 +99,8 @@ export class MultiaddressService
         const directAddrrs = new Set<string>();
         const connections = await this.components.addressManager.getAddresses();
         const check = this.checkIpResult;
-        if (check && check.portOpen) {
-          if (check.ipv4) {
+        if (check && (check.ipv4portOpen || check.ipv6portOpen)) {
+          if (check.ipv4 && check.ipv4portOpen) {
             connections.forEach((addr) => {
               const peerId = addr.getPeerId();
               const ip = check.ipv4;
@@ -108,7 +108,7 @@ export class MultiaddressService
               directAddrrs.add(ma.toString());
             });
           }
-          if (check.ipv6) {
+          if (check.ipv6 && check.ipv6portOpen) {
             connections.forEach((addr) => {
               const peerId = addr.getPeerId();
               const ip = check.ipv6;
@@ -121,12 +121,8 @@ export class MultiaddressService
         const addresses = Array.from(connections).map((conn) =>
           conn.toString()
         );
-        let jsonString: string;
-        if (directAddrrs.size > 0) {
-          jsonString = JSON.stringify(directAddrrs);
-        } else {
-          jsonString = JSON.stringify(addresses);
-        }
+        addresses.concat(...directAddrrs);
+        let jsonString = JSON.stringify(addresses);
         await sendAndReceive(stream, jsonString).catch((err) => {
           this.log(
             LogLevel.Error,

@@ -327,18 +327,21 @@ export class P2PClient extends EventEmitter {
         this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
         return undefined;
       });
+      this.log(
+        LogLevel.Info,
+        `Check IP result: ${JSON.stringify(checkIPResult)}`
+      );
       const maListService = this.node.services.maList as MultiaddressService;
       if (checkIPResult) {
         maListService.setCheckIpResult(checkIPResult);
-        if (checkIPResult.portOpen) {
-          this.log(
-            LogLevel.Info,
-            `Send to DHT: Port ${checkIPResult.port} is open on ${checkIPResult.ipv4}`
-          );
+        if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
+          this.log(LogLevel.Info, `Send to DHT open ports`);
           const dhtData = JSON.stringify({
             ipv4: checkIPResult.ipv4,
             ipv6: checkIPResult.ipv6,
             port: checkIPResult.port,
+            ipv4portOpen: checkIPResult.ipv4portOpen,
+            ipv6portOpen: checkIPResult.ipv6portOpen,
             timestamp: Date.now(),
           });
 

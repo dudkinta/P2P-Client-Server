@@ -75,7 +75,8 @@ export interface CheckResult {
   ipv4: string | null;
   ipv6: string | null;
   port: number;
-  portOpen: boolean;
+  ipv4portOpen: boolean;
+  ipv6portOpen: boolean;
   error?: string;
 }
 
@@ -84,7 +85,7 @@ async function getExternalIPv4(): Promise<string | null> {
     const response = await axios.get("https://api.ipify.org?format=json");
     return response.data.ip;
   } catch (error) {
-    console.error("Ошибка при получении IPv4:", error);
+    console.error("Ошибка при получении IPv4:");
     return null;
   }
 }
@@ -94,7 +95,7 @@ async function getExternalIPv6(): Promise<string | null> {
     const response = await axios.get("https://api6.ipify.org?format=json");
     return response.data.ip;
   } catch (error) {
-    console.error("Ошибка при получении IPv6:", error);
+    console.error("Ошибка при получении IPv6:");
     return null;
   }
 }
@@ -138,34 +139,39 @@ async function isPortOpen(
 export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
   try {
     // Получаем IPv4 и IPv6 адреса
-    const [ipv4, ipv6] = await Promise.all([
+    let [ipv4, ipv6] = await Promise.all([
       getExternalIPv4(),
       getExternalIPv6(),
     ]);
 
     // Проверяем доступность порта для IPv4
-    let portOpen = false;
+    let ipv4portOpen = false;
     if (ipv4) {
-      portOpen = await isPortOpen(port, ipv4);
+      ipv4portOpen = await isPortOpen(port, ipv4);
     }
 
     // Если IPv6 доступен, можно дополнительно проверить и его
-    if (!portOpen && ipv6) {
-      portOpen = await isPortOpen(port, ipv6);
+    let ipv6portOpen = false;
+    if (ipv6) {
+      ipv6portOpen = await isPortOpen(port, ipv6);
     }
-
+    if (ipv4 == ipv6) {
+      ipv6 = null;
+    }
     return {
       ipv4,
       ipv6,
       port,
-      portOpen,
+      ipv4portOpen,
+      ipv6portOpen,
     };
   } catch (error) {
     return {
       ipv4: null,
       ipv6: null,
       port: port,
-      portOpen: false,
+      ipv4portOpen: false,
+      ipv6portOpen: false,
       error: (error as Error).message,
     };
   }
