@@ -9,9 +9,9 @@ async function main(): Promise<void> {
 
   let port = config.port ?? 6006;
   const argv = process.argv.slice(2);
-  if (!argv.includes("--no-webserver")) {
-    port = 0;
-  }
+  //if (argv.includes("--no-webserver")) {
+  //  port = 0;
+  //}
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
   const networkService = new NodeService(
     new P2PClient(listenAddrs, port, config.roles.NODE)
