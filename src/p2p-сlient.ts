@@ -9,11 +9,7 @@ import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
-import {
-  getNodeClient,
-  getRelayClient,
-  generateCID,
-} from "./helpers/libp2p-helper.js";
+import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
 import { getIpAndCheckPort } from "./helpers/check-ip.js";
 import { KadDHT } from "@libp2p/kad-dht";
 import { StoreService } from "./services/store/store.js";
@@ -250,153 +246,6 @@ export class P2PClient extends EventEmitter {
     }
   }
 
-  async getFromDHT(dhtKey: string): Promise<any> {
-    if (!this.node) {
-      return undefined;
-    }
-    try {
-      const dht = this.node.services.aminoDHT as KadDHT;
-      if (!dht) {
-        throw new Error("getFromDHT. DHT service is not initialized");
-      }
-      const value = await dht.get(new TextEncoder().encode(dhtKey));
-      if (value) {
-        for await (const event of value) {
-          if (event.name === "VALUE") {
-            const decodedValue = JSON.parse(
-              new TextDecoder().decode(event.value)
-            );
-            return decodedValue;
-          }
-        }
-      }
-      return undefined;
-    } catch (err) {
-      this.log(LogLevel.Error, `Failed to get from DHT: ${err}`);
-      return undefined;
-    }
-  }
-
-  private async sendToDHT(dhtKey: string, dhtData: any): Promise<void> {
-    if (!this.node) {
-      return;
-    }
-    try {
-      const dht = this.node.services.dht as KadDHT;
-      if (!dht) {
-        throw new Error("sendToDHT. DHT service is not initialized");
-      }
-
-      await dht.put(
-        new TextEncoder().encode(dhtKey),
-        new TextEncoder().encode(dhtData)
-      );
-
-      this.log(
-        LogLevel.Info,
-        `Successfully published port info to DHT: ${dhtKey}`
-      );
-    } catch (err) {
-      this.log(LogLevel.Error, `Failed to publish port info to DHT: ${err}`);
-    }
-  }
-
-  async findProviders(key: string): Promise<PeerInfo[]> {
-    const res = new Set<PeerInfo>();
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized");
-      throw new Error("Node is not initialized for findProviders");
-    }
-    const cid = await generateCID(key).catch((err) => {
-      this.log(LogLevel.Error, `Error in generateCID: ${err}`);
-      throw err;
-    });
-    const providers = await this.node.contentRouting.findProviders(cid);
-
-    for await (const provider of providers) {
-      res.add(provider);
-      console.log(`Found provider: ${provider.id.toString()}`);
-    }
-    return Array.from(res);
-  }
-
-  private async publishProvider(key: string): Promise<void> {
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized");
-      throw new Error("Node is not initialized for publishProvider");
-    }
-    const cid = await generateCID(key).catch((err) => {
-      this.log(LogLevel.Error, `Error in generateCID: ${err}`);
-      throw err;
-    });
-    await this.node.contentRouting.provide(cid).catch((err) => {
-      this.log(LogLevel.Error, `Error in provide: ${err}`);
-      throw err;
-    });
-    console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
-  }
-
-  private async sendDirectDataToDHT(checkIPResult: any): Promise<void> {
-    let needResend = false;
-    if (!this.node) {
-      this.log(LogLevel.Error, "Publish to DHT. Node is not initialized");
-      return;
-    }
-    if (!this.localPeerId) {
-      this.log(
-        LogLevel.Error,
-        "Publish to DHT. LocalPeerId is not initialized"
-      );
-      return;
-    }
-
-    if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
-      this.log(LogLevel.Info, `Send to DHT open ports`);
-      const dhtData = JSON.stringify({
-        ipv4: checkIPResult.ipv4,
-        ipv6: checkIPResult.ipv6,
-        port: checkIPResult.port,
-        ipv4portOpen: checkIPResult.ipv4portOpen,
-        ipv6portOpen: checkIPResult.ipv6portOpen,
-        timestamp: Date.now(),
-      });
-      await this.publishProvider("/direct-connect").catch((err) => {
-        this.log(
-          LogLevel.Error,
-          `Error in publishProvider /direct-connect: ${err}`
-        );
-        needResend = true;
-      });
-      // Генерируем ключ для записи в DHT
-      const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
-      this.sendToDHT(dhtKey, dhtData).catch((err) => {
-        this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
-        needResend = true;
-      });
-      if (needResend) {
-        setTimeout(async () => {
-          await this.sendDirectDataToDHT(checkIPResult);
-        }, 10000);
-      }
-    }
-  }
-
-  private async sendConnectDataToDHT(): Promise<void> {
-    let needResend = false;
-    await this.publishProvider("/node-connect").catch((err) => {
-      this.log(
-        LogLevel.Error,
-        `Error in publishProvider /node-connect: ${err}`
-      );
-      needResend = true;
-    });
-    if (needResend) {
-      setTimeout(async () => {
-        await this.sendConnectDataToDHT();
-      }, 10000);
-    }
-  }
-
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -447,12 +296,6 @@ export class P2PClient extends EventEmitter {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
 
-      setTimeout(async () => {
-        await this.sendConnectDataToDHT().catch((err) => {
-          this.log(LogLevel.Error, `Error in sendConnectDataToDHT: ${err}`);
-        });
-      }, 10000);
-
       const currentPort = this.node
         .getMultiaddrs()[0]
         .toString()
@@ -466,14 +309,6 @@ export class P2PClient extends EventEmitter {
         LogLevel.Info,
         `Check IP result: ${JSON.stringify(checkIPResult)}`
       );
-
-      if (checkIPResult) {
-        setTimeout(async () => {
-          await this.sendDirectDataToDHT(checkIPResult).catch((err) => {
-            this.log(LogLevel.Error, `Error in sendDirectDataToDHT: ${err}`);
-          });
-        }, 60000);
-      }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

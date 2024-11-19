@@ -19,8 +19,6 @@ type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
 type RequestConnectedPeers = (
   node: Node
 ) => Promise<Map<string, string> | undefined>;
-type RequestDHT = (dhtKey: string) => Promise<any>;
-type RequestFindProviders = (dhtKey: string) => Promise<PeerInfo[] | undefined>;
 type RequestStore = (node: Node) => Promise<any | undefined>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
@@ -36,8 +34,6 @@ export class NodeStrategy extends Map<string, Node> {
   private requestRoles: RequestRoles;
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
-  private requestDHT: RequestDHT;
-  private requestFindProviders: RequestFindProviders;
   private requestStore: RequestStore;
 
   private log = (level: LogLevel, message: string) => {
@@ -56,8 +52,6 @@ export class NodeStrategy extends Map<string, Node> {
     requestRoles: RequestRoles,
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
-    requestDHT: RequestDHT,
-    requestFindProviders: RequestFindProviders,
     requestStore: RequestStore
   ) {
     super();
@@ -66,8 +60,6 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestRoles = requestRoles;
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
-    this.requestDHT = requestDHT;
-    this.requestFindProviders = requestFindProviders;
     this.requestStore = requestStore;
   }
 
@@ -100,9 +92,6 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);
-    setTimeout(async () => {
-      await this.checkDHT();
-    }, 0);
     setTimeout(async () => {
       await this.sendToSocket();
     }, 0);
@@ -148,37 +137,7 @@ export class NodeStrategy extends Map<string, Node> {
       await this.sendToSocket();
     }, 1000);
   }
-  private async checkDHT(): Promise<void> {
-    // проверка DHT
-    const providersDirectConnect =
-      await this.requestFindProviders("/direct-connect");
-    if (providersDirectConnect) {
-      this.log(
-        LogLevel.Trace,
-        `Providers for /direct-connect: ${JSON.stringify(providersDirectConnect)}`
-      );
-    }
-    const providersNodeConnect =
-      await this.requestFindProviders("/node-connect");
-    if (providersNodeConnect) {
-      this.log(
-        LogLevel.Trace,
-        `Providers for /node-connect: ${JSON.stringify(providersNodeConnect)}`
-      );
-    }
 
-    /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
-      const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
-        this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
-        return undefined;
-      });
-      if (dhtResult) {
-        this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
-      }*/
-    setTimeout(async () => {
-      await this.checkDHT();
-    }, 30000);
-  }
   private async connectToMainRelay(): Promise<void> {
     const relay = getRandomElement(this.config.getRelays());
     if (!relay) {

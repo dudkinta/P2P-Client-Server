@@ -31,8 +31,6 @@ export class NodeService extends EventEmitter {
       this.RequestRoles.bind(this),
       this.RequestMultiaddrrs.bind(this),
       this.RequestConnectedPeers.bind(this),
-      this.RequestDHT.bind(this),
-      this.FindProviders.bind(this),
       this.RequestStore.bind(this)
     );
   }
@@ -391,45 +389,6 @@ export class NodeService extends EventEmitter {
           `Error in RequestStore ${JSON.stringify(error)}`
         );
       }
-      return undefined;
-    }
-  }
-
-  async RequestDHT(dhtKey: string): Promise<any> {
-    try {
-      const dhtValue = await this.client.getFromDHT(dhtKey).catch((error) => {
-        this.log(
-          LogLevel.Error,
-          `Error in promise RequestDHT ${JSON.stringify(error)}`
-        );
-        throw error;
-      });
-      this.log(LogLevel.Info, `DHT value for ${dhtKey} is ${dhtValue}`);
-      return dhtValue;
-    } catch (error) {
-      this.log(LogLevel.Error, `Error in RequestDHT ${JSON.stringify(error)}`);
-      return undefined;
-    }
-  }
-
-  async FindProviders(dhtKey: string): Promise<PeerInfo[] | undefined> {
-    try {
-      const providers = await this.client
-        .findProviders(dhtKey)
-        .catch((error) => {
-          this.log(
-            LogLevel.Error,
-            `Error in promise FindProviders ${JSON.stringify(error)}`
-          );
-          throw error;
-        });
-      this.log(LogLevel.Info, `Providers for ${dhtKey} is ${providers}`);
-      return providers;
-    } catch (error) {
-      this.log(
-        LogLevel.Error,
-        `Error in FindProviders ${JSON.stringify(error)}`
-      );
       return undefined;
     }
   }

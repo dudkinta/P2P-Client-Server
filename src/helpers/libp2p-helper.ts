@@ -7,18 +7,12 @@ import {
   circuitRelayTransport,
   circuitRelayServer,
 } from "@libp2p/circuit-relay-v2";
-import { kadDHT } from "@libp2p/kad-dht";
 import { identify, identifyPush } from "@libp2p/identify";
-//import { ping } from "./../services/ping/index.js";
-//import { ping } from "@libp2p/ping";
 import { roles } from "./../services/roles/index.js";
 import { peerList } from "./../services/peer-list/index.js";
 import { maList } from "./../services/multiadress/index.js";
 import { store } from "./../services/store/index.js";
 import ConfigLoader from "./config-loader.js";
-import { CID } from "multiformats/cid";
-import { sha256 } from "multiformats/hashes/sha2";
-import e from "express";
 
 export async function getRelayClient(
   lintenAddrs: string[],
@@ -64,13 +58,8 @@ export async function getRelayClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
-        dht: kadDHT({
-          clientMode: false,
-          kBucketSize: 20,
-        }),
         identify: identify(),
         identifyPush: identifyPush(),
-        //ping: ping(),
         store: store(),
         roles: roles({
           roles: [config.roles.RELAY],
@@ -134,13 +123,8 @@ export async function getNodeClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
-        dht: kadDHT({
-          clientMode: false,
-          kBucketSize: 20,
-        }),
         identify: identify(),
         identifyPush: identifyPush(),
-        //ping: ping(),
         store: store(),
         roles: roles({
           roles: [config.roles.NODE],
@@ -156,10 +140,4 @@ export async function getNodeClient(
   } catch (error) {
     throw new Error(`Error during createLibp2p: ${error}`);
   }
-}
-
-export async function generateCID(key: string) {
-  const hash = await sha256.digest(new TextEncoder().encode(key));
-  const cid = CID.createV1(0x70, hash); // 0x70 — raw-формат
-  return cid;
 }
