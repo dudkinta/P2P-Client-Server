@@ -25,8 +25,6 @@ import type {
   Startable,
   Connection,
 } from "@libp2p/interface";
-import { multiaddr } from "@multiformats/multiaddr";
-import { dir } from "console";
 
 export class MultiaddressService
   implements Startable, MultiaddressServiceInterface
@@ -39,7 +37,6 @@ export class MultiaddressService
   private readonly maxOutboundStreams: number;
   private readonly runOnLimitedConnection: boolean;
   private readonly logger: Logger;
-  private checkIpResult: CheckResult | undefined;
   private readonly log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("libp2p:multiaddresses", level, timestamp, message);
@@ -96,32 +93,11 @@ export class MultiaddressService
           stream?.abort(new TimeoutError("send multiaddresses timeout"));
         });
 
-        const directAddrrs = new Set<string>();
         const connections = await this.components.addressManager.getAddresses();
-        const check = this.checkIpResult;
-        if (check && (check.ipv4portOpen || check.ipv6portOpen)) {
-          if (check.ipv4 && check.ipv4portOpen) {
-            connections.forEach((addr) => {
-              const peerId = addr.getPeerId();
-              const ip = check.ipv4;
-              const ma = multiaddr(`/ip4/${ip}/tcp/${check.port}/${peerId}`);
-              directAddrrs.add(ma.toString());
-            });
-          }
-          if (check.ipv6 && check.ipv6portOpen) {
-            connections.forEach((addr) => {
-              const peerId = addr.getPeerId();
-              const ip = check.ipv6;
-              const ma = multiaddr(`/ip6/${ip}/tcp/${check.port}/${peerId}`);
-              directAddrrs.add(ma.toString());
-            });
-          }
-        }
 
         const addresses = Array.from(connections).map((conn) =>
           conn.toString()
         );
-        addresses.concat(...directAddrrs);
         let jsonString = JSON.stringify(addresses);
         await sendAndReceive(stream, jsonString).catch((err) => {
           this.log(
@@ -209,9 +185,5 @@ export class MultiaddressService
         await stream.close(options);
       }
     }
-  }
-
-  setCheckIpResult(check: CheckResult): void {
-    this.checkIpResult = check;
   }
 }

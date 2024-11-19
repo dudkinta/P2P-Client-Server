@@ -1,11 +1,10 @@
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
 import { TimeoutError, PeerInfo, Connection, PeerId } from "@libp2p/interface";
-import { PingService } from "./services/ping/index.js";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
-import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
+import { Multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
@@ -79,38 +78,20 @@ export class P2PClient extends EventEmitter {
     }
   }
 
-  async pingByAddress(peerAddress: string): Promise<number> {
-    if (!this.node) {
-      throw new Error("Node is not initialized for ping");
-    }
-    try {
-      const addr = multiaddr(peerAddress);
-      const ping = this.node.services.ping as PingService;
-      this.log(LogLevel.Info, `Пингуем ${peerAddress}`);
-      const latency = await ping.ping(addr);
-      this.log(LogLevel.Info, `Пинг ${peerAddress}: ${latency}ms`);
-      return latency;
-    } catch (error) {
-      this.log(LogLevel.Error, `Ошибка при пинге: ${JSON.stringify(error)}`);
-      if (error instanceof TimeoutError) {
-        this.log(
-          LogLevel.Error,
-          `Ошибка таймаута при пинге: ${JSON.stringify(error)}`
-        );
-      }
-      throw error;
-    }
-  }
-
   async getRolesByAddress(conn: Connection): Promise<string> {
     if (!this.node) {
       throw new Error("Node is not initialized for getRoles");
     }
     try {
       const roleService = this.node.services.roles as RolesService;
-      const result = await roleService.roles(conn, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const result = await roleService
+        .roles(conn, {
+          signal: AbortSignal.timeout(5000),
+        })
+        .catch((err) => {
+          this.log(LogLevel.Error, `Error in getRoles: ${err}`);
+          throw err;
+        });
       this.log(
         LogLevel.Info,
         `Роли пира (${conn.remotePeer.toString()}): ${result}`
@@ -137,9 +118,14 @@ export class P2PClient extends EventEmitter {
     }
     try {
       const peerListService = this.node.services.peerList as PeerListService;
-      const result = await peerListService.getConnectedPeers(conn, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const result = await peerListService
+        .getConnectedPeers(conn, {
+          signal: AbortSignal.timeout(5000),
+        })
+        .catch((err) => {
+          this.log(LogLevel.Error, `Error in getPeerList: ${err}`);
+          throw err;
+        });
       this.log(
         LogLevel.Info,
         `Подключенные пиры к пиру: (${conn.remotePeer.toString()}): ${result}`
@@ -166,9 +152,14 @@ export class P2PClient extends EventEmitter {
     }
     try {
       const storeService = this.node.services.store as StoreService;
-      const result = await storeService.getStore(conn, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const result = await storeService
+        .getStore(conn, {
+          signal: AbortSignal.timeout(5000),
+        })
+        .catch((err) => {
+          this.log(LogLevel.Error, `Error in getStore: ${err}`);
+          throw err;
+        });
       this.log(
         LogLevel.Info,
         `Store from: (${conn.remotePeer.toString()}): ${result}`
@@ -246,7 +237,10 @@ export class P2PClient extends EventEmitter {
     const signal = AbortSignal.timeout(5000);
     try {
       this.log(LogLevel.Info, `Disconnecting from ${ma.toString()}`);
-      await this.node.hangUp(ma, { signal });
+      await this.node.hangUp(ma, { signal }).catch((err) => {
+        this.log(LogLevel.Error, `Error in hangUp: ${err}`);
+        throw err;
+      });
       this.log(LogLevel.Info, `Disconnected from ${ma.toString()}`);
     } catch (error) {
       this.log(
@@ -313,8 +307,12 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Error, "Node is not initialized");
       throw new Error("Node is not initialized for findProviders");
     }
-    const cid = await generateCID(key);
+    const cid = await generateCID(key).catch((err) => {
+      this.log(LogLevel.Error, `Error in generateCID: ${err}`);
+      throw err;
+    });
     const providers = await this.node.contentRouting.findProviders(cid);
+
     for await (const provider of providers) {
       res.add(provider);
       console.log(`Found provider: ${provider.id.toString()}`);
@@ -327,8 +325,14 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Error, "Node is not initialized");
       throw new Error("Node is not initialized for publishProvider");
     }
-    const cid = await generateCID(key);
-    await this.node.contentRouting.provide(cid);
+    const cid = await generateCID(key).catch((err) => {
+      this.log(LogLevel.Error, `Error in generateCID: ${err}`);
+      throw err;
+    });
+    await this.node.contentRouting.provide(cid).catch((err) => {
+      this.log(LogLevel.Error, `Error in provide: ${err}`);
+      throw err;
+    });
     console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
   }
 
@@ -345,9 +349,6 @@ export class P2PClient extends EventEmitter {
       );
       return;
     }
-
-    const maListService = this.node.services.maList as MultiaddressService;
-    maListService.setCheckIpResult(checkIPResult);
 
     if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
       this.log(LogLevel.Info, `Send to DHT open ports`);
@@ -447,7 +448,9 @@ export class P2PClient extends EventEmitter {
       });
 
       setTimeout(async () => {
-        await this.sendConnectDataToDHT();
+        await this.sendConnectDataToDHT().catch((err) => {
+          this.log(LogLevel.Error, `Error in sendConnectDataToDHT: ${err}`);
+        });
       }, 10000);
 
       const currentPort = this.node
@@ -466,7 +469,9 @@ export class P2PClient extends EventEmitter {
 
       if (checkIPResult) {
         setTimeout(async () => {
-          await this.sendDirectDataToDHT(checkIPResult);
+          await this.sendDirectDataToDHT(checkIPResult).catch((err) => {
+            this.log(LogLevel.Error, `Error in sendDirectDataToDHT: ${err}`);
+          });
         }, 60000);
       }
     } catch (err: any) {

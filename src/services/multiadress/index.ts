@@ -9,14 +9,12 @@ import type {
   AddressManager,
   Registrar,
 } from "@libp2p/interface-internal";
-import { CheckResult } from "../../helpers/check-ip.js";
 
 export interface MultiaddressService {
   getMultiaddress(
     connection: Connection,
     options?: AbortOptions
   ): Promise<string>;
-  setCheckIpResult(check: CheckResult): void;
 }
 
 export interface MultiaddressServiceInit {

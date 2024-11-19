@@ -395,30 +395,6 @@ export class NodeService extends EventEmitter {
     }
   }
 
-  private async RequestPing(addrr: string): Promise<number | undefined> {
-    try {
-      const lat = await this.client.pingByAddress(addrr).catch((error) => {
-        this.log(
-          LogLevel.Error,
-          `Error in promise RequestPing ${JSON.stringify(error)}`
-        );
-        throw error;
-      });
-      this.log(LogLevel.Info, `Ping to ${addrr} is ${lat}ms`);
-      return lat;
-    } catch (error) {
-      if (error instanceof OutOfLimitError) {
-        this.log(LogLevel.Error, `Out of limit in connection (${addrr})`);
-      } else {
-        this.log(
-          LogLevel.Error,
-          `Error in RequestPing ${JSON.stringify(error)}`
-        );
-      }
-      return undefined;
-    }
-  }
-
   async RequestDHT(dhtKey: string): Promise<any> {
     try {
       const dhtValue = await this.client.getFromDHT(dhtKey).catch((error) => {

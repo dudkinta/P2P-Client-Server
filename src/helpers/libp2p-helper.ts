@@ -10,7 +10,7 @@ import {
 import { kadDHT } from "@libp2p/kad-dht";
 import { identify, identifyPush } from "@libp2p/identify";
 //import { ping } from "./../services/ping/index.js";
-import { ping } from "@libp2p/ping";
+//import { ping } from "@libp2p/ping";
 import { roles } from "./../services/roles/index.js";
 import { peerList } from "./../services/peer-list/index.js";
 import { maList } from "./../services/multiadress/index.js";
@@ -70,7 +70,7 @@ export async function getRelayClient(
         }),
         identify: identify(),
         identifyPush: identifyPush(),
-        ping: ping(),
+        //ping: ping(),
         store: store(),
         roles: roles({
           roles: [config.roles.RELAY],
@@ -140,7 +140,7 @@ export async function getNodeClient(
         }),
         identify: identify(),
         identifyPush: identifyPush(),
-        ping: ping(),
+        //ping: ping(),
         store: store(),
         roles: roles({
           roles: [config.roles.NODE],
