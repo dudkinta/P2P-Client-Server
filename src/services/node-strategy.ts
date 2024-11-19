@@ -102,6 +102,23 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.sendToSocket();
     }, 0);
+    setTimeout(async () => {
+      await this.getCandidates();
+    }, 30000);
+  }
+
+  private async getCandidates(): Promise<void> {
+    for (const [key, node] of this) {
+      await this.getConnectedPeers(node).catch((error) => {
+        this.log(
+          LogLevel.Error,
+          `Error in promise getConnectedPeers: ${error}`
+        );
+      });
+    }
+    setTimeout(async () => {
+      await this.getCandidates();
+    }, 60000);
   }
 
   private async sendToSocket(): Promise<void> {
@@ -191,18 +208,6 @@ export class NodeStrategy extends Map<string, Node> {
       this.log(
         LogLevel.Info,
         `Limits connection ${connection.remoteAddr.toString()} \r\nLimits bytes:${connection.limits.bytes}  Limits second:${connection.limits.seconds}`
-      );
-    }
-
-    // обновляем список кандидатов
-    for (const [key, node] of this) {
-      const connectedPeers = await this.getConnectedPeers(node).catch(
-        (error) => {
-          this.log(
-            LogLevel.Error,
-            `Error in promise getConnectedPeers: ${error}`
-          );
-        }
       );
     }
 
