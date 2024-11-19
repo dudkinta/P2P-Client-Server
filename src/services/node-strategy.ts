@@ -142,7 +142,7 @@ export class NodeStrategy extends Map<string, Node> {
     if (providersNodeConnect) {
       this.log(
         LogLevel.Trace,
-        `Providers for /direct-connect: ${JSON.stringify(providersNodeConnect)}`
+        `Providers for /node-connect: ${JSON.stringify(providersNodeConnect)}`
       );
     }
 

@@ -377,7 +377,9 @@ export class P2PClient extends EventEmitter {
             );
             return;
           }
-          await this.publishProvider("/node-connect");
+          await this.publishProvider("/node-connect").catch((err) => {
+            this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
+          });
 
           const maListService = this.node.services
             .maList as MultiaddressService;
@@ -393,7 +395,9 @@ export class P2PClient extends EventEmitter {
               ipv6portOpen: checkIPResult.ipv6portOpen,
               timestamp: Date.now(),
             });
-            await this.publishProvider("/direct-connect");
+            await this.publishProvider("/direct-connect").catch((err) => {
+              this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
+            });
             // Генерируем ключ для записи в DHT
             const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
             this.sendToDHT(dhtKey, dhtData).catch((err) => {
