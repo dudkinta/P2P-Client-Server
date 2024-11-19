@@ -62,7 +62,7 @@ export async function getRelayClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
-        aminoDHT: kadDHT({
+        dht: kadDHT({
           clientMode: false,
           kBucketSize: 20,
         }),
@@ -122,7 +122,7 @@ export async function getNodeClient(
       connectionEncrypters: [noise()],
       streamMuxers: [yamux()],
       services: {
-        aminoDHT: kadDHT({
+        dht: kadDHT({
           clientMode: false,
           kBucketSize: 20,
         }),

@@ -258,7 +258,7 @@ export class P2PClient extends EventEmitter {
       return;
     }
     try {
-      const dht = this.node.services.aminoDHT as KadDHT;
+      const dht = this.node.services.dht as KadDHT;
       if (!dht) {
         throw new Error("sendToDHT. DHT service is not initialized");
       }
