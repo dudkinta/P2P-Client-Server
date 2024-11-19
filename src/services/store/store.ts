@@ -90,7 +90,7 @@ export class StoreService implements Startable, StoreServiceInterface {
         const peers = await this.components.peerStore.all();
         const store = Array.from(peers).map((peer) => ({
           peerId: peer.id.toString(),
-          address: peer.addresses.map((addr) => addr.toString()),
+          address: peer.addresses.map((addr) => addr.multiaddr.toString()),
         }));
         const jsonString = JSON.stringify(store);
         await sendAndReceive(stream, jsonString).catch((err) => {
