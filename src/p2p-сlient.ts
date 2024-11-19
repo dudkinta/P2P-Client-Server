@@ -349,37 +349,53 @@ export class P2PClient extends EventEmitter {
         Number.parseFloat(currentPort)
       ).catch((err) => {
         this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
-        return undefined;
       });
       this.log(
         LogLevel.Info,
         `Check IP result: ${JSON.stringify(checkIPResult)}`
       );
-      const maListService = this.node.services.maList as MultiaddressService;
+
       if (checkIPResult) {
-        maListService.setCheckIpResult(checkIPResult);
-        if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
-          this.log(LogLevel.Info, `Send to DHT open ports`);
-          const dhtData = JSON.stringify({
-            ipv4: checkIPResult.ipv4,
-            ipv6: checkIPResult.ipv6,
-            port: checkIPResult.port,
-            ipv4portOpen: checkIPResult.ipv4portOpen,
-            ipv6portOpen: checkIPResult.ipv6portOpen,
-            timestamp: Date.now(),
-          });
-          // Ваш ключ для DHT
-          const key = "/direct-connect";
-          const cid = await generateCID(key);
-          // Предоставление CID через contentRouting
-          await this.node.contentRouting.provide(cid);
-          console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
-          // Генерируем ключ для записи в DHT
-          const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
-          this.sendToDHT(dhtKey, dhtData).catch((err) => {
-            this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
-          });
-        }
+        setTimeout(async () => {
+          if (!this.node) {
+            this.log(LogLevel.Error, "Publish to DHT. Node is not initialized");
+            return;
+          }
+          if (!this.localPeerId) {
+            this.log(
+              LogLevel.Error,
+              "Publish to DHT. LocalPeerId is not initialized"
+            );
+            return;
+          }
+          const maListService = this.node.services
+            .maList as MultiaddressService;
+          maListService.setCheckIpResult(checkIPResult);
+          if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
+            this.log(LogLevel.Info, `Send to DHT open ports`);
+            const dhtData = JSON.stringify({
+              ipv4: checkIPResult.ipv4,
+              ipv6: checkIPResult.ipv6,
+              port: checkIPResult.port,
+              ipv4portOpen: checkIPResult.ipv4portOpen,
+              ipv6portOpen: checkIPResult.ipv6portOpen,
+              timestamp: Date.now(),
+            });
+            // Ваш ключ для DHT
+            const key = "/direct-connect";
+            const cid = await generateCID(key);
+            // Предоставление CID через contentRouting
+            await this.node.contentRouting.provide(cid);
+            console.log(
+              `Provided key ${key} with CID ${cid.toString()} to DHT`
+            );
+            // Генерируем ключ для записи в DHT
+            const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
+            this.sendToDHT(dhtKey, dhtData).catch((err) => {
+              this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
+            });
+          }
+        }, 5 * 60000);
       }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
