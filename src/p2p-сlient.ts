@@ -315,10 +315,6 @@ export class P2PClient extends EventEmitter {
       );
       return;
     }
-    await this.publishProvider("/node-connect").catch((err) => {
-      this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
-      needResend = true;
-    });
 
     const maListService = this.node.services.maList as MultiaddressService;
     maListService.setCheckIpResult(checkIPResult);
@@ -334,7 +330,10 @@ export class P2PClient extends EventEmitter {
         timestamp: Date.now(),
       });
       await this.publishProvider("/direct-connect").catch((err) => {
-        this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
+        this.log(
+          LogLevel.Error,
+          `Error in publishProvider /direct-connect: ${err}`
+        );
         needResend = true;
       });
       // Генерируем ключ для записи в DHT
@@ -348,6 +347,22 @@ export class P2PClient extends EventEmitter {
           await this.sendDirectDataToDHT(checkIPResult);
         }, 10000);
       }
+    }
+  }
+
+  private async sendConnectDataToDHT(): Promise<void> {
+    let needResend = false;
+    await this.publishProvider("/node-connect").catch((err) => {
+      this.log(
+        LogLevel.Error,
+        `Error in publishProvider /node-connect: ${err}`
+      );
+      needResend = true;
+    });
+    if (needResend) {
+      setTimeout(async () => {
+        await this.sendConnectDataToDHT();
+      }, 10000);
     }
   }
 
@@ -400,6 +415,11 @@ export class P2PClient extends EventEmitter {
       this.node.getMultiaddrs().forEach((ma) => {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
+
+      setTimeout(async () => {
+        await this.sendConnectDataToDHT();
+      }, 10000);
+
       const currentPort = this.node
         .getMultiaddrs()[0]
         .toString()
