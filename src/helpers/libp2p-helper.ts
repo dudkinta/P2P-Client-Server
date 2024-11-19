@@ -16,7 +16,6 @@ import { maList } from "./../services/multiadress/index.js";
 import ConfigLoader from "./config-loader.js";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
-import { bytes } from "multiformats";
 
 export async function getRelayClient(
   lintenAddrs: string[],
@@ -63,8 +62,8 @@ export async function getRelayClient(
           },
         }),
         aminoDHT: kadDHT({
-          peerInfoMapper: removePrivateAddressesMapper,
           clientMode: false,
+          kBucketSize: 20,
         }),
         identify: identify(),
         identifyPush: identifyPush(),
@@ -123,8 +122,8 @@ export async function getNodeClient(
       streamMuxers: [yamux()],
       services: {
         aminoDHT: kadDHT({
-          peerInfoMapper: removePrivateAddressesMapper,
           clientMode: false,
+          kBucketSize: 20,
         }),
         identify: identify(),
         identifyPush: identifyPush(),
