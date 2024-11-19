@@ -7,9 +7,10 @@ import {
   circuitRelayTransport,
   circuitRelayServer,
 } from "@libp2p/circuit-relay-v2";
-import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
+import { kadDHT } from "@libp2p/kad-dht";
 import { identify, identifyPush } from "@libp2p/identify";
-import { ping } from "./../services/ping/index.js";
+//import { ping } from "./../services/ping/index.js";
+import { ping } from "@libp2p/ping";
 import { roles } from "./../services/roles/index.js";
 import { peerList } from "./../services/peer-list/index.js";
 import { maList } from "./../services/multiadress/index.js";

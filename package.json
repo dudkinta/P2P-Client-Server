@@ -8,7 +8,7 @@
     "server": "node dist/relay.js",
     "build": "npx tsc",
     "start": "node dist/node.js",
-    "node": "set DEBUG=p2p-client && npx tsc && node dist/node.js",
+    "node": "set DEBUG=libp2p:kad-dht* && npx tsc && node dist/node.js",
     "node:no-webserver": "npx tsc && node dist/node.js --no-webserver",
     "dev": "concurrently \"npm run node\" \"npm run vite\"",
     "vite": "cd frontend && npm run dev"
@@ -39,6 +39,7 @@
     "@libp2p/kad-dht": "^14.1.0",
     "@libp2p/peer-id": "^5.0.7",
     "@libp2p/peer-id-factory": "^4.2.4",
+    "@libp2p/ping": "^2.0.12",
     "@libp2p/tcp": "^10.0.11",
     "@libp2p/websockets": "^9.0.11",
     "@multiformats/multiaddr": "^12.3.1",
