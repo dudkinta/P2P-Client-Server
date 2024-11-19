@@ -69,7 +69,10 @@ export class NodeStrategy extends Map<string, Node> {
 
   set(key: string, value: Node): this {
     super.set(key, value);
-    this.log(LogLevel.Info, `Node ${key} added to storage`);
+    this.log(
+      LogLevel.Info,
+      `Node ${key} added to storage. Direction: ${value.getOpenedConnection()?.direction}`
+    );
     this.startNodeStrategy(key, value);
     return this;
   }
@@ -254,22 +257,14 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     // проверка DHT
-    for (const [key, node] of this) {
-      if (!node) {
-        continue;
-      }
-      if (!node.peerId) {
-        continue;
-      }
-
-      const providers = await this.requestFindProviders("/direct-connect");
-      if (providers) {
-        this.log(
-          LogLevel.Trace,
-          `Providers for /direct-connect: ${JSON.stringify(providers)}`
-        );
-      }
-      /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
+    const providers = await this.requestFindProviders("/direct-connect");
+    if (providers) {
+      this.log(
+        LogLevel.Trace,
+        `Providers for /direct-connect: ${JSON.stringify(providers)}`
+      );
+    }
+    /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
       const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
         return undefined;
@@ -277,7 +272,6 @@ export class NodeStrategy extends Map<string, Node> {
       if (dhtResult) {
         this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
       }*/
-    }
 
     //отправляем все ноды в сокет
     SendNodesToSocket(Array.from(this.values()));
