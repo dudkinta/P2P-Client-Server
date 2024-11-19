@@ -301,6 +301,56 @@ export class P2PClient extends EventEmitter {
     await this.node.contentRouting.provide(cid);
     console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
   }
+
+  private async sendDirectDataToDHT(checkIPResult: any): Promise<void> {
+    let needResend = false;
+    if (!this.node) {
+      this.log(LogLevel.Error, "Publish to DHT. Node is not initialized");
+      return;
+    }
+    if (!this.localPeerId) {
+      this.log(
+        LogLevel.Error,
+        "Publish to DHT. LocalPeerId is not initialized"
+      );
+      return;
+    }
+    await this.publishProvider("/node-connect").catch((err) => {
+      this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
+      needResend = true;
+    });
+
+    const maListService = this.node.services.maList as MultiaddressService;
+    maListService.setCheckIpResult(checkIPResult);
+
+    if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
+      this.log(LogLevel.Info, `Send to DHT open ports`);
+      const dhtData = JSON.stringify({
+        ipv4: checkIPResult.ipv4,
+        ipv6: checkIPResult.ipv6,
+        port: checkIPResult.port,
+        ipv4portOpen: checkIPResult.ipv4portOpen,
+        ipv6portOpen: checkIPResult.ipv6portOpen,
+        timestamp: Date.now(),
+      });
+      await this.publishProvider("/direct-connect").catch((err) => {
+        this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
+        needResend = true;
+      });
+      // Генерируем ключ для записи в DHT
+      const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
+      this.sendToDHT(dhtKey, dhtData).catch((err) => {
+        this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
+        needResend = true;
+      });
+      if (needResend) {
+        setTimeout(async () => {
+          await this.sendDirectDataToDHT(checkIPResult);
+        }, 10000);
+      }
+    }
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -366,45 +416,8 @@ export class P2PClient extends EventEmitter {
 
       if (checkIPResult) {
         setTimeout(async () => {
-          if (!this.node) {
-            this.log(LogLevel.Error, "Publish to DHT. Node is not initialized");
-            return;
-          }
-          if (!this.localPeerId) {
-            this.log(
-              LogLevel.Error,
-              "Publish to DHT. LocalPeerId is not initialized"
-            );
-            return;
-          }
-          await this.publishProvider("/node-connect").catch((err) => {
-            this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
-          });
-
-          const maListService = this.node.services
-            .maList as MultiaddressService;
-          maListService.setCheckIpResult(checkIPResult);
-
-          if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
-            this.log(LogLevel.Info, `Send to DHT open ports`);
-            const dhtData = JSON.stringify({
-              ipv4: checkIPResult.ipv4,
-              ipv6: checkIPResult.ipv6,
-              port: checkIPResult.port,
-              ipv4portOpen: checkIPResult.ipv4portOpen,
-              ipv6portOpen: checkIPResult.ipv6portOpen,
-              timestamp: Date.now(),
-            });
-            await this.publishProvider("/direct-connect").catch((err) => {
-              this.log(LogLevel.Error, `Error in publishProvider: ${err}`);
-            });
-            // Генерируем ключ для записи в DHT
-            const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
-            this.sendToDHT(dhtKey, dhtData).catch((err) => {
-              this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
-            });
-          }
-        }, 5 * 60000);
+          await this.sendDirectDataToDHT(checkIPResult);
+        }, 60000);
       }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
