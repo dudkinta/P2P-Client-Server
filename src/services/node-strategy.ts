@@ -96,8 +96,41 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);
+    setTimeout(async () => {
+      await this.checkDHT();
+    }, 0);
+    setTimeout(async () => {
+      await this.sendToSocket();
+    }, 0);
   }
 
+  private async sendToSocket(): Promise<void> {
+    SendNodesToSocket(Array.from(this.values()));
+    setTimeout(async () => {
+      await this.sendToSocket();
+    }, 1000);
+  }
+  private async checkDHT(): Promise<void> {
+    // проверка DHT
+    const providers = await this.requestFindProviders("/direct-connect");
+    if (providers) {
+      this.log(
+        LogLevel.Trace,
+        `Providers for /direct-connect: ${JSON.stringify(providers)}`
+      );
+    }
+    /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
+      const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
+        this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
+        return undefined;
+      });
+      if (dhtResult) {
+        this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
+      }*/
+    setTimeout(async () => {
+      await this.checkDHT();
+    }, 30000);
+  }
   private async connectToMainRelay(): Promise<void> {
     const relay = getRandomElement(this.config.getRelays());
     if (!relay) {
@@ -255,26 +288,6 @@ export class NodeStrategy extends Map<string, Node> {
         );
       });
     }
-
-    // проверка DHT
-    const providers = await this.requestFindProviders("/direct-connect");
-    if (providers) {
-      this.log(
-        LogLevel.Trace,
-        `Providers for /direct-connect: ${JSON.stringify(providers)}`
-      );
-    }
-    /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
-      const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
-        this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
-        return undefined;
-      });
-      if (dhtResult) {
-        this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
-      }*/
-
-    //отправляем все ноды в сокет
-    SendNodesToSocket(Array.from(this.values()));
 
     setTimeout(async () => {
       await this.selfDiag();
