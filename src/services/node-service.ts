@@ -32,7 +32,8 @@ export class NodeService extends EventEmitter {
       this.RequestMultiaddrrs.bind(this),
       this.RequestConnectedPeers.bind(this),
       this.RequestDHT.bind(this),
-      this.FindProviders.bind(this)
+      this.FindProviders.bind(this),
+      this.RequestStore.bind(this)
     );
   }
 
@@ -340,6 +341,60 @@ export class NodeService extends EventEmitter {
       return undefined;
     }
   }
+
+  private async RequestStore(node: Node): Promise<any | undefined> {
+    if (!node.isConnect()) {
+      this.log(LogLevel.Warning, `Node is not connected`);
+      return undefined;
+    }
+    if (!node.peerId) {
+      this.log(LogLevel.Warning, `PeerId is undefined`);
+      return undefined;
+    }
+    try {
+      if (node.protocols.has(this.config.protocols.STORE)) {
+        const connection = node.getOpenedConnection();
+        if (!connection) return undefined;
+
+        let storeStr = await this.client.getStore(connection).catch((error) => {
+          this.log(
+            LogLevel.Error,
+            `Error in promise RequestStore ${JSON.stringify(error)}`
+          );
+          throw error;
+        });
+        if (!storeStr || storeStr.length === 0) return undefined;
+        try {
+          this.log(
+            LogLevel.Info,
+            `Store from ${node.peerId?.toString()} is: ${storeStr}`
+          );
+          return JSON.parse(storeStr);
+        } catch (parseError) {
+          this.log(
+            LogLevel.Error,
+            `Error parsing storeStr JSON ${JSON.stringify(parseError)}`
+          );
+          return undefined;
+        }
+      }
+    } catch (error) {
+      if (error instanceof OutOfLimitError) {
+        this.nodeStorage.stopNodeStrategy(
+          node.peerId.toString(),
+          "Out of limit",
+          10000
+        );
+      } else {
+        this.log(
+          LogLevel.Error,
+          `Error in RequestStore ${JSON.stringify(error)}`
+        );
+      }
+      return undefined;
+    }
+  }
+
   private async RequestPing(addrr: string): Promise<number | undefined> {
     try {
       const lat = await this.client.pingByAddress(addrr).catch((error) => {

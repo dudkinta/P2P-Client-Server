@@ -14,6 +14,7 @@ import { ping } from "@libp2p/ping";
 import { roles } from "./../services/roles/index.js";
 import { peerList } from "./../services/peer-list/index.js";
 import { maList } from "./../services/multiadress/index.js";
+import { store } from "./../services/store/index.js";
 import ConfigLoader from "./config-loader.js";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
@@ -69,6 +70,7 @@ export async function getRelayClient(
         identify: identify(),
         identifyPush: identifyPush(),
         ping: ping(),
+        store: store(),
         roles: roles({
           roles: [config.roles.RELAY],
         }),
@@ -129,6 +131,7 @@ export async function getNodeClient(
         identify: identify(),
         identifyPush: identifyPush(),
         ping: ping(),
+        store: store(),
         roles: roles({
           roles: [config.roles.NODE],
         }),

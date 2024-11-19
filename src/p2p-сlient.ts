@@ -17,6 +17,7 @@ import {
 } from "./helpers/libp2p-helper.js";
 import { getIpAndCheckPort } from "./helpers/check-ip.js";
 import { KadDHT } from "@libp2p/kad-dht";
+import { StoreService } from "./services/store/store.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -153,6 +154,35 @@ export class P2PClient extends EventEmitter {
         this.log(
           LogLevel.Error,
           `Ошибка таймаута при запросе подключеных пиров: ${JSON.stringify(error)}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  async getStore(conn: Connection): Promise<string> {
+    if (!this.node) {
+      throw new Error("Node is not initialized for getStore");
+    }
+    try {
+      const storeService = this.node.services.store as StoreService;
+      const result = await storeService.getStore(conn, {
+        signal: AbortSignal.timeout(5000),
+      });
+      this.log(
+        LogLevel.Info,
+        `Store from: (${conn.remotePeer.toString()}): ${result}`
+      );
+      return result;
+    } catch (error) {
+      this.log(
+        LogLevel.Error,
+        `Ошибка при запросе store: ${JSON.stringify(error)}`
+      );
+      if (error instanceof TimeoutError) {
+        this.log(
+          LogLevel.Error,
+          `Ошибка таймаута при запросе store: ${JSON.stringify(error)}`
         );
       }
       throw error;

@@ -2,7 +2,7 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { promises as fs } from "fs";
 
 export interface Protocols {
-  PING: string;
+  STORE: string;
   ROLE: string;
   PEER_LIST: string;
   MULTIADDRES: string;

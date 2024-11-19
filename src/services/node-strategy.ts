@@ -21,6 +21,7 @@ type RequestConnectedPeers = (
 ) => Promise<Map<string, string> | undefined>;
 type RequestDHT = (dhtKey: string) => Promise<any>;
 type RequestFindProviders = (dhtKey: string) => Promise<PeerInfo[] | undefined>;
+type RequestStore = (node: Node) => Promise<any | undefined>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
@@ -37,6 +38,7 @@ export class NodeStrategy extends Map<string, Node> {
   private requestConnectedPeers: RequestConnectedPeers;
   private requestDHT: RequestDHT;
   private requestFindProviders: RequestFindProviders;
+  private requestStore: RequestStore;
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -55,7 +57,8 @@ export class NodeStrategy extends Map<string, Node> {
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
     requestDHT: RequestDHT,
-    requestFindProviders: RequestFindProviders
+    requestFindProviders: RequestFindProviders,
+    requestStore: RequestStore
   ) {
     super();
     this.requestConnect = requestConnect;
@@ -65,6 +68,7 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestConnectedPeers = requestConnectedPeers;
     this.requestDHT = requestDHT;
     this.requestFindProviders = requestFindProviders;
+    this.requestStore = requestStore;
   }
 
   set(key: string, value: Node): this {
@@ -105,6 +109,23 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.getCandidates();
     }, 30000);
+    setTimeout(async () => {
+      await this.getStores();
+    }, 30000);
+  }
+
+  private async getStores(): Promise<void> {
+    for (const [key, node] of this) {
+      const res = await this.requestStore(node).catch((error) => {
+        this.log(LogLevel.Error, `Error in promise requestStore: ${error}`);
+      });
+      if (res) {
+        this.log(LogLevel.Trace, `Store result for ${key}: ${res}`);
+      }
+    }
+    setTimeout(async () => {
+      await this.getStores();
+    }, 60000);
   }
 
   private async getCandidates(): Promise<void> {
