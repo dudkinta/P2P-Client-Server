@@ -14,6 +14,7 @@ export interface Roles {
 
 export interface Config {
   port: number;
+  wsport: number;
   listen: string[];
   protocols: Protocols;
   roles: Roles;

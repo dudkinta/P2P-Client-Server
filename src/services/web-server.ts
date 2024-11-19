@@ -3,12 +3,13 @@ import path from "path";
 import http from "http";
 import { setupSocketIO } from "./socket-service.js";
 import { NodeService } from "./node-service.js";
-
+import ConfigLoader from "./../helpers/config-loader.js";
 const __dirname = path.resolve();
 
 export function createServer(ns: NodeService): http.Server {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const config = ConfigLoader.getInstance().getConfig();
+  const port = config.wsport ?? 3006;
   const server = http.createServer(app);
   setupSocketIO(server, ns);
 
@@ -18,8 +19,8 @@ export function createServer(ns: NodeService): http.Server {
     res.sendFile(path.join(__dirname, "./dist/frontend", "index.html"));
   });
 
-  server.listen(PORT, () => {
-    console.log(`Сервер запущен на http://localhost:${PORT}`);
+  server.listen(port, () => {
+    console.log(`Сервер запущен на http://localhost:${port}`);
   });
 
   return server;

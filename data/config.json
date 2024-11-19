@@ -1,5 +1,6 @@
 {
   "port": 6006,
+  "wsport": 3006,
   "listen": ["/ip4/0.0.0.0/tcp/", "/ip6/::/tcp/"],
   "protocols": {
     "STORE": "/chain/store/1.0.0",
