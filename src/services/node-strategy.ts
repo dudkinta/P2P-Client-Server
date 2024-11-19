@@ -129,13 +129,23 @@ export class NodeStrategy extends Map<string, Node> {
   }
   private async checkDHT(): Promise<void> {
     // проверка DHT
-    const providers = await this.requestFindProviders("/direct-connect");
-    if (providers) {
+    const providersDirectConnect =
+      await this.requestFindProviders("/direct-connect");
+    if (providersDirectConnect) {
       this.log(
         LogLevel.Trace,
-        `Providers for /direct-connect: ${JSON.stringify(providers)}`
+        `Providers for /direct-connect: ${JSON.stringify(providersDirectConnect)}`
       );
     }
+    const providersNodeConnect =
+      await this.requestFindProviders("/node-connect");
+    if (providersNodeConnect) {
+      this.log(
+        LogLevel.Trace,
+        `Providers for /direct-connect: ${JSON.stringify(providersNodeConnect)}`
+      );
+    }
+
     /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
       const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);

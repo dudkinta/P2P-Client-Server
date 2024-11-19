@@ -292,6 +292,15 @@ export class P2PClient extends EventEmitter {
     return Array.from(res);
   }
 
+  private async publishProvider(key: string): Promise<void> {
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized");
+      throw new Error("Node is not initialized for publishProvider");
+    }
+    const cid = await generateCID(key);
+    await this.node.contentRouting.provide(cid);
+    console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
+  }
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -368,9 +377,12 @@ export class P2PClient extends EventEmitter {
             );
             return;
           }
+          await this.publishProvider("/node-connect");
+
           const maListService = this.node.services
             .maList as MultiaddressService;
           maListService.setCheckIpResult(checkIPResult);
+
           if (checkIPResult.ipv4portOpen || checkIPResult.ipv6portOpen) {
             this.log(LogLevel.Info, `Send to DHT open ports`);
             const dhtData = JSON.stringify({
@@ -381,14 +393,7 @@ export class P2PClient extends EventEmitter {
               ipv6portOpen: checkIPResult.ipv6portOpen,
               timestamp: Date.now(),
             });
-            // Ваш ключ для DHT
-            const key = "/direct-connect";
-            const cid = await generateCID(key);
-            // Предоставление CID через contentRouting
-            await this.node.contentRouting.provide(cid);
-            console.log(
-              `Provided key ${key} with CID ${cid.toString()} to DHT`
-            );
+            await this.publishProvider("/direct-connect");
             // Генерируем ключ для записи в DHT
             const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
             this.sendToDHT(dhtKey, dhtData).catch((err) => {
