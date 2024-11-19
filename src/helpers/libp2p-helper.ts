@@ -18,6 +18,7 @@ import { store } from "./../services/store/index.js";
 import ConfigLoader from "./config-loader.js";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
+import e from "express";
 
 export async function getRelayClient(
   lintenAddrs: string[],
@@ -40,8 +41,8 @@ export async function getRelayClient(
       transports: [
         tcp(),
         circuitRelayTransport({
-          maxInboundStopStreams: 500,
-          maxOutboundStopStreams: 500,
+          maxInboundStopStreams: 128,
+          maxOutboundStopStreams: 128,
           stopTimeout: 60000,
           reservationCompletionTimeout: 20000,
         }),
@@ -55,10 +56,10 @@ export async function getRelayClient(
       streamMuxers: [yamux()],
       services: {
         relay: circuitRelayServer({
-          maxInboundHopStreams: 512,
-          maxOutboundStopStreams: 515,
+          maxInboundHopStreams: 128,
+          maxOutboundStopStreams: 128,
           reservations: {
-            maxReservations: 512,
+            maxReservations: 128,
             defaultDurationLimit: 600000,
             defaultDataLimit: BigInt(1 << 24),
           },
@@ -110,8 +111,8 @@ export async function getNodeClient(
       transports: [
         tcp(),
         circuitRelayTransport({
-          maxInboundStopStreams: 500,
-          maxOutboundStopStreams: 500,
+          maxInboundStopStreams: 128,
+          maxOutboundStopStreams: 128,
           stopTimeout: 60000,
           reservationCompletionTimeout: 20000,
         }),
@@ -124,6 +125,15 @@ export async function getNodeClient(
       connectionEncrypters: [noise()],
       streamMuxers: [yamux()],
       services: {
+        relay: circuitRelayServer({
+          maxInboundHopStreams: 128,
+          maxOutboundStopStreams: 128,
+          reservations: {
+            maxReservations: 128,
+            defaultDurationLimit: 600000,
+            defaultDataLimit: BigInt(1 << 24),
+          },
+        }),
         dht: kadDHT({
           clientMode: false,
           kBucketSize: 20,
