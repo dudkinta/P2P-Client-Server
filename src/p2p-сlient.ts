@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
-import { TimeoutError, type Connection, type PeerId } from "@libp2p/interface";
+import { TimeoutError, PeerInfo, Connection, PeerId } from "@libp2p/interface";
 import { PingService } from "./services/ping/index.js";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
@@ -10,7 +10,11 @@ import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
-import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
+import {
+  getNodeClient,
+  getRelayClient,
+  generateCID,
+} from "./helpers/libp2p-helper.js";
 import { getIpAndCheckPort } from "./helpers/check-ip.js";
 import { KadDHT } from "@libp2p/kad-dht";
 const { debug } = pkg;
@@ -273,6 +277,21 @@ export class P2PClient extends EventEmitter {
     }
   }
 
+  async findProviders(key: string): Promise<PeerInfo[]> {
+    const res = new Set<PeerInfo>();
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized");
+      throw new Error("Node is not initialized for findProviders");
+    }
+    const cid = await generateCID(key);
+    const providers = await this.node.contentRouting.findProviders(cid);
+    for await (const provider of providers) {
+      res.add(provider);
+      console.log(`Found provider: ${provider.id.toString()}`);
+    }
+    return Array.from(res);
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -322,8 +341,13 @@ export class P2PClient extends EventEmitter {
       this.node.getMultiaddrs().forEach((ma) => {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
-
-      const checkIPResult = await getIpAndCheckPort(this.port).catch((err) => {
+      const currentPort = this.node
+        .getMultiaddrs()[0]
+        .toString()
+        .split("/tcp/")[1];
+      const checkIPResult = await getIpAndCheckPort(
+        Number.parseFloat(currentPort)
+      ).catch((err) => {
         this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
         return undefined;
       });
@@ -344,9 +368,14 @@ export class P2PClient extends EventEmitter {
             ipv6portOpen: checkIPResult.ipv6portOpen,
             timestamp: Date.now(),
           });
-
+          // Ваш ключ для DHT
+          const key = "/direct-connect";
+          const cid = await generateCID(key);
+          // Предоставление CID через contentRouting
+          await this.node.contentRouting.provide(cid);
+          console.log(`Provided key ${key} with CID ${cid.toString()} to DHT`);
           // Генерируем ключ для записи в DHT
-          const dhtKey = `/port-check/${this.localPeerId.toString()}`;
+          const dhtKey = `/direct-connect/${this.localPeerId.toString()}`;
           this.sendToDHT(dhtKey, dhtData).catch((err) => {
             this.log(LogLevel.Error, `Error in sendToDHT: ${err}`);
           });

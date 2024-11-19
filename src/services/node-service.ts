@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import ConfigLoader from "../helpers/config-loader.js";
 import { P2PClient } from "../p2p-сlient.js";
 import { multiaddr } from "@multiformats/multiaddr";
-import { Connection, PeerId } from "@libp2p/interface";
+import { Connection, PeerId, PeerInfo } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
 import { OutOfLimitError } from "../models/out-of-limit-error.js";
@@ -17,8 +17,8 @@ export class NodeService extends EventEmitter {
   private config = ConfigLoader.getInstance().getConfig();
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
-    sendDebug("network-service", level, timestamp, message);
-    debug("network-service")(
+    sendDebug("node-service", level, timestamp, message);
+    debug("node-service")(
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
   };
@@ -31,7 +31,8 @@ export class NodeService extends EventEmitter {
       this.RequestRoles.bind(this),
       this.RequestMultiaddrrs.bind(this),
       this.RequestConnectedPeers.bind(this),
-      this.RequestDHT.bind(this)
+      this.RequestDHT.bind(this),
+      this.FindProviders.bind(this)
     );
   }
 
@@ -178,7 +179,14 @@ export class NodeService extends EventEmitter {
     }
   }
   private async RequestRoles(node: Node): Promise<string[] | undefined> {
-    if (!node.isConnect() || !node.peerId) return undefined;
+    if (!node.isConnect()) {
+      this.log(LogLevel.Warning, `Node is not connected`);
+      return undefined;
+    }
+    if (!node.peerId) {
+      this.log(LogLevel.Warning, `PeerId is undefined`);
+      return undefined;
+    }
     try {
       if (node.protocols.has(this.config.protocols.ROLE)) {
         const connection = node.getOpenedConnection();
@@ -225,7 +233,14 @@ export class NodeService extends EventEmitter {
     }
   }
   private async RequestMultiaddrrs(node: Node): Promise<string[] | undefined> {
-    if (!node.isConnect() || !node.peerId) return undefined;
+    if (!node.isConnect()) {
+      this.log(LogLevel.Warning, `Node is not connected`);
+      return undefined;
+    }
+    if (!node.peerId) {
+      this.log(LogLevel.Warning, `PeerId is undefined`);
+      return undefined;
+    }
     try {
       if (node.protocols.has(this.config.protocols.MULTIADDRES)) {
         const connection = node.getOpenedConnection();
@@ -272,7 +287,14 @@ export class NodeService extends EventEmitter {
     }
   }
   private async RequestConnectedPeers(node: Node): Promise<any | undefined> {
-    if (!node.isConnect() || !node.peerId) return undefined;
+    if (!node.isConnect()) {
+      this.log(LogLevel.Warning, `Node is not connected`);
+      return undefined;
+    }
+    if (!node.peerId) {
+      this.log(LogLevel.Warning, `PeerId is undefined`);
+      return undefined;
+    }
     try {
       if (node.protocols.has(this.config.protocols.PEER_LIST)) {
         const connection = node.getOpenedConnection();
@@ -355,6 +377,28 @@ export class NodeService extends EventEmitter {
       return dhtValue;
     } catch (error) {
       this.log(LogLevel.Error, `Error in RequestDHT ${JSON.stringify(error)}`);
+      return undefined;
+    }
+  }
+
+  async FindProviders(dhtKey: string): Promise<PeerInfo[] | undefined> {
+    try {
+      const providers = await this.client
+        .findProviders(dhtKey)
+        .catch((error) => {
+          this.log(
+            LogLevel.Error,
+            `Error in promise FindProviders ${JSON.stringify(error)}`
+          );
+          throw error;
+        });
+      this.log(LogLevel.Info, `Providers for ${dhtKey} is ${providers}`);
+      return providers;
+    } catch (error) {
+      this.log(
+        LogLevel.Error,
+        `Error in FindProviders ${JSON.stringify(error)}`
+      );
       return undefined;
     }
   }

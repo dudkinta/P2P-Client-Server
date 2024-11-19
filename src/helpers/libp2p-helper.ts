@@ -14,6 +14,9 @@ import { roles } from "./../services/roles/index.js";
 import { peerList } from "./../services/peer-list/index.js";
 import { maList } from "./../services/multiadress/index.js";
 import ConfigLoader from "./config-loader.js";
+import { CID } from "multiformats/cid";
+import { sha256 } from "multiformats/hashes/sha2";
+import { bytes } from "multiformats";
 
 export async function getRelayClient(
   lintenAddrs: string[],
@@ -61,6 +64,7 @@ export async function getRelayClient(
         }),
         aminoDHT: kadDHT({
           peerInfoMapper: removePrivateAddressesMapper,
+          clientMode: false,
         }),
         identify: identify(),
         identifyPush: identifyPush(),
@@ -120,6 +124,7 @@ export async function getNodeClient(
       services: {
         aminoDHT: kadDHT({
           peerInfoMapper: removePrivateAddressesMapper,
+          clientMode: false,
         }),
         identify: identify(),
         identifyPush: identifyPush(),
@@ -138,4 +143,10 @@ export async function getNodeClient(
   } catch (error) {
     throw new Error(`Error during createLibp2p: ${error}`);
   }
+}
+
+export async function generateCID(key: string) {
+  const hash = await sha256.digest(new TextEncoder().encode(key));
+  const cid = CID.createV1(0x70, hash); // 0x70 — raw-формат
+  return cid;
 }

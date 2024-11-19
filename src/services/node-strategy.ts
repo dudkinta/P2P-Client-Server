@@ -1,7 +1,7 @@
 import { Node } from "../models/node.js";
 import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
-import { Connection, PeerId } from "@libp2p/interface";
+import { Connection, PeerId, PeerInfo } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
 import {
@@ -20,6 +20,7 @@ type RequestConnectedPeers = (
   node: Node
 ) => Promise<Map<string, string> | undefined>;
 type RequestDHT = (dhtKey: string) => Promise<any>;
+type RequestFindProviders = (dhtKey: string) => Promise<PeerInfo[] | undefined>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
@@ -35,6 +36,7 @@ export class NodeStrategy extends Map<string, Node> {
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
   private requestDHT: RequestDHT;
+  private requestFindProviders: RequestFindProviders;
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -52,7 +54,8 @@ export class NodeStrategy extends Map<string, Node> {
     requestRoles: RequestRoles,
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
-    requestDHT: RequestDHT
+    requestDHT: RequestDHT,
+    requestFindProviders: RequestFindProviders
   ) {
     super();
     this.requestConnect = requestConnect;
@@ -61,6 +64,7 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
     this.requestDHT = requestDHT;
+    this.requestFindProviders = requestFindProviders;
   }
 
   set(key: string, value: Node): this {
@@ -258,14 +262,21 @@ export class NodeStrategy extends Map<string, Node> {
         continue;
       }
 
-      const dhtKey = `/port-check/${node.peerId?.toString()}`;
+      const providers = await this.requestFindProviders("/direct-connect");
+      if (providers) {
+        this.log(
+          LogLevel.Trace,
+          `Providers for /direct-connect: ${JSON.stringify(providers)}`
+        );
+      }
+      /*const dhtKey = `/port-check/${node.peerId?.toString()}`;
       const dhtResult = await this.requestDHT(dhtKey).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestDHT: ${error}`);
         return undefined;
       });
       if (dhtResult) {
         this.log(LogLevel.Trace, `DHT result for ${key}: ${dhtResult}`);
-      }
+      }*/
     }
 
     //отправляем все ноды в сокет
@@ -622,6 +633,7 @@ export class NodeStrategy extends Map<string, Node> {
     );
     const peerId = ma.getPeerId();
     if (!peerId) {
+      this.log(LogLevel.Warning, `PeerId not found in address ${address}`);
       return undefined;
     }
     if (this.banList.has(peerId.toString())) {
