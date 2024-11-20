@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // URL вашего сервера Express
+        target: 'http://localhost:3006', // URL вашего сервера Express
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '') // убирает /api, если не нужно
       }

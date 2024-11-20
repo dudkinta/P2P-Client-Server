@@ -72,31 +72,31 @@ export function isRelay(address: string): boolean {
 }
 
 export interface CheckResult {
-  ipv4: string | null;
-  ipv6: string | null;
+  ipv4: string | undefined;
+  ipv6: string | undefined;
   port: number;
   ipv4portOpen: boolean;
   ipv6portOpen: boolean;
   error?: string;
 }
 
-async function getExternalIPv4(): Promise<string | null> {
+async function getExternalIPv4(): Promise<string | undefined> {
   try {
     const response = await axios.get("https://api.ipify.org?format=json");
     return response.data.ip;
   } catch (error) {
     console.error("Ошибка при получении IPv4:");
-    return null;
+    return undefined;
   }
 }
 
-async function getExternalIPv6(): Promise<string | null> {
+async function getExternalIPv6(): Promise<string | undefined> {
   try {
     const response = await axios.get("https://api6.ipify.org?format=json");
     return response.data.ip;
   } catch (error) {
     console.error("Ошибка при получении IPv6:");
-    return null;
+    return undefined;
   }
 }
 
@@ -136,7 +136,9 @@ async function isPortOpen(
   });
 }
 
-export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
+export async function getIpAndCheckPort(
+  port: number
+): Promise<CheckResult | undefined> {
   try {
     // Получаем IPv4 и IPv6 адреса
     let [ipv4, ipv6] = await Promise.all([
@@ -156,7 +158,7 @@ export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
       ipv6portOpen = await isPortOpen(port, ipv6);
     }
     if (ipv4 == ipv6) {
-      ipv6 = null;
+      ipv6 = undefined;
     }
     return {
       ipv4,
@@ -167,8 +169,8 @@ export async function getIpAndCheckPort(port: number): Promise<CheckResult> {
     };
   } catch (error) {
     return {
-      ipv4: null,
-      ipv6: null,
+      ipv4: undefined,
+      ipv6: undefined,
       port: port,
       ipv4portOpen: false,
       ipv6portOpen: false,

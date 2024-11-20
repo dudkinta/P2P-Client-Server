@@ -10,8 +10,6 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
-import { getIpAndCheckPort } from "./helpers/check-ip.js";
-import { KadDHT } from "@libp2p/kad-dht";
 import { StoreService } from "./services/store/store.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
@@ -295,20 +293,6 @@ export class P2PClient extends EventEmitter {
       this.node.getMultiaddrs().forEach((ma) => {
         this.log(LogLevel.Info, `${ma.toString()}`);
       });
-
-      const currentPort = this.node
-        .getMultiaddrs()[0]
-        .toString()
-        .split("/tcp/")[1];
-      const checkIPResult = await getIpAndCheckPort(
-        Number.parseFloat(currentPort)
-      ).catch((err) => {
-        this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
-      });
-      this.log(
-        LogLevel.Info,
-        `Check IP result: ${JSON.stringify(checkIPResult)}`
-      );
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

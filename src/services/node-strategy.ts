@@ -93,14 +93,14 @@ export class NodeStrategy extends Map<string, Node> {
       await this.selfDiag();
     }, 10000);
     setTimeout(async () => {
-      await this.sendToSocket();
-    }, 0);
-    setTimeout(async () => {
       await this.getCandidates();
     }, 30000);
     setTimeout(async () => {
       await this.getStores();
     }, 30000);
+    setTimeout(async () => {
+      await this.sendToSocket();
+    }, 0);
   }
 
   private async getStores(): Promise<void> {
@@ -132,7 +132,8 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async sendToSocket(): Promise<void> {
-    SendNodesToSocket(Array.from(this.values()));
+    const nodes = Array.from(this.values());
+    SendNodesToSocket(nodes);
     setTimeout(async () => {
       await this.sendToSocket();
     }, 1000);
@@ -267,23 +268,39 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     //отключение от релейных узлов если достаточно подключенных нод
-    if (this.size > this.config.getConfig().MAX_NODES) {
-      const relayNodes = Array.from(this.values()).filter((node) => {
-        node.roles.has(this.config.getConfig().roles.RELAY) &&
-          !node.roles.has(this.config.getConfig().roles.NODE);
-      });
-      relayNodes.forEach(async (node) => {
+    /*if (this.size > 1) {
+      this.forEach(async (node) => {
         if (!node || !node.peerId) {
           return;
         }
-        await this.stopNodeStrategy(
-          node.peerId.toString(),
-          `too many connected nodes`,
-          60 * 1000 * 5
-        );
+        if (node.roles.has(this.config.getConfig().roles.RELAY)) {
+          this.log(
+            LogLevel.Trace,
+            `Relay node need disconnect: ${node.peerId}`
+          );
+          await this.stopNodeStrategy(
+            node.peerId.toString(),
+            `too many connected nodes`,
+            60 * 1000 * 5
+          );
+        }
+      });
+    }*/
+
+    //удаление закрытых соединений
+    for (const [key, node] of this) {
+      if (!node) {
+        continue;
+      }
+      if (node.connections.size == 0) {
+        continue;
+      }
+      node.connections.forEach((conn) => {
+        if (conn.status == "closed") {
+          node.connections.delete(conn);
+        }
       });
     }
-
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);

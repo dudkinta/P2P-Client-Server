@@ -4,7 +4,7 @@ import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendDebug } from "./../../services/socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
-import { CheckResult } from "../../helpers/check-ip.js";
+import { getIpAndCheckPort, CheckResult } from "../../helpers/check-ip.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -42,6 +42,8 @@ export class MultiaddressService
     sendDebug("libp2p:multiaddresses", level, timestamp, message);
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
+  private directAddress: CheckResult | undefined;
+
   constructor(
     components: MultiaddressServiceComponents,
     init: MultiaddressServiceInit = {}
@@ -67,6 +69,22 @@ export class MultiaddressService
       maxOutboundStreams: this.maxOutboundStreams,
       runOnLimitedConnection: this.runOnLimitedConnection,
     });
+
+    const currentPort = this.components.addressManager
+      .getAddresses()[0]
+      .toString()
+      .split("/tcp/")[1];
+    this.directAddress = await getIpAndCheckPort(
+      Number.parseFloat(currentPort)
+    ).catch((err) => {
+      this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
+      return undefined;
+    });
+    this.log(
+      LogLevel.Info,
+      `Check IP result: ${JSON.stringify(this.directAddress)}`
+    );
+
     this.started = true;
   }
 
@@ -92,20 +110,45 @@ export class MultiaddressService
         signal.addEventListener("abort", () => {
           stream?.abort(new TimeoutError("send multiaddresses timeout"));
         });
+        if (
+          this.directAddress &&
+          (this.directAddress.ipv4portOpen || this.directAddress.ipv6portOpen)
+        ) {
+          const addresses = [];
+          if (this.directAddress.ipv4 && this.directAddress.ipv4portOpen) {
+            addresses.push(
+              `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/`
+            );
+          }
+          if (this.directAddress.ipv6 && this.directAddress.ipv6portOpen) {
+            addresses.push(
+              `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/`
+            );
+          }
+          let jsonString = JSON.stringify(addresses);
+          await sendAndReceive(stream, jsonString).catch((err) => {
+            this.log(
+              LogLevel.Error,
+              `error while sending multiaddresses${JSON.stringify(err)}`
+            );
+            throw err;
+          });
+        } else {
+          const connections =
+            await this.components.addressManager.getAddresses();
 
-        const connections = await this.components.addressManager.getAddresses();
-
-        const addresses = Array.from(connections).map((conn) =>
-          conn.toString()
-        );
-        let jsonString = JSON.stringify(addresses);
-        await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log(
-            LogLevel.Error,
-            `error while sending multiaddresses${JSON.stringify(err)}`
+          const addresses = Array.from(connections).map((conn) =>
+            conn.toString()
           );
-          throw err;
-        });
+          let jsonString = JSON.stringify(addresses);
+          await sendAndReceive(stream, jsonString).catch((err) => {
+            this.log(
+              LogLevel.Error,
+              `error while sending multiaddresses${JSON.stringify(err)}`
+            );
+            throw err;
+          });
+        }
       })
       .catch((err) => {
         this.log(

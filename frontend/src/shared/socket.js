@@ -7,7 +7,7 @@ export function initializeSocket() {
     const debugInfoStore = useDebugInfoStore();
     const nodeInfoStore = useNodeInfoStore();
     if (!socket) {
-        socket = io('http://localhost:3000');
+        socket = io('http://localhost:3006');
 
         socket.on('connect', () => {
 
