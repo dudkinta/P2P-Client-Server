@@ -15,6 +15,7 @@ export interface MultiaddressService {
     connection: Connection,
     options?: AbortOptions
   ): Promise<string>;
+  getDirectMultiaddress(): Promise<string[]>;
 }
 
 export interface MultiaddressServiceInit {

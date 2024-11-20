@@ -69,22 +69,6 @@ export class MultiaddressService
       maxOutboundStreams: this.maxOutboundStreams,
       runOnLimitedConnection: this.runOnLimitedConnection,
     });
-
-    const currentPort = this.components.addressManager
-      .getAddresses()[0]
-      .toString()
-      .split("/tcp/")[1];
-    this.directAddress = await getIpAndCheckPort(
-      Number.parseFloat(currentPort)
-    ).catch((err) => {
-      this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
-      return undefined;
-    });
-    this.log(
-      LogLevel.Info,
-      `Check IP result: ${JSON.stringify(this.directAddress)}`
-    );
-
     this.started = true;
   }
 
@@ -228,5 +212,38 @@ export class MultiaddressService
         await stream.close(options);
       }
     }
+  }
+
+  async getDirectMultiaddress(): Promise<string[]> {
+    const addresses = [];
+    const addrrs = this.components.addressManager.getAddresses();
+    this.log(LogLevel.Info, `Addrrs cound: ${addrrs.length.toString()}`);
+    const currentPort = addrrs[0].toString().split("/tcp/")[1];
+    this.directAddress = await getIpAndCheckPort(
+      Number.parseFloat(currentPort)
+    ).catch((err) => {
+      this.log(LogLevel.Error, `Error in getIpAndCheckPort: ${err}`);
+      return undefined;
+    });
+    this.log(
+      LogLevel.Info,
+      `Check IP result: ${JSON.stringify(this.directAddress)}`
+    );
+    if (
+      this.directAddress &&
+      (this.directAddress.ipv4portOpen || this.directAddress.ipv6portOpen)
+    ) {
+      if (this.directAddress.ipv4 && this.directAddress.ipv4portOpen) {
+        addresses.push(
+          `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/`
+        );
+      }
+      if (this.directAddress.ipv6 && this.directAddress.ipv6portOpen) {
+        addresses.push(
+          `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/`
+        );
+      }
+    }
+    return addresses;
   }
 }

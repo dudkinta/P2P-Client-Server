@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
-import { TimeoutError, PeerInfo, Connection, PeerId } from "@libp2p/interface";
+import { TimeoutError, Connection, PeerId } from "@libp2p/interface";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
@@ -252,7 +252,6 @@ export class P2PClient extends EventEmitter {
         return;
       }
 
-      this.localPeerId = this.node.peerId;
       this.node.addEventListener("connection:open", (event: any) => {
         this.log(
           LogLevel.Info,
@@ -290,9 +289,19 @@ export class P2PClient extends EventEmitter {
 
       await this.node.start();
       this.log(LogLevel.Info, `Libp2p listening on:`);
-      this.node.getMultiaddrs().forEach((ma) => {
-        this.log(LogLevel.Info, `${ma.toString()}`);
-      });
+      this.localPeerId = this.node.peerId;
+      const maService = this.node.services.maList as MultiaddressService;
+      if (maService) {
+        const maList = await maService.getDirectMultiaddress();
+        maList.forEach((ma) => {
+          this.log(
+            LogLevel.Info,
+            `${ma.toString()}${this.localPeerId?.toString()}`
+          );
+        });
+      } else {
+        this.log(LogLevel.Warning, "No multiaddress service found");
+      }
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

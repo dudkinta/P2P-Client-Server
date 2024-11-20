@@ -127,6 +127,7 @@ export class RelayService {
           if (conn) {
             relay.connection = conn;
             relay.addrList.add(conn.remoteAddr.toString());
+            this.log(LogLevel.Info, `Connected to ${relay.peerId}`);
             break;
           } else {
             this.banList.add(relay.peerId);
@@ -147,9 +148,6 @@ export class RelayService {
           relay.connection = undefined;
         }
       }
-    });
-    this.relayList.forEach(async (relay) => {
-      this.log(LogLevel.Info, `${relay.toJSON()}`);
     });
     setTimeout(async () => {
       await this.mainCycle();

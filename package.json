@@ -5,7 +5,7 @@
   "bin": "dist/index.js",
   "type": "module",
   "scripts": {
-    "server": "node dist/relay.js",
+    "server": "set DEBUG=libp2p:multiaddresses && npm run build && node dist/relay.js",
     "build": "npx tsc",
     "start": "node dist/node.js",
     "node": "set DEBUG=p2p-client && npx tsc && node dist/node.js",
