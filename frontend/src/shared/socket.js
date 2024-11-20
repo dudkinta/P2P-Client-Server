@@ -1,13 +1,16 @@
 import { io } from 'socket.io-client';
 import { useDebugInfoStore } from './../entities/debug-info/model/debug-store';
 import { useNodeInfoStore } from './../entities/node-info/model/node-store';
+import config from './../../../data/config.json';
 let socket;
 
 export function initializeSocket() {
     const debugInfoStore = useDebugInfoStore();
     const nodeInfoStore = useNodeInfoStore();
     if (!socket) {
-        socket = io('http://localhost:3006');
+        const port = config.wsport ?? 3006;
+        console.log(`Use port: ${port}`);
+        socket = io(`http://localhost:${port}`);
 
         socket.on('connect', () => {
 

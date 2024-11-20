@@ -98,15 +98,16 @@ export class MultiaddressService
           this.directAddress &&
           (this.directAddress.ipv4portOpen || this.directAddress.ipv6portOpen)
         ) {
+          const peerId = this.components.peerId.toString();
           const addresses = [];
           if (this.directAddress.ipv4 && this.directAddress.ipv4portOpen) {
             addresses.push(
-              `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/`
+              `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/${peerId}`
             );
           }
           if (this.directAddress.ipv6 && this.directAddress.ipv6portOpen) {
             addresses.push(
-              `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/`
+              `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/${peerId}`
             );
           }
           let jsonString = JSON.stringify(addresses);
@@ -229,18 +230,19 @@ export class MultiaddressService
       LogLevel.Info,
       `Check IP result: ${JSON.stringify(this.directAddress)}`
     );
+    const peerId = this.components.peerId.toString();
     if (
       this.directAddress &&
       (this.directAddress.ipv4portOpen || this.directAddress.ipv6portOpen)
     ) {
       if (this.directAddress.ipv4 && this.directAddress.ipv4portOpen) {
         addresses.push(
-          `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/`
+          `/ip4/${this.directAddress.ipv4}/tcp/${this.directAddress.port}/p2p/${peerId}`
         );
       }
       if (this.directAddress.ipv6 && this.directAddress.ipv6portOpen) {
         addresses.push(
-          `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/`
+          `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/${peerId}`
         );
       }
     }

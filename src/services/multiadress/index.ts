@@ -3,6 +3,7 @@ import type {
   AbortOptions,
   ComponentLogger,
   Connection,
+  PeerId,
 } from "@libp2p/interface";
 import type {
   ConnectionManager,
@@ -31,6 +32,7 @@ export interface MultiaddressServiceComponents {
   addressManager: AddressManager;
   connectionManager: ConnectionManager;
   logger: ComponentLogger;
+  peerId: PeerId;
 }
 
 export function maList(

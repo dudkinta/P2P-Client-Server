@@ -294,10 +294,7 @@ export class P2PClient extends EventEmitter {
       if (maService) {
         const maList = await maService.getDirectMultiaddress();
         maList.forEach((ma) => {
-          this.log(
-            LogLevel.Info,
-            `${ma.toString()}${this.localPeerId?.toString()}`
-          );
+          this.log(LogLevel.Info, `${ma.toString()}`);
         });
       } else {
         this.log(LogLevel.Warning, "No multiaddress service found");
