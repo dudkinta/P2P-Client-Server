@@ -58,7 +58,10 @@ class ConfigLoader {
   }
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
-    fs.writeFile("./data/relay.knows", JSON.stringify(this.knowsRelay));
+    fs.writeFile(
+      "./data/relay.knows",
+      JSON.stringify(this.knowsRelay, null, 2)
+    );
   }
 
   public isKnownRelay(peer: string): boolean {

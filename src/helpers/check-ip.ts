@@ -55,7 +55,7 @@ export function isLocalAddress(addrStr: string): boolean {
 
 export function isDirect(address: string): boolean {
   const regex =
-    /^\/ip4\/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/tcp\/(\d{1,5})(\/ws)?\/p2p\/[A-Za-z0-9]+$/;
+    /^\/(ip4\/\d{1,3}(\.\d{1,3}){3}|ip6\/[0-9a-fA-F:]+)\/tcp\/\d{1,5}(\/ws)?\/p2p\/[A-Za-z0-9]+$/;
   const isMatch = regex.test(address);
   const containsRelay = address.includes("/p2p-circuit/");
   return isMatch && !containsRelay;
