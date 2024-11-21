@@ -100,7 +100,7 @@ export class StoreService implements Startable, StoreServiceInterface {
       if (this.Store.size > 0) {
         // Обработка запроса
         if (request?.key) {
-          const storeItems = this.Store.values()
+          const storeItems = Array.from(this.Store.values())
             .filter((value) => value.key === request.key)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
@@ -108,7 +108,7 @@ export class StoreService implements Startable, StoreServiceInterface {
         }
 
         if (request?.peerId) {
-          const storeItems = this.Store.values()
+          const storeItems = Array.from(this.Store.values())
             .filter((value) => value.peerId === request.peerId)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
