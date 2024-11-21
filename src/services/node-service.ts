@@ -2,13 +2,14 @@ import { EventEmitter } from "events";
 import ConfigLoader from "../helpers/config-loader.js";
 import { P2PClient } from "../p2p-сlient.js";
 import { multiaddr } from "@multiformats/multiaddr";
-import { Connection, PeerId, PeerInfo } from "@libp2p/interface";
+import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
 import { OutOfLimitError } from "../models/out-of-limit-error.js";
 import { sendDebug } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 import pkg from "debug";
+import { RequestStore } from "./store/index.js";
 const { debug } = pkg;
 export class NodeService extends EventEmitter {
   private client: P2PClient;
@@ -31,7 +32,7 @@ export class NodeService extends EventEmitter {
       this.RequestRoles.bind(this),
       this.RequestMultiaddrrs.bind(this),
       this.RequestConnectedPeers.bind(this),
-      this.RequestStore.bind(this)
+      this.RequestStoreData.bind(this)
     );
   }
 
@@ -340,7 +341,10 @@ export class NodeService extends EventEmitter {
     }
   }
 
-  private async RequestStore(node: Node): Promise<any | undefined> {
+  private async RequestStoreData(
+    node: Node,
+    request: RequestStore
+  ): Promise<any | undefined> {
     if (!node.isConnect()) {
       this.log(LogLevel.Warning, `Node is not connected`);
       return undefined;
@@ -353,14 +357,15 @@ export class NodeService extends EventEmitter {
       if (node.protocols.has(this.config.protocols.STORE)) {
         const connection = node.getOpenedConnection();
         if (!connection) return undefined;
-
-        let storeStr = await this.client.getStore(connection).catch((error) => {
-          this.log(
-            LogLevel.Error,
-            `Error in promise RequestStore ${JSON.stringify(error)}`
-          );
-          throw error;
-        });
+        let storeStr = await this.client
+          .getStore(connection, request)
+          .catch((error) => {
+            this.log(
+              LogLevel.Error,
+              `Error in promise RequestStore ${JSON.stringify(error)}`
+            );
+            throw error;
+          });
         if (!storeStr || storeStr.length === 0) return undefined;
         try {
           this.log(

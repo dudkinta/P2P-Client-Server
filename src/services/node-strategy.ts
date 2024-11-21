@@ -1,13 +1,14 @@
 import { Node } from "../models/node.js";
 import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
-import { Connection, PeerId, PeerInfo } from "@libp2p/interface";
+import { Connection, PeerId } from "@libp2p/interface";
 import pkg from "debug";
 import { multiaddr } from "@multiformats/multiaddr";
 import {
   sendDebug as SendLogToSocket,
   sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
+import { RequestStore } from "./../services/store/index.js";
 import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
 
@@ -19,7 +20,10 @@ type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
 type RequestConnectedPeers = (
   node: Node
 ) => Promise<Map<string, string> | undefined>;
-type RequestStore = (node: Node) => Promise<any | undefined>;
+type RequestStoreData = (
+  node: Node,
+  request: RequestStore
+) => Promise<any | undefined>;
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
@@ -34,7 +38,7 @@ export class NodeStrategy extends Map<string, Node> {
   private requestRoles: RequestRoles;
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
-  private requestStore: RequestStore;
+  private requestStoreData: RequestStoreData;
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -52,7 +56,7 @@ export class NodeStrategy extends Map<string, Node> {
     requestRoles: RequestRoles,
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
-    requestStore: RequestStore
+    requestStoreData: RequestStoreData
   ) {
     super();
     this.requestConnect = requestConnect;
@@ -60,7 +64,7 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestRoles = requestRoles;
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
-    this.requestStore = requestStore;
+    this.requestStoreData = requestStoreData;
   }
 
   set(key: string, value: Node): this {
@@ -105,7 +109,11 @@ export class NodeStrategy extends Map<string, Node> {
 
   private async getStores(): Promise<void> {
     for (const [key, node] of this) {
-      const res = await this.requestStore(node).catch((error) => {
+      const request: RequestStore = {
+        key: "DirectAddresses",
+        peerId: undefined,
+      };
+      const res = await this.requestStoreData(node, request).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestStore: ${error}`);
       });
       if (res) {

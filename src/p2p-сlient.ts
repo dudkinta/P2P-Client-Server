@@ -10,7 +10,7 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
-import { StoreService } from "./services/store/store.js";
+import { StoreService, RequestStore } from "./services/store/index.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -140,14 +140,14 @@ export class P2PClient extends EventEmitter {
     }
   }
 
-  async getStore(conn: Connection): Promise<string> {
+  async getStore(conn: Connection, request: RequestStore): Promise<string> {
     if (!this.node) {
       throw new Error("Node is not initialized for getStore");
     }
     try {
       const storeService = this.node.services.store as StoreService;
       const result = await storeService
-        .getStore(conn, {
+        .getStore(conn, request, {
           signal: AbortSignal.timeout(5000),
         })
         .catch((err) => {
@@ -296,6 +296,24 @@ export class P2PClient extends EventEmitter {
         maList.forEach((ma) => {
           this.log(LogLevel.Info, `${ma.toString()}`);
         });
+        if (maList.length > 0) {
+          const storeService = this.node.services.store as StoreService;
+          if (storeService) {
+            const peerId = this.node.peerId.toString();
+            const key = "DirectAddresses";
+            const value = maList;
+            const ttl = 60000 * 60;
+            const dt = Date.now();
+            storeService.putStore({
+              peerId,
+              key,
+              type: "string[]",
+              value,
+              ttl,
+              dt,
+            });
+          }
+        }
       } else {
         this.log(LogLevel.Warning, "No multiaddress service found");
       }

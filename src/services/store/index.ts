@@ -8,9 +8,25 @@ import type {
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 
 export interface StoreService {
-  getStore(connection: Connection, options?: AbortOptions): Promise<string>;
+  getStore(
+    connection: Connection,
+    request: RequestStore,
+    options?: AbortOptions
+  ): Promise<string>;
+  putStore(storeItem: StoreItem): void;
 }
-
+export interface StoreItem {
+  peerId: string;
+  key: string;
+  type: string;
+  value: any;
+  ttl: number;
+  dt: number;
+}
+export interface RequestStore {
+  key: string | undefined;
+  peerId: string | undefined;
+}
 export interface StoreServiceInit {
   protocolPrefix?: string;
   maxInboundStreams?: number;
