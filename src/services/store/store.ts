@@ -1,7 +1,10 @@
 import { TimeoutError } from "@libp2p/interface";
-import { OutOfLimitError } from "../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
+import {
+  readFromStream,
+  writeToStream,
+  readCompleteStringFromStream,
+} from "../../helpers/stream-helper.js";
 import { sendDebug } from "../socket-service.js";
 import * as crypto from "crypto";
 import { LogLevel } from "../../helpers/log-level.js";
@@ -93,8 +96,7 @@ export class StoreService implements Startable, StoreServiceInterface {
         stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
 
-      const requestBuffer = await readFromStream(stream, Infinity, { signal }); // Чтение данных (здесь 1024 байта - пример)
-      const requestStr = new TextDecoder().decode(requestBuffer);
+      const requestStr = await readCompleteStringFromStream(stream, { signal });
       this.log(LogLevel.Trace, `Received store request: ${requestStr}`);
       const request = JSON.parse(requestStr) as RequestStore;
       if (this.Store.size > 0) {
@@ -105,7 +107,7 @@ export class StoreService implements Startable, StoreServiceInterface {
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
           this.log(LogLevel.Trace, `Sending store response: ${response}`);
-          await writeToStream(stream, response, { signal });
+          await writeToStream(stream, response, 1024);
         }
 
         if (request?.peerId) {
@@ -114,11 +116,11 @@ export class StoreService implements Startable, StoreServiceInterface {
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
           this.log(LogLevel.Trace, `Sending store response: ${response}`);
-          await writeToStream(stream, response, { signal });
+          await writeToStream(stream, response, 1024);
         }
       } else {
         const nullResponse = new TextEncoder().encode(JSON.stringify([]));
-        await writeToStream(stream, nullResponse, { signal });
+        await writeToStream(stream, nullResponse, 1024);
       }
     } catch (err) {
       this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
@@ -151,10 +153,11 @@ export class StoreService implements Startable, StoreServiceInterface {
       });
 
       const requestBuffer = new TextEncoder().encode(JSON.stringify(request));
-      await writeToStream(stream, requestBuffer, { signal });
+      await writeToStream(stream, requestBuffer, 1024);
 
-      const responseBuffer = await readFromStream(stream, 1024, { signal }); // Чтение данных (здесь 1024 байта - пример)
-      const responseStr = new TextDecoder().decode(responseBuffer);
+      const responseStr = await readCompleteStringFromStream(stream, {
+        signal,
+      });
 
       this.log(LogLevel.Info, `Received store response: ${responseStr}`);
       if (!responseStr) {

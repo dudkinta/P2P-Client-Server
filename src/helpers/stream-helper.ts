@@ -53,29 +53,13 @@ export async function sendAndReceive(
   return receivedMessage;
 }
 
-const DEFAULT_TIMEOUT = 10000;
+const DEFAULT_TIMEOUT = 5000;
 
-/**
- * Чтение данных из потока
- * @param stream Поток libp2p
- * @param length Количество байт для чтения
- * @param options Настройки AbortOptions
- * @returns Uint8Array с прочитанными данными
- */
-/**
- * Чтение всех данных из потока
- * @param stream Поток libp2p
- * @param maxLength Максимальная длина данных (по умолчанию без ограничения)
- * @param options Настройки AbortOptions
- * @returns Uint8Array с прочитанными данными
- */
 export async function readFromStream(
   stream: Stream,
-  maxLength: number = Infinity,
+  chunkProcessor: (chunk: Uint8Array) => void,
   options: AbortOptions = {}
-): Promise<Uint8Array> {
-  const receivedDataList = new Uint8ArrayList();
-
+): Promise<void> {
   if (options.signal == null) {
     const signal = AbortSignal.timeout(DEFAULT_TIMEOUT);
     options.signal = signal;
@@ -84,40 +68,28 @@ export async function readFromStream(
   const reader = stream.source[Symbol.asyncIterator]();
 
   try {
-    let totalLength = 0;
-
     while (true) {
       const { value, done } = await reader.next();
       if (done) {
         break; // Поток завершён
       }
 
-      totalLength += value.length;
-
-      if (totalLength > maxLength) {
-        throw new Error(
-          `Stream data exceeds maximum allowed length of ${maxLength} bytes`
-        );
+      if (value instanceof Uint8ArrayList) {
+        // Преобразуем Uint8ArrayList в обычный Uint8Array
+        chunkProcessor(value.subarray());
+      } else {
+        chunkProcessor(value); // Если это уже Uint8Array
       }
-
-      receivedDataList.append(value);
     }
-
-    return receivedDataList.subarray(); // Возвращаем все собранные данные
   } catch (error) {
     throw new Error(`Error while reading from stream: ${error}`);
   }
 }
 
-/**
- * Запись данных в поток
- * @param stream Поток libp2p
- * @param data Данные для записи
- * @param options Настройки AbortOptions
- */
 export async function writeToStream(
   stream: Stream,
   data: Uint8Array,
+  chunkSize: number = 1024,
   options: AbortOptions = {}
 ): Promise<void> {
   if (options.signal == null) {
@@ -130,10 +102,31 @@ export async function writeToStream(
 
     await writer(
       (async function* () {
-        yield data;
+        for (let i = 0; i < data.length; i += chunkSize) {
+          // Разбиваем данные на части и записываем по частям
+          yield data.slice(i, i + chunkSize);
+        }
       })()
     );
   } catch (error) {
     throw new Error(`Error while writing to stream: ${error}`);
   }
+}
+
+export async function readCompleteStringFromStream(
+  stream: Stream,
+  options: AbortOptions = {}
+): Promise<string> {
+  let completeString = "";
+  const decoder = new TextDecoder("utf-8"); // Создаём декодер для преобразования байтов в строку
+
+  await readFromStream(
+    stream,
+    (chunk) => {
+      completeString += decoder.decode(chunk, { stream: true }); // Добавляем преобразованный кусок
+    },
+    options
+  );
+
+  return completeString; // Возвращаем собранную строку
 }
