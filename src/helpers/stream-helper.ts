@@ -1,5 +1,5 @@
 import { Uint8ArrayList } from "uint8arraylist";
-import { Stream } from "@libp2p/interface";
+import type { Stream, AbortOptions } from "@libp2p/interface";
 
 export async function sendAndReceive(
   stream: Stream,
@@ -53,45 +53,87 @@ export async function sendAndReceive(
   return receivedMessage;
 }
 
-// Метод для записи данных в поток
-export async function writeToStream(
-  stream: Stream,
-  message: string
-): Promise<void> {
-  const encoder = new TextEncoder();
-  const messageUint8Array = encoder.encode(message);
+const DEFAULT_TIMEOUT = 10000;
 
-  async function* messageGenerator(): AsyncGenerator<Uint8ArrayList> {
-    yield new Uint8ArrayList(messageUint8Array);
+/**
+ * Чтение данных из потока
+ * @param stream Поток libp2p
+ * @param length Количество байт для чтения
+ * @param options Настройки AbortOptions
+ * @returns Uint8Array с прочитанными данными
+ */
+/**
+ * Чтение всех данных из потока
+ * @param stream Поток libp2p
+ * @param maxLength Максимальная длина данных (по умолчанию без ограничения)
+ * @param options Настройки AbortOptions
+ * @returns Uint8Array с прочитанными данными
+ */
+export async function readFromStream(
+  stream: Stream,
+  maxLength: number = Infinity,
+  options: AbortOptions = {}
+): Promise<Uint8Array> {
+  const receivedDataList = new Uint8ArrayList();
+
+  if (options.signal == null) {
+    const signal = AbortSignal.timeout(DEFAULT_TIMEOUT);
+    options.signal = signal;
   }
 
+  const reader = stream.source[Symbol.asyncIterator]();
+
   try {
-    await stream.sink(messageGenerator());
+    let totalLength = 0;
+
+    while (true) {
+      const { value, done } = await reader.next();
+      if (done) {
+        break; // Поток завершён
+      }
+
+      totalLength += value.length;
+
+      if (totalLength > maxLength) {
+        throw new Error(
+          `Stream data exceeds maximum allowed length of ${maxLength} bytes`
+        );
+      }
+
+      receivedDataList.append(value);
+    }
+
+    return receivedDataList.subarray(); // Возвращаем все собранные данные
   } catch (error) {
-    throw new Error(`WriteToStream failed: ${error}`);
+    throw new Error(`Error while reading from stream: ${error}`);
   }
 }
 
-// Метод для чтения данных из потока
-export async function readFromStream(stream: Stream): Promise<string> {
-  const decoder = new TextDecoder();
-  const receivedDataList = new Uint8ArrayList();
-
-  try {
-    for await (const chunk of stream.source) {
-      receivedDataList.append(chunk);
-    }
-  } catch (error) {
-    throw new Error(`ReadFromStream failed: ${error}`);
+/**
+ * Запись данных в поток
+ * @param stream Поток libp2p
+ * @param data Данные для записи
+ * @param options Настройки AbortOptions
+ */
+export async function writeToStream(
+  stream: Stream,
+  data: Uint8Array,
+  options: AbortOptions = {}
+): Promise<void> {
+  if (options.signal == null) {
+    const signal = AbortSignal.timeout(DEFAULT_TIMEOUT);
+    options.signal = signal;
   }
 
-  if (receivedDataList.length === 0) {
-    throw new Error("No data received from stream");
-  }
-
   try {
-    return decoder.decode(receivedDataList.subarray());
+    const writer = stream.sink;
+
+    await writer(
+      (async function* () {
+        yield data;
+      })()
+    );
   } catch (error) {
-    throw new Error(`Failed to decode data: ${error}`);
+    throw new Error(`Error while writing to stream: ${error}`);
   }
 }

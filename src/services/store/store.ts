@@ -93,7 +93,9 @@ export class StoreService implements Startable, StoreServiceInterface {
         stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
 
-      const requestStr = await readFromStream(stream);
+      const requestBuffer = await readFromStream(stream, Infinity, { signal }); // Чтение данных (здесь 1024 байта - пример)
+      const requestStr = new TextDecoder().decode(requestBuffer);
+      this.log(LogLevel.Trace, `Received store request: ${requestStr}`);
       const request = JSON.parse(requestStr) as RequestStore;
 
       // Обработка запроса
@@ -101,16 +103,16 @@ export class StoreService implements Startable, StoreServiceInterface {
         const storeItems = this.Store.values()
           .filter((value) => value.key === request.key)
           .map((value) => JSON.stringify(value));
-        const response = JSON.stringify(storeItems);
-        await writeToStream(stream, response);
+        const response = new TextEncoder().encode(JSON.stringify(storeItems));
+        await writeToStream(stream, response, { signal });
       }
 
       if (request?.peerId) {
         const storeItems = this.Store.values()
           .filter((value) => value.peerId === request.peerId)
           .map((value) => JSON.stringify(value));
-        const response = JSON.stringify(storeItems);
-        await writeToStream(stream, response);
+        const response = new TextEncoder().encode(JSON.stringify(storeItems));
+        await writeToStream(stream, response, { signal });
       }
     } catch (err) {
       this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
@@ -134,23 +136,29 @@ export class StoreService implements Startable, StoreServiceInterface {
         throw new Error("Connection is not open");
       }
 
+      const signal = options.signal || AbortSignal.timeout(this.timeout);
+
       stream = await connection.newStream(this.protocol, {
         ...options,
+        signal,
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
 
-      await writeToStream(stream, JSON.stringify(request));
+      const requestBuffer = new TextEncoder().encode(JSON.stringify(request));
+      await writeToStream(stream, requestBuffer, { signal });
 
-      const result = await readFromStream(stream);
-      this.log(LogLevel.Info, `Received store response: ${result}`);
+      const responseBuffer = await readFromStream(stream, 1024, { signal }); // Чтение данных (здесь 1024 байта - пример)
+      const responseStr = new TextDecoder().decode(responseBuffer);
 
-      const storeItems = JSON.parse(result) as StoreItem[];
+      this.log(LogLevel.Info, `Received store response: ${responseStr}`);
+
+      const storeItems = JSON.parse(responseStr) as StoreItem[];
       storeItems.forEach((item) => {
         const hash = this.getHash(item.peerId, item.key);
         this.Store.set(hash, item);
       });
 
-      return result;
+      return responseStr;
     } catch (err) {
       this.log(LogLevel.Error, `Failed to get store: ${err}`);
       throw err;
