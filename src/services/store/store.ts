@@ -77,70 +77,48 @@ export class StoreService implements Startable, StoreServiceInterface {
     return this.started;
   }
 
-  handleMessage(data: IncomingStreamData): void {
+  async handleMessage(data: IncomingStreamData): Promise<void> {
+    const { stream } = data;
     this.log(
       LogLevel.Info,
-      `incoming getStore from ${data.connection.remotePeer.toString()}`
+      `Incoming getStore from ${data.connection.remotePeer}`
     );
 
-    const { stream } = data;
-    Promise.resolve()
-      .then(async () => {
-        const signal = AbortSignal.timeout(this.timeout);
-        signal.addEventListener("abort", () => {
-          stream?.abort(new TimeoutError("send store timeout"));
-        });
+    try {
+      const signal = AbortSignal.timeout(this.timeout);
 
-        const requestStr = await readFromStream(stream).catch((err) => {
-          this.log(
-            LogLevel.Error,
-            `Error while sending store ${JSON.stringify(err)}`
-          );
-          throw err;
-        });
-
-        const request = JSON.parse(requestStr) as RequestStore;
-        if (request && request.key) {
-          const storeItems = this.Store.values()
-            .filter((value) => value.key === request.key)
-            .map((value) => JSON.stringify(value));
-          const response = JSON.stringify(storeItems);
-          await writeToStream(stream, response).catch((err) => {
-            this.log(
-              LogLevel.Error,
-              `Error while receiving store ${JSON.stringify(err)}`
-            );
-            throw err;
-          });
-        }
-        this.log(LogLevel.Info, `request ${JSON.stringify(request)}`);
-        if (request && request.peerId) {
-          const storeItems = this.Store.values()
-            .filter((value) => value.peerId === request.peerId)
-            .map((value) => JSON.stringify(value));
-          const response = JSON.stringify(storeItems);
-          await writeToStream(stream, response).catch((err) => {
-            this.log(
-              LogLevel.Error,
-              `Error while receiving store ${JSON.stringify(err)}`
-            );
-            throw err;
-          });
-        }
-      })
-      .catch((err) => {
-        this.log(
-          LogLevel.Error,
-          `incoming store from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
-        );
-        //stream?.abort(err);
-      })
-      .finally(() => {
-        this.log(
-          LogLevel.Info,
-          `incoming store from ${data.connection.remotePeer.toString()} completed`
-        );
+      // Завершение по таймауту
+      signal.addEventListener("abort", () => {
+        this.log(LogLevel.Warning, "Timeout reached, aborting stream");
+        stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
+
+      const requestStr = await readFromStream(stream);
+      const request = JSON.parse(requestStr) as RequestStore;
+
+      // Обработка запроса
+      if (request?.key) {
+        const storeItems = this.Store.values()
+          .filter((value) => value.key === request.key)
+          .map((value) => JSON.stringify(value));
+        const response = JSON.stringify(storeItems);
+        await writeToStream(stream, response);
+      }
+
+      if (request?.peerId) {
+        const storeItems = this.Store.values()
+          .filter((value) => value.peerId === request.peerId)
+          .map((value) => JSON.stringify(value));
+        const response = JSON.stringify(storeItems);
+        await writeToStream(stream, response);
+      }
+    } catch (err) {
+      this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
+    } finally {
+      await stream.close().catch((err) => {
+        this.log(LogLevel.Warning, `Failed to close stream: ${err.message}`);
+      });
+    }
   }
 
   async getStore(
@@ -148,74 +126,39 @@ export class StoreService implements Startable, StoreServiceInterface {
     request: RequestStore,
     options: AbortOptions = {}
   ): Promise<string> {
-    this.log(LogLevel.Info, `Get store ${connection.remotePeer.toString()}`);
+    this.log(LogLevel.Info, `Requesting store from ${connection.remotePeer}`);
     let stream: Stream | undefined;
+
     try {
-      if (connection == null) {
-        throw new Error("connection is null");
-      }
-      if (connection.status !== "open") {
-        throw new Error("connection is not open");
-      }
-
-      if (connection.limits) {
-        if (connection.limits.seconds && connection.limits.seconds < 10000) {
-          throw new OutOfLimitError("connection has time limits");
-        }
-        if (connection.limits.bytes && connection.limits.bytes < 10000) {
-          throw new OutOfLimitError("connection has byte limits");
-        }
-      }
-
-      if (options.signal == null) {
-        const signal = AbortSignal.timeout(this.timeout);
-
-        options = {
-          ...options,
-          signal,
-        };
+      if (!connection || connection.status !== "open") {
+        throw new Error("Connection is not open");
       }
 
       stream = await connection.newStream(this.protocol, {
         ...options,
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
-      this.log(LogLevel.Info, `Get request to ${connection.remotePeer}`);
-      await writeToStream(stream, JSON.stringify(request)).catch((err) => {
-        this.log(
-          LogLevel.Error,
-          `Error while receiving store ${JSON.stringify(err)}`
-        );
-        throw err;
+
+      await writeToStream(stream, JSON.stringify(request));
+
+      const result = await readFromStream(stream);
+      this.log(LogLevel.Info, `Received store response: ${result}`);
+
+      const storeItems = JSON.parse(result) as StoreItem[];
+      storeItems.forEach((item) => {
+        const hash = this.getHash(item.peerId, item.key);
+        this.Store.set(hash, item);
       });
-      const result = await readFromStream(stream).catch((err) => {
-        this.log(
-          LogLevel.Error,
-          `Error while receiving store ${JSON.stringify(err)}`
-        );
-        throw err;
-      });
-      this.log(LogLevel.Info, `Received answer: ${result}`);
-      if (result) {
-        const storeItems = JSON.parse(result) as StoreItem[];
-        storeItems.forEach((storeItem) => {
-          const hash = this.getHash(storeItem.peerId, storeItem.key);
-          this.Store.set(hash, storeItem);
-        });
-      }
+
       return result;
-    } catch (err: any) {
-      this.log(
-        LogLevel.Error,
-        `error while getStore ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
-      );
-
-      //stream?.abort(err);
-
+    } catch (err) {
+      this.log(LogLevel.Error, `Failed to get store: ${err}`);
       throw err;
     } finally {
-      if (stream != null) {
-        await stream.close(options);
+      if (stream) {
+        await stream.close().catch((err) => {
+          this.log(LogLevel.Warning, `Failed to close stream: ${err.message}`);
+        });
       }
     }
   }
