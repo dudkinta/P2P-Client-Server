@@ -101,17 +101,19 @@ export class StoreService implements Startable, StoreServiceInterface {
         // Обработка запроса
         if (request?.key) {
           const storeItems = Array.from(this.Store.values())
-            .filter((value) => value.key === request.key)
+            .filter((value) => value.key == request.key)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
+          this.log(LogLevel.Trace, `Sending store response: ${response}`);
           await writeToStream(stream, response, { signal });
         }
 
         if (request?.peerId) {
           const storeItems = Array.from(this.Store.values())
-            .filter((value) => value.peerId === request.peerId)
+            .filter((value) => value.peerId == request.peerId)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
+          this.log(LogLevel.Trace, `Sending store response: ${response}`);
           await writeToStream(stream, response, { signal });
         }
       } else {
@@ -158,11 +160,22 @@ export class StoreService implements Startable, StoreServiceInterface {
       if (!responseStr) {
         return "";
       }
-      const storeItems = JSON.parse(responseStr) as StoreItem[];
-      storeItems.forEach((item) => {
-        const hash = this.getHash(item.peerId, item.key);
-        this.Store.set(hash, item);
-      });
+
+      try {
+        // Парсим первый уровень массива
+        const parsedArray: string[] = JSON.parse(responseStr);
+
+        // Парсим каждую строку в объект StoreItem
+        const storeItems: StoreItem[] = parsedArray.map((item) =>
+          JSON.parse(item)
+        );
+        storeItems.forEach((item) => {
+          this.putStore(item);
+        });
+        console.log(storeItems);
+      } catch (error) {
+        console.error("Failed to parse JSON:", error);
+      }
 
       return responseStr;
     } catch (err) {
@@ -186,5 +199,9 @@ export class StoreService implements Startable, StoreServiceInterface {
   putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
     this.Store.set(hash, storeItem);
+    this.log(
+      LogLevel.Trace,
+      `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+    );
   }
 }
