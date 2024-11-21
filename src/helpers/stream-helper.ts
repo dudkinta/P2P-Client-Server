@@ -84,25 +84,27 @@ export async function writeToStream(
 // Функция для чтения данных из потока
 export async function readFromStream(stream: Stream): Promise<string> {
   const decoder = new TextDecoder();
-
-  // Accumulate received data
   const receivedDataList = new Uint8ArrayList();
+
   try {
     for await (const chunk of stream.source) {
+      console.log("Received chunk:", chunk);
       receivedDataList.append(chunk);
     }
   } catch (error) {
+    console.error("Error while iterating over stream.source:", error);
     throw new Error("Read helper. Error while reading from the stream.");
   }
 
-  // Decode received data
-  let receivedMessage: string;
-  try {
-    const receivedData: Uint8Array = receivedDataList.subarray();
-    receivedMessage = decoder.decode(receivedData);
-  } catch (error) {
-    throw new Error("Read helper. Failed to decode the received data.");
+  if (receivedDataList.length === 0) {
+    throw new Error("Read helper. No data received from the stream.");
   }
 
-  return receivedMessage;
+  try {
+    const receivedData: Uint8Array = receivedDataList.subarray();
+    return decoder.decode(receivedData);
+  } catch (error) {
+    console.error("Error while decoding received data:", error);
+    throw new Error("Read helper. Failed to decode the received data.");
+  }
 }

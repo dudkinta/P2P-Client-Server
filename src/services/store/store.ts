@@ -133,7 +133,7 @@ export class StoreService implements Startable, StoreServiceInterface {
           LogLevel.Error,
           `incoming store from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
         );
-        stream?.abort(err);
+        //stream?.abort(err);
       })
       .finally(() => {
         this.log(
@@ -210,7 +210,7 @@ export class StoreService implements Startable, StoreServiceInterface {
         `error while getStore ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
       );
 
-      stream?.abort(err);
+      //stream?.abort(err);
 
       throw err;
     } finally {
