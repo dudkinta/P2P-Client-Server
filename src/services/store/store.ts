@@ -1,7 +1,7 @@
 import { TimeoutError } from "@libp2p/interface";
 import { OutOfLimitError } from "../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { sendAndReceive } from "../../helpers/stream-helper.js";
+import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { sendDebug } from "../socket-service.js";
 import * as crypto from "crypto";
 import { LogLevel } from "../../helpers/log-level.js";
@@ -91,20 +91,21 @@ export class StoreService implements Startable, StoreServiceInterface {
           stream?.abort(new TimeoutError("send store timeout"));
         });
 
-        const requestStr = await sendAndReceive(stream, "").catch((err) => {
+        const requestStr = await readFromStream(stream).catch((err) => {
           this.log(
             LogLevel.Error,
             `Error while sending store ${JSON.stringify(err)}`
           );
           throw err;
         });
+
         const request = JSON.parse(requestStr) as RequestStore;
         if (request && request.key) {
           const storeItems = this.Store.values()
             .filter((value) => value.key === request.key)
             .map((value) => JSON.stringify(value));
           const response = JSON.stringify(storeItems);
-          await sendAndReceive(stream, response).catch((err) => {
+          await writeToStream(stream, response).catch((err) => {
             this.log(
               LogLevel.Error,
               `Error while receiving store ${JSON.stringify(err)}`
@@ -112,12 +113,13 @@ export class StoreService implements Startable, StoreServiceInterface {
             throw err;
           });
         }
+        this.log(LogLevel.Info, `request ${JSON.stringify(request)}`);
         if (request && request.peerId) {
           const storeItems = this.Store.values()
             .filter((value) => value.peerId === request.peerId)
             .map((value) => JSON.stringify(value));
           const response = JSON.stringify(storeItems);
-          await sendAndReceive(stream, response).catch((err) => {
+          await writeToStream(stream, response).catch((err) => {
             this.log(
               LogLevel.Error,
               `Error while receiving store ${JSON.stringify(err)}`
@@ -179,10 +181,14 @@ export class StoreService implements Startable, StoreServiceInterface {
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
       this.log(LogLevel.Info, `Get request to ${connection.remotePeer}`);
-      const result = await sendAndReceive(
-        stream,
-        JSON.stringify(request)
-      ).catch((err) => {
+      await writeToStream(stream, JSON.stringify(request)).catch((err) => {
+        this.log(
+          LogLevel.Error,
+          `Error while receiving store ${JSON.stringify(err)}`
+        );
+        throw err;
+      });
+      const result = await readFromStream(stream).catch((err) => {
         this.log(
           LogLevel.Error,
           `Error while receiving store ${JSON.stringify(err)}`
@@ -190,16 +196,18 @@ export class StoreService implements Startable, StoreServiceInterface {
         throw err;
       });
       this.log(LogLevel.Info, `Received answer: ${result}`);
-      const storeItems = JSON.parse(result) as StoreItem[];
-      storeItems.forEach((storeItem) => {
-        const hash = this.getHash(storeItem.peerId, storeItem.key);
-        this.Store.set(hash, storeItem);
-      });
+      if (result) {
+        const storeItems = JSON.parse(result) as StoreItem[];
+        storeItems.forEach((storeItem) => {
+          const hash = this.getHash(storeItem.peerId, storeItem.key);
+          this.Store.set(hash, storeItem);
+        });
+      }
       return result;
     } catch (err: any) {
       this.log(
         LogLevel.Error,
-        `error while roling ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
+        `error while getStore ${connection.remotePeer.toString()} ${JSON.stringify(err)}`
       );
 
       stream?.abort(err);
@@ -211,14 +219,10 @@ export class StoreService implements Startable, StoreServiceInterface {
       }
     }
   }
+
   private getHash(peer: string, key: string): string {
-    // Создаем хеш-объект с использованием алгоритма SHA-256
     const hash = crypto.createHash("sha256");
-
-    // Обновляем хеш-объект данными (можно использовать любое разделение, например, двоеточие)
     hash.update(`${peer}:${key}`);
-
-    // Возвращаем хеш в виде строки в формате HEX
     return hash.digest("hex");
   }
 
