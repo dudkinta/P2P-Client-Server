@@ -97,22 +97,26 @@ export class StoreService implements Startable, StoreServiceInterface {
       const requestStr = new TextDecoder().decode(requestBuffer);
       this.log(LogLevel.Trace, `Received store request: ${requestStr}`);
       const request = JSON.parse(requestStr) as RequestStore;
+      if (this.Store.size > 0) {
+        // Обработка запроса
+        if (request?.key) {
+          const storeItems = this.Store.values()
+            .filter((value) => value.key === request.key)
+            .map((value) => JSON.stringify(value));
+          const response = new TextEncoder().encode(JSON.stringify(storeItems));
+          await writeToStream(stream, response, { signal });
+        }
 
-      // Обработка запроса
-      if (request?.key) {
-        const storeItems = this.Store.values()
-          .filter((value) => value.key === request.key)
-          .map((value) => JSON.stringify(value));
-        const response = new TextEncoder().encode(JSON.stringify(storeItems));
-        await writeToStream(stream, response, { signal });
-      }
-
-      if (request?.peerId) {
-        const storeItems = this.Store.values()
-          .filter((value) => value.peerId === request.peerId)
-          .map((value) => JSON.stringify(value));
-        const response = new TextEncoder().encode(JSON.stringify(storeItems));
-        await writeToStream(stream, response, { signal });
+        if (request?.peerId) {
+          const storeItems = this.Store.values()
+            .filter((value) => value.peerId === request.peerId)
+            .map((value) => JSON.stringify(value));
+          const response = new TextEncoder().encode(JSON.stringify(storeItems));
+          await writeToStream(stream, response, { signal });
+        }
+      } else {
+        const nullResponse = new TextEncoder().encode(JSON.stringify([]));
+        await writeToStream(stream, nullResponse, { signal });
       }
     } catch (err) {
       this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
@@ -151,7 +155,9 @@ export class StoreService implements Startable, StoreServiceInterface {
       const responseStr = new TextDecoder().decode(responseBuffer);
 
       this.log(LogLevel.Info, `Received store response: ${responseStr}`);
-
+      if (!responseStr) {
+        return "";
+      }
       const storeItems = JSON.parse(responseStr) as StoreItem[];
       storeItems.forEach((item) => {
         const hash = this.getHash(item.peerId, item.key);
