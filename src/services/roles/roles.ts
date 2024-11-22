@@ -1,6 +1,6 @@
 import { TimeoutError } from "@libp2p/interface";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { sendAndReceive } from "../../helpers/stream-helper.js";
+import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { sendDebug } from "./../../services/socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
 import {
@@ -88,14 +88,10 @@ export class RolesService implements Startable, RolesServiceInterface {
           stream?.abort(new TimeoutError("send roles timeout"));
         });
 
-        const jsonString = JSON.stringify(this.roleList);
-        await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log(
-            LogLevel.Error,
-            `send roles to %p failed with error ${JSON.stringify(err)}`
-          );
-          stream?.abort(err);
-        });
+        const response = new TextEncoder().encode(
+          JSON.stringify(this.roleList)
+        );
+        await writeToStream(stream, response, { signal });
       })
       .catch((err) => {
         this.log(
@@ -140,7 +136,7 @@ export class RolesService implements Startable, RolesServiceInterface {
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
       this.log(LogLevel.Info, `send request to ${connection.remotePeer}`);
-      const result = await sendAndReceive(stream, "").catch((err) => {
+      const result = await readFromStream(stream, options).catch((err) => {
         this.log(
           LogLevel.Error,
           `send roles to %p failed with error ${JSON.stringify(err)}`

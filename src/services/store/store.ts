@@ -1,10 +1,6 @@
 import { TimeoutError } from "@libp2p/interface";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import {
-  readFromStream,
-  writeToStream,
-  readCompleteStringFromStream,
-} from "../../helpers/stream-helper.js";
+import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { sendDebug } from "../socket-service.js";
 import * as crypto from "crypto";
 import { LogLevel } from "../../helpers/log-level.js";
@@ -90,24 +86,24 @@ export class StoreService implements Startable, StoreServiceInterface {
     try {
       const signal = AbortSignal.timeout(this.timeout);
 
-      // Завершение по таймауту
       signal.addEventListener("abort", () => {
         this.log(LogLevel.Warning, "Timeout reached, aborting stream");
         stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
 
-      const requestStr = await readCompleteStringFromStream(stream, { signal });
-      this.log(LogLevel.Trace, `Received store request: ${requestStr}`);
+      const requestStr = await readFromStream(stream, { signal });
       const request = JSON.parse(requestStr) as RequestStore;
+      const newStoreItem = JSON.parse(requestStr) as StoreItem;
+      if (newStoreItem) {
+        this.putStore(newStoreItem);
+      }
       if (this.Store.size > 0) {
-        // Обработка запроса
         if (request?.key) {
           const storeItems = Array.from(this.Store.values())
             .filter((value) => value.key == request.key)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
-          this.log(LogLevel.Trace, `Sending store response: ${response}`);
-          await writeToStream(stream, response, 1024);
+          await writeToStream(stream, response, { signal });
         }
 
         if (request?.peerId) {
@@ -115,12 +111,11 @@ export class StoreService implements Startable, StoreServiceInterface {
             .filter((value) => value.peerId == request.peerId)
             .map((value) => JSON.stringify(value));
           const response = new TextEncoder().encode(JSON.stringify(storeItems));
-          this.log(LogLevel.Trace, `Sending store response: ${response}`);
-          await writeToStream(stream, response, 1024);
+          await writeToStream(stream, response, { signal });
         }
       } else {
         const nullResponse = new TextEncoder().encode(JSON.stringify([]));
-        await writeToStream(stream, nullResponse, 1024);
+        await writeToStream(stream, nullResponse, { signal });
       }
     } catch (err) {
       this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
@@ -153,9 +148,9 @@ export class StoreService implements Startable, StoreServiceInterface {
       });
 
       const requestBuffer = new TextEncoder().encode(JSON.stringify(request));
-      await writeToStream(stream, requestBuffer, 1024);
+      await writeToStream(stream, requestBuffer);
 
-      const responseStr = await readCompleteStringFromStream(stream, {
+      const responseStr = await readFromStream(stream, {
         signal,
       });
 
@@ -165,10 +160,7 @@ export class StoreService implements Startable, StoreServiceInterface {
       }
 
       try {
-        // Парсим первый уровень массива
         const parsedArray: string[] = JSON.parse(responseStr);
-
-        // Парсим каждую строку в объект StoreItem
         const storeItems: StoreItem[] = parsedArray.map((item) =>
           JSON.parse(item)
         );
@@ -201,10 +193,37 @@ export class StoreService implements Startable, StoreServiceInterface {
 
   putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
-    this.Store.set(hash, storeItem);
-    this.log(
-      LogLevel.Trace,
-      `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+    if (!this.Store.has(hash)) {
+      this.Store.set(hash, storeItem);
+      this.log(
+        LogLevel.Trace,
+        `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+      );
+      setTimeout(async () => {
+        await this.sentToAllPeers(storeItem);
+      }, 0);
+    }
+  }
+
+  private async sentToAllPeers(storeItem: StoreItem): Promise<void> {
+    const connections = this.components.connectionManager.getConnections();
+    const connectedPeers = Array.from(connections).filter(
+      (conn) => conn.status === "open"
     );
+    connectedPeers.forEach(async (conn) => {
+      try {
+        const signal = AbortSignal.timeout(this.timeout);
+
+        const stream = await conn.newStream(this.protocol, {
+          signal,
+          runOnLimitedConnection: this.runOnLimitedConnection,
+        });
+        const request = new TextEncoder().encode(JSON.stringify(storeItem));
+        const requestBuffer = new TextEncoder().encode(JSON.stringify(request));
+        await writeToStream(stream, requestBuffer);
+      } catch (error) {
+        this.log(LogLevel.Error, `Failed to broadcast to peer: ${error}`);
+      }
+    });
   }
 }

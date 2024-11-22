@@ -1,5 +1,5 @@
 import { TimeoutError } from "@libp2p/interface";
-import { sendAndReceive } from "../../helpers/stream-helper.js";
+import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendDebug } from "./../../services/socket-service.js";
@@ -110,14 +110,8 @@ export class MultiaddressService
               `/ip6/${this.directAddress.ipv6}/tcp/${this.directAddress.port}/p2p/${peerId}`
             );
           }
-          let jsonString = JSON.stringify(addresses);
-          await sendAndReceive(stream, jsonString).catch((err) => {
-            this.log(
-              LogLevel.Error,
-              `error while sending multiaddresses${JSON.stringify(err)}`
-            );
-            throw err;
-          });
+          const response = new TextEncoder().encode(JSON.stringify(addresses));
+          await writeToStream(stream, response);
         } else {
           const connections =
             await this.components.addressManager.getAddresses();
@@ -125,14 +119,8 @@ export class MultiaddressService
           const addresses = Array.from(connections).map((conn) =>
             conn.toString()
           );
-          let jsonString = JSON.stringify(addresses);
-          await sendAndReceive(stream, jsonString).catch((err) => {
-            this.log(
-              LogLevel.Error,
-              `error while sending multiaddresses${JSON.stringify(err)}`
-            );
-            throw err;
-          });
+          const response = new TextEncoder().encode(JSON.stringify(addresses));
+          await writeToStream(stream, response, { signal });
         }
       })
       .catch((err) => {
@@ -190,13 +178,7 @@ export class MultiaddressService
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
       this.log(LogLevel.Info, `send request to ${connection.remotePeer}`);
-      const result = await sendAndReceive(stream, "").catch((err) => {
-        this.log(
-          LogLevel.Error,
-          `error while receiving multiaddresses ${JSON.stringify(err)}`
-        );
-        throw err;
-      });
+      const result = await readFromStream(stream, options);
       this.log(LogLevel.Info, `received answer: ${result}`);
       return result;
     } catch (err: any) {
