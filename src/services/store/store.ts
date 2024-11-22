@@ -219,8 +219,7 @@ export class StoreService implements Startable, StoreServiceInterface {
           runOnLimitedConnection: this.runOnLimitedConnection,
         });
         const request = new TextEncoder().encode(JSON.stringify(storeItem));
-        const requestBuffer = new TextEncoder().encode(JSON.stringify(request));
-        await writeToStream(stream, requestBuffer);
+        await writeToStream(stream, request);
       } catch (error) {
         this.log(LogLevel.Error, `Failed to broadcast to peer: ${error}`);
       }
