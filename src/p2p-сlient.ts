@@ -235,6 +235,36 @@ export class P2PClient extends EventEmitter {
     }
   }
 
+  async updateSelfMultiaddress(): Promise<void> {
+    if (this.node) {
+      const maService = this.node.services.maList as MultiaddressService;
+      if (maService) {
+        const maList = await maService.getDirectMultiaddress();
+        maList.forEach((ma) => {
+          this.log(LogLevel.Info, `${ma.toString()}`);
+        });
+        if (maList.length > 0) {
+          const storeService = this.node.services.store as StoreService;
+          if (storeService) {
+            storeService.putStore({
+              peerId: this.node.peerId.toString(),
+              key: "DirectAddresses",
+              value: maList,
+              ttl: 60000 * 60,
+              dt: Date.now(),
+              recieved: Date.now(),
+            });
+          }
+        }
+      } else {
+        this.log(LogLevel.Warning, "No multiaddress service found");
+      }
+    }
+    setTimeout(async () => {
+      await this.updateSelfMultiaddress();
+    }, 60000 * 30);
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -281,28 +311,7 @@ export class P2PClient extends EventEmitter {
       await this.node.start();
       this.log(LogLevel.Info, `Libp2p listening on:`);
       this.localPeerId = this.node.peerId;
-      const maService = this.node.services.maList as MultiaddressService;
-      if (maService) {
-        const maList = await maService.getDirectMultiaddress();
-        maList.forEach((ma) => {
-          this.log(LogLevel.Info, `${ma.toString()}`);
-        });
-        if (maList.length > 0) {
-          const storeService = this.node.services.store as StoreService;
-          if (storeService) {
-            storeService.putStore({
-              peerId: this.node.peerId.toString(),
-              key: "DirectAddresses",
-              value: maList,
-              ttl: 60000 * 60,
-              dt: Date.now(),
-              recieved: Date.now(),
-            });
-          }
-        }
-      } else {
-        this.log(LogLevel.Warning, "No multiaddress service found");
-      }
+      await this.updateSelfMultiaddress();
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

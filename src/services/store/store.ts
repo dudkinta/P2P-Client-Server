@@ -69,7 +69,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     this.started = true;
     setTimeout(async () => {
       await this.getFromAllPeers();
-    }, 1000);
+    }, 2000);
     this.log(LogLevel.Info, "Started store service");
   }
 
@@ -227,15 +227,36 @@ export class StoreService implements Startable, StoreServiceInterface {
 
   putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
-    if (!this.Store.has(hash)) {
-      storeItem.recieved = Date.now();
+    storeItem.recieved = Date.now();
+    if (this.Store.has(hash)) {
+      const existingItem = this.Store.get(hash);
+      if (existingItem && existingItem.dt <= storeItem.dt) {
+        this.Store.set(hash, storeItem);
+        this.log(
+          LogLevel.Trace,
+          `StoreItem ${storeItem.peerId}:${storeItem.key} updated`
+        );
+      }
+    } else {
       this.Store.set(hash, storeItem);
       this.log(
         LogLevel.Trace,
-        `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+        `StoreItem ${storeItem.peerId}:${storeItem.key} saved`
       );
     }
     this.log(LogLevel.Trace, `Store size: ${this.Store.size}`);
+  }
+
+  private deleteOldStoreItems(): void {
+    for (const [key, value] of this.Store) {
+      if (Date.now() - value.dt > value.ttl) {
+        this.Store.delete(key);
+        this.log(
+          LogLevel.Trace,
+          `Removed old storeItem ${value.peerId}:${value.key}`
+        );
+      }
+    }
   }
 
   private async getFromAllPeers(): Promise<void> {
@@ -277,8 +298,10 @@ export class StoreService implements Startable, StoreServiceInterface {
         }
       }
     }
+    this.deleteOldStoreItems();
+
     setTimeout(async () => {
       await this.getFromAllPeers();
-    }, 10000);
+    }, 10000 * 10);
   }
 }
