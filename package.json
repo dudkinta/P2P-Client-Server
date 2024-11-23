@@ -5,7 +5,7 @@
   "bin": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build && cd .. && npm install && npx tsc",
+    "build": "cd frontend && npm run build && cd .. && npx tsc",
     "server": "node dist/relay.js",
     "node": "node dist/node.js",
     "dev": "npm run byuild && concurrently \"npm run node\" \"npm run vite\"",

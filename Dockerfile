@@ -13,6 +13,10 @@ RUN npm install
 # Копируем остальные файлы проекта
 COPY . .
 
+# Устанавливаем зависимости и собираем фронтенд
+WORKDIR /app/frontend
+RUN npm install
+
 # Возвращаемся в корневую директорию
 WORKDIR /app
 RUN npm run build
