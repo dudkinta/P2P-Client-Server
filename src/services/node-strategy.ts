@@ -301,7 +301,7 @@ export class NodeStrategy extends Map<string, Node> {
     }*/
 
     //отключение от релейных узлов если достаточно подключенных нод
-    /*if (this.size > 1) {
+    if (this.size > 5) {
       this.forEach(async (node) => {
         if (!node || !node.peerId) {
           return;
@@ -314,11 +314,11 @@ export class NodeStrategy extends Map<string, Node> {
           await this.stopNodeStrategy(
             node.peerId.toString(),
             `too many connected nodes`,
-            60 * 1000 * 5
+            60000 * 30
           );
         }
       });
-    }*/
+    }
 
     //удаление закрытых соединений
     for (const [key, node] of this) {
