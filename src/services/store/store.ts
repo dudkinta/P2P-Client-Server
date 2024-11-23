@@ -200,7 +200,9 @@ export class StoreService implements Startable, StoreServiceInterface {
         storeItems.forEach((item) => {
           this.putStore(item);
         });
-        console.log(storeItems);
+        if (storeItems.length > 0) {
+          console.log(storeItems);
+        }
       } catch (error) {
         console.error("Failed to parse JSON:", error);
       }

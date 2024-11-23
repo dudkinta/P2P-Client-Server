@@ -109,12 +109,12 @@ export class NodeStrategy extends Map<string, Node> {
     const request: RequestStore = {
       key: undefined,
       peerId: undefined,
-      dt: dt,
+      dt: 0,
     };
     const res = this.requestStoreData(request);
-    if (res) {
-      this.log(LogLevel.Trace, `Store result for ${dt}: ${res}`);
-    }
+    res.forEach((item) => {
+      this.log(LogLevel.Trace, `Store contains: ${JSON.stringify(item)}`);
+    });
     setTimeout(() => {
       this.getStores(lastUpdateDt);
     }, 60000);
