@@ -228,6 +228,18 @@ export class NodeStrategy extends Map<string, Node> {
       if (this.has(key)) {
         continue;
       }
+      if (this.banList.has(key)) {
+        continue;
+      }
+      if (this.banDirectAddress.has(address)) {
+        continue;
+      }
+      if (this.PeerId?.toString() == key) {
+        continue;
+      }
+      if (this.config.isKnownRelay(key)) {
+        continue;
+      }
       if (this.size >= this.config.getConfig().MAX_NODES) {
         this.log(
           LogLevel.Info,
