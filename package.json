@@ -1,12 +1,10 @@
 {
   "name": "node",
   "version": "1.0.0",
-  "main": "index.js",
-  "bin": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "cd frontend && npm run build && cd .. && npx tsc",
-    "server": "node dist/relay.js",
+    "server": "set DEBUG=libp2p:store && node dist/relay.js",
     "node": "node dist/node.js",
     "dev": "npm run byuild && concurrently \"npm run node\" \"npm run vite\"",
     "vite": "cd frontend && npm run dev"

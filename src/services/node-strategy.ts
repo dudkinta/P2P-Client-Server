@@ -93,30 +93,44 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);
-    setTimeout(async () => {
+    /*setTimeout(async () => {
       await this.getCandidates();
-    }, 30000);
+    }, 30000);*/
     setTimeout(() => {
-      this.getStores(0);
+      this.getDirectAdressesFromStores(0);
     }, 30000);
     setTimeout(async () => {
       await this.sendToSocket();
     }, 0);
   }
 
-  private getStores(dt: number): void {
+  private getDirectAdressesFromStores(dt: number): void {
     const lastUpdateDt = Date.now();
     const request: RequestStore = {
-      key: undefined,
+      key: "DirectAddresses",
       peerId: undefined,
-      dt: 0,
+      dt: lastUpdateDt,
     };
     const res = this.requestStoreData(request);
     res.forEach((item) => {
       this.log(LogLevel.Trace, `Store contains: ${JSON.stringify(item)}`);
+      if (item.key == "DirectAddresses") {
+        if (item.type == "string[]") {
+          const directAddrs = JSON.parse(item.value);
+          directAddrs.forEach((addr: string) => {
+            if (this.candidatePeers.has(item.peerId)) {
+              if (this.candidatePeers.get(item.peerId) != addr) {
+                this.candidatePeers.set(item.peerId, addr);
+              }
+            } else {
+              this.candidatePeers.set(item.peerId, addr);
+            }
+          });
+        }
+      }
     });
     setTimeout(() => {
-      this.getStores(lastUpdateDt);
+      this.getDirectAdressesFromStores(lastUpdateDt);
     }, 60000);
   }
 
@@ -225,7 +239,7 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     // поиск прямых адресов у пиров
-    for (const [key, node] of this) {
+    /*for (const [key, node] of this) {
       if (!node) {
         continue;
       }
@@ -268,7 +282,7 @@ export class NodeStrategy extends Map<string, Node> {
           }, 500);
         }
       }
-    }
+    }*/
 
     //отключение от релейных узлов если достаточно подключенных нод
     /*if (this.size > 1) {

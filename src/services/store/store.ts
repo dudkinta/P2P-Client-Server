@@ -42,7 +42,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     sendDebug("libp2p:store", level, timestamp, message);
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
-  private LastUpdateDt: number = 0;
+  private LastUpdateMap: Map<string, number> = new Map();
   constructor(components: StoreServiceComponents, init: StoreServiceInit = {}) {
     this.components = components;
     this.logger = components.logger.forComponent("@libp2p/store");
@@ -60,6 +60,7 @@ export class StoreService implements Startable, StoreServiceInterface {
   readonly [Symbol.toStringTag] = "@libp2p/store";
 
   async start(): Promise<void> {
+    this.log(LogLevel.Info, "Starting store service");
     await this.components.registrar.handle(this.protocol, this.handleMessage, {
       maxInboundStreams: this.maxInboundStreams,
       maxOutboundStreams: this.maxOutboundStreams,
@@ -69,6 +70,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     setTimeout(async () => {
       await this.getFromAllPeers();
     }, 1000);
+    this.log(LogLevel.Info, "Started store service");
   }
 
   async stop(): Promise<void> {
@@ -200,9 +202,6 @@ export class StoreService implements Startable, StoreServiceInterface {
         storeItems.forEach((item) => {
           this.putStore(item);
         });
-        if (storeItems.length > 0) {
-          console.log(storeItems);
-        }
       } catch (error) {
         console.error("Failed to parse JSON:", error);
       }
@@ -236,15 +235,20 @@ export class StoreService implements Startable, StoreServiceInterface {
         `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
       );
     }
+    this.log(LogLevel.Trace, `Store size: ${this.Store.size}`);
   }
 
   private async getFromAllPeers(): Promise<void> {
     const connections = this.components.connectionManager.getConnections();
     for (const connection of connections) {
+      this.log(LogLevel.Info, `Getting store from ${connection.remotePeer}`);
       if (connection.status === "open") {
+        const lastUpdate =
+          this.LastUpdateMap.get(`${connection.remotePeer.toString()}:all`) ??
+          0;
         const response = await this.getFromStore(
           connection,
-          { key: undefined, peerId: undefined, dt: this.LastUpdateDt },
+          { key: undefined, peerId: undefined, dt: lastUpdate },
           { signal: AbortSignal.timeout(5000) }
         ).catch((err) => {
           this.log(
@@ -253,12 +257,19 @@ export class StoreService implements Startable, StoreServiceInterface {
           );
         });
         if (response) {
-          this.LastUpdateDt = Date.now();
+          this.LastUpdateMap.set(
+            `${connection.remotePeer.toString()}:all`,
+            Date.now()
+          );
           const lines = JSON.parse(response) as string[];
           for (const line of lines) {
             try {
               const storeItem = JSON.parse(line) as StoreItem;
               this.putStore(storeItem);
+              this.log(
+                LogLevel.Trace,
+                `I have stored ${storeItem.key} from ${storeItem.peerId}`
+              );
             } catch (error) {
               console.error("Failed to parse JSON:", error);
             }

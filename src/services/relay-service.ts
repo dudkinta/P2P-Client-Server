@@ -13,13 +13,6 @@ export class RelayService {
   private config = ConfigLoader.getInstance();
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
-    console.log(
-      `[${timestamp.toISOString().slice(11, 23)}]`,
-      "relay-service",
-      level,
-      timestamp,
-      message
-    );
     debug("relay-service")(
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
