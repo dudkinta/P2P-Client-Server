@@ -109,24 +109,28 @@ export class NodeStrategy extends Map<string, Node> {
     const request: RequestStore = {
       key: "DirectAddresses",
       peerId: undefined,
-      dt: lastUpdateDt,
+      dt: 0,
     };
+    this.log(LogLevel.Trace, `Getting direct addresses from stores`);
     const res = this.requestStoreData(request);
+    this.log(LogLevel.Trace, `Store size: ${res.length}`);
     res.forEach((item) => {
       this.log(LogLevel.Trace, `Store contains: ${JSON.stringify(item)}`);
       if (item.key == "DirectAddresses") {
-        if (item.type == "string[]") {
-          const directAddrs = JSON.parse(item.value);
-          directAddrs.forEach((addr: string) => {
-            if (this.candidatePeers.has(item.peerId)) {
-              if (this.candidatePeers.get(item.peerId) != addr) {
-                this.candidatePeers.set(item.peerId, addr);
-              }
-            } else {
+        const addrs = item.value as string[];
+        addrs.forEach((addr) => {
+          this.log(
+            LogLevel.Trace,
+            `Direct address for ${item.peerId}: ${addr}`
+          );
+          if (this.candidatePeers.has(item.peerId)) {
+            if (this.candidatePeers.get(item.peerId) != addr) {
               this.candidatePeers.set(item.peerId, addr);
             }
-          });
-        }
+          } else {
+            this.candidatePeers.set(item.peerId, addr);
+          }
+        });
       }
     });
     setTimeout(() => {
@@ -231,7 +235,7 @@ export class NodeStrategy extends Map<string, Node> {
         );
         break;
       }
-
+      this.log(LogLevel.Debug, `Try connect to candidate ${address}`);
       await this.tryConnect(address).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
         return undefined;
@@ -662,6 +666,7 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async tryConnect(address: string): Promise<Connection | undefined> {
+    this.log(LogLevel.Info, `Trying to connect to ${address}`);
     const ma = multiaddr(address);
     this.log(
       LogLevel.Info,

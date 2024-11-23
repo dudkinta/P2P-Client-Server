@@ -1,10 +1,5 @@
 import { StoreService as StoreServiceClass } from "./store.js";
-import type {
-  AbortOptions,
-  ComponentLogger,
-  Connection,
-  PeerStore,
-} from "@libp2p/interface";
+import type { ComponentLogger, PeerStore } from "@libp2p/interface";
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 
 export interface StoreService {
@@ -15,7 +10,6 @@ export interface StoreService {
 export interface StoreItem {
   peerId: string;
   key: string;
-  type: string;
   value: any;
   ttl: number;
   dt: number;

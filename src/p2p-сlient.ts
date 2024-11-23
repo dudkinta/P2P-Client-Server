@@ -293,7 +293,6 @@ export class P2PClient extends EventEmitter {
             storeService.putStore({
               peerId: this.node.peerId.toString(),
               key: "DirectAddresses",
-              type: "string[]",
               value: maList,
               ttl: 60000 * 60,
               dt: Date.now(),
