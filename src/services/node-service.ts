@@ -9,7 +9,7 @@ import { OutOfLimitError } from "../models/out-of-limit-error.js";
 import { sendDebug } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 import pkg from "debug";
-import { RequestStore } from "./store/index.js";
+import { RequestStore, StoreItem } from "./store/index.js";
 const { debug } = pkg;
 export class NodeService extends EventEmitter {
   private client: P2PClient;
@@ -341,61 +341,8 @@ export class NodeService extends EventEmitter {
     }
   }
 
-  private async RequestStoreData(
-    node: Node,
-    request: RequestStore
-  ): Promise<any | undefined> {
-    if (!node.isConnect()) {
-      this.log(LogLevel.Warning, `Node is not connected`);
-      return undefined;
-    }
-    if (!node.peerId) {
-      this.log(LogLevel.Warning, `PeerId is undefined`);
-      return undefined;
-    }
-    try {
-      if (node.protocols.has(this.config.protocols.STORE)) {
-        const connection = node.getOpenedConnection();
-        if (!connection) return undefined;
-        let storeStr = await this.client
-          .getStore(connection, request)
-          .catch((error) => {
-            this.log(
-              LogLevel.Error,
-              `Error in promise RequestStore ${JSON.stringify(error)}`
-            );
-            throw error;
-          });
-        if (!storeStr || storeStr.length === 0) return undefined;
-        try {
-          this.log(
-            LogLevel.Info,
-            `Store from ${node.peerId?.toString()} is: ${storeStr}`
-          );
-          return JSON.parse(storeStr);
-        } catch (parseError) {
-          this.log(
-            LogLevel.Error,
-            `Error parsing storeStr JSON ${JSON.stringify(parseError)}`
-          );
-          return undefined;
-        }
-      }
-    } catch (error) {
-      if (error instanceof OutOfLimitError) {
-        this.nodeStorage.stopNodeStrategy(
-          node.peerId.toString(),
-          "Out of limit",
-          10000
-        );
-      } else {
-        this.log(
-          LogLevel.Error,
-          `Error in RequestStore ${JSON.stringify(error)}`
-        );
-      }
-      return undefined;
-    }
+  private RequestStoreData(request: RequestStore): StoreItem[] {
+    return this.client.getStore(request);
   }
 
   getRoot(): { root: Node; connections: Connection[] } | undefined {

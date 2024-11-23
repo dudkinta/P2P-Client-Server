@@ -42,6 +42,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     sendDebug("libp2p:store", level, timestamp, message);
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
+  private LastUpdateDt: number = 0;
   constructor(components: StoreServiceComponents, init: StoreServiceInit = {}) {
     this.components = components;
     this.logger = components.logger.forComponent("@libp2p/store");
@@ -65,6 +66,9 @@ export class StoreService implements Startable, StoreServiceInterface {
       runOnLimitedConnection: this.runOnLimitedConnection,
     });
     this.started = true;
+    setTimeout(async () => {
+      await this.getFromAllPeers();
+    }, 1000);
   }
 
   async stop(): Promise<void> {
@@ -92,31 +96,33 @@ export class StoreService implements Startable, StoreServiceInterface {
       });
 
       const requestStr = await readFromStream(stream, { signal });
+      this.log(LogLevel.Trace, `Received requestStr: ${requestStr}`);
       const request = JSON.parse(requestStr) as RequestStore;
-      const newStoreItem = JSON.parse(requestStr) as StoreItem;
-      if (newStoreItem) {
-        this.putStore(newStoreItem);
-      }
-      if (this.Store.size > 0) {
-        if (request?.key) {
-          const storeItems = Array.from(this.Store.values())
-            .filter((value) => value.key == request.key)
-            .map((value) => JSON.stringify(value));
-          const response = new TextEncoder().encode(JSON.stringify(storeItems));
-          await writeToStream(stream, response, { signal });
+      const storeItems: string[] = [];
+      const dtStart = request?.dt ?? 0;
+      if (request?.key) {
+        for (const [key, value] of this.Store) {
+          if (value.key === request.key && value.recieved >= dtStart) {
+            storeItems.push(JSON.stringify(value));
+          }
         }
-
-        if (request?.peerId) {
-          const storeItems = Array.from(this.Store.values())
-            .filter((value) => value.peerId == request.peerId)
-            .map((value) => JSON.stringify(value));
-          const response = new TextEncoder().encode(JSON.stringify(storeItems));
-          await writeToStream(stream, response, { signal });
-        }
-      } else {
-        const nullResponse = new TextEncoder().encode(JSON.stringify([]));
-        await writeToStream(stream, nullResponse, { signal });
       }
+      if (request?.peerId) {
+        for (const [key, value] of this.Store) {
+          if (value.peerId === request.peerId && value.recieved >= dtStart) {
+            storeItems.push(JSON.stringify(value));
+          }
+        }
+      }
+      if (request?.key === undefined && request?.peerId === undefined) {
+        for (const [key, value] of this.Store) {
+          if (value.recieved >= dtStart) {
+            storeItems.push(JSON.stringify(value));
+          }
+        }
+      }
+      const response = new TextEncoder().encode(JSON.stringify(storeItems));
+      await writeToStream(stream, response, { signal });
     } catch (err) {
       this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
     } finally {
@@ -126,7 +132,34 @@ export class StoreService implements Startable, StoreServiceInterface {
     }
   }
 
-  async getStore(
+  getStore(request: RequestStore): StoreItem[] {
+    const storeItems: StoreItem[] = [];
+    const dtStart = request?.dt ?? 0;
+    if (request?.key) {
+      for (const [key, value] of this.Store) {
+        if (value.key === request.key && value.recieved >= dtStart) {
+          storeItems.push(value);
+        }
+      }
+    }
+    if (request?.peerId) {
+      for (const [key, value] of this.Store) {
+        if (value.peerId === request.peerId && value.recieved >= dtStart) {
+          storeItems.push(value);
+        }
+      }
+    }
+    if (request?.key === undefined && request?.peerId === undefined) {
+      for (const [key, value] of this.Store) {
+        if (value.recieved >= dtStart) {
+          storeItems.push(value);
+        }
+      }
+    }
+    return storeItems;
+  }
+
+  private async getFromStore(
     connection: Connection,
     request: RequestStore,
     options: AbortOptions = {}
@@ -193,36 +226,44 @@ export class StoreService implements Startable, StoreServiceInterface {
 
   putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
-    if (!this.Store.has(hash)) {
-      this.Store.set(hash, storeItem);
-      this.log(
-        LogLevel.Trace,
-        `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
-      );
-      setTimeout(async () => {
-        await this.sentToAllPeers(storeItem);
-      }, 0);
-    }
+    storeItem.recieved = Date.now();
+    this.Store.set(hash, storeItem);
+    this.log(
+      LogLevel.Trace,
+      `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+    );
   }
 
-  private async sentToAllPeers(storeItem: StoreItem): Promise<void> {
+  private async getFromAllPeers(): Promise<void> {
     const connections = this.components.connectionManager.getConnections();
-    const connectedPeers = Array.from(connections).filter(
-      (conn) => conn.status === "open"
-    );
-    connectedPeers.forEach(async (conn) => {
-      try {
-        const signal = AbortSignal.timeout(this.timeout);
-
-        const stream = await conn.newStream(this.protocol, {
-          signal,
-          runOnLimitedConnection: this.runOnLimitedConnection,
+    for (const connection of connections) {
+      if (connection.status === "open") {
+        const response = await this.getFromStore(
+          connection,
+          { key: undefined, peerId: undefined, dt: this.LastUpdateDt },
+          { signal: AbortSignal.timeout(5000) }
+        ).catch((err) => {
+          this.log(
+            LogLevel.Error,
+            `Failed to get store from ${connection.remotePeer}: ${err}`
+          );
         });
-        const request = new TextEncoder().encode(JSON.stringify(storeItem));
-        await writeToStream(stream, request);
-      } catch (error) {
-        this.log(LogLevel.Error, `Failed to broadcast to peer: ${error}`);
+        if (response) {
+          this.LastUpdateDt = Date.now();
+          const lines = JSON.parse(response) as string[];
+          for (const line of lines) {
+            try {
+              const storeItem = JSON.parse(line) as StoreItem;
+              this.putStore(storeItem);
+            } catch (error) {
+              console.error("Failed to parse JSON:", error);
+            }
+          }
+        }
       }
-    });
+    }
+    setTimeout(async () => {
+      await this.getFromAllPeers();
+    }, 10000);
   }
 }

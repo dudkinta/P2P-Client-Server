@@ -10,7 +10,11 @@ import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
 import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
-import { StoreService, RequestStore } from "./services/store/index.js";
+import {
+  StoreService,
+  RequestStore,
+  StoreItem,
+} from "./services/store/index.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -140,36 +144,23 @@ export class P2PClient extends EventEmitter {
     }
   }
 
-  async getStore(conn: Connection, request: RequestStore): Promise<string> {
+  getStore(request: RequestStore): StoreItem[] {
     if (!this.node) {
       throw new Error("Node is not initialized for getStore");
     }
+    const storeService = this.node.services.store as StoreService;
+    if (!storeService) {
+      throw new Error("Store service is not initialized");
+    }
     try {
-      const storeService = this.node.services.store as StoreService;
-      const result = await storeService
-        .getStore(conn, request, {
-          signal: AbortSignal.timeout(5000),
-        })
-        .catch((err) => {
-          this.log(LogLevel.Error, `Error in getStore: ${err}`);
-          throw err;
-        });
-      this.log(
-        LogLevel.Info,
-        `Store from: (${conn.remotePeer.toString()}): ${result}`
-      );
+      const result = storeService.getStore(request);
+      this.log(LogLevel.Debug, `Store: ${JSON.stringify(result)}`);
       return result;
     } catch (error) {
       this.log(
         LogLevel.Error,
         `Ошибка при запросе store: ${JSON.stringify(error)}`
       );
-      if (error instanceof TimeoutError) {
-        this.log(
-          LogLevel.Error,
-          `Ошибка таймаута при запросе store: ${JSON.stringify(error)}`
-        );
-      }
       throw error;
     }
   }
@@ -299,18 +290,14 @@ export class P2PClient extends EventEmitter {
         if (maList.length > 0) {
           const storeService = this.node.services.store as StoreService;
           if (storeService) {
-            const peerId = this.node.peerId.toString();
-            const key = "DirectAddresses";
-            const value = maList;
-            const ttl = 60000 * 60;
-            const dt = Date.now();
             storeService.putStore({
-              peerId,
-              key,
+              peerId: this.node.peerId.toString(),
+              key: "DirectAddresses",
               type: "string[]",
-              value,
-              ttl,
-              dt,
+              value: maList,
+              ttl: 60000 * 60,
+              dt: Date.now(),
+              recieved: Date.now(),
             });
           }
         }

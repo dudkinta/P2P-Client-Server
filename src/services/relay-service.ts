@@ -4,7 +4,6 @@ import { multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "../helpers/config-loader.js";
 import { LogLevel } from "../helpers/log-level.js";
 import { Relay } from "../models/relay.js";
-import { RequestStore } from "./store/index.js";
 import pkg from "debug";
 const { debug } = pkg;
 
@@ -149,23 +148,6 @@ export class RelayService {
           relay.connection = undefined;
           return;
         }
-        const request: RequestStore = {
-          key: "DirectAddresses",
-          peerId: undefined,
-        };
-        let storeStr = await this.client
-          .getStore(relay.connection, request)
-          .catch((error) => {
-            this.log(
-              LogLevel.Error,
-              `Error in promise RequestStore ${JSON.stringify(error)}`
-            );
-          });
-        if (!storeStr || storeStr.length === 0) return undefined;
-        this.log(
-          LogLevel.Info,
-          `Store from ${relay.peerId?.toString()} is: ${storeStr}`
-        );
       }
     });
 

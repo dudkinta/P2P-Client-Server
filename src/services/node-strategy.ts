@@ -8,7 +8,7 @@ import {
   sendDebug as SendLogToSocket,
   sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
-import { RequestStore } from "./../services/store/index.js";
+import { RequestStore, StoreItem } from "./../services/store/index.js";
 import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
 
@@ -20,10 +20,7 @@ type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
 type RequestConnectedPeers = (
   node: Node
 ) => Promise<Map<string, string> | undefined>;
-type RequestStoreData = (
-  node: Node,
-  request: RequestStore
-) => Promise<any | undefined>;
+type RequestStoreData = (request: RequestStore) => StoreItem[];
 export class NodeStrategy extends Map<string, Node> {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
@@ -99,29 +96,27 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.getCandidates();
     }, 30000);
-    setTimeout(async () => {
-      await this.getStores();
+    setTimeout(() => {
+      this.getStores(0);
     }, 30000);
     setTimeout(async () => {
       await this.sendToSocket();
     }, 0);
   }
 
-  private async getStores(): Promise<void> {
-    for (const [key, node] of this) {
-      const request: RequestStore = {
-        key: "DirectAddresses",
-        peerId: undefined,
-      };
-      const res = await this.requestStoreData(node, request).catch((error) => {
-        this.log(LogLevel.Error, `Error in promise requestStore: ${error}`);
-      });
-      if (res) {
-        this.log(LogLevel.Trace, `Store result for ${key}: ${res}`);
-      }
+  private getStores(dt: number): void {
+    const lastUpdateDt = Date.now();
+    const request: RequestStore = {
+      key: undefined,
+      peerId: undefined,
+      dt: dt,
+    };
+    const res = this.requestStoreData(request);
+    if (res) {
+      this.log(LogLevel.Trace, `Store result for ${dt}: ${res}`);
     }
-    setTimeout(async () => {
-      await this.getStores();
+    setTimeout(() => {
+      this.getStores(lastUpdateDt);
     }, 60000);
   }
 

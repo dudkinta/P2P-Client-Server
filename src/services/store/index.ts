@@ -8,13 +8,10 @@ import type {
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 
 export interface StoreService {
-  getStore(
-    connection: Connection,
-    request: RequestStore,
-    options?: AbortOptions
-  ): Promise<string>;
+  getStore(request: RequestStore): StoreItem[];
   putStore(storeItem: StoreItem): void;
 }
+
 export interface StoreItem {
   peerId: string;
   key: string;
@@ -22,10 +19,13 @@ export interface StoreItem {
   value: any;
   ttl: number;
   dt: number;
+  recieved: number;
 }
+
 export interface RequestStore {
   key: string | undefined;
   peerId: string | undefined;
+  dt: number | undefined;
 }
 export interface StoreServiceInit {
   protocolPrefix?: string;
