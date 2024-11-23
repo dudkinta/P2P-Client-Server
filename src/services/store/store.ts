@@ -228,12 +228,14 @@ export class StoreService implements Startable, StoreServiceInterface {
 
   putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
-    storeItem.recieved = Date.now();
-    this.Store.set(hash, storeItem);
-    this.log(
-      LogLevel.Trace,
-      `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
-    );
+    if (!this.Store.has(hash)) {
+      storeItem.recieved = Date.now();
+      this.Store.set(hash, storeItem);
+      this.log(
+        LogLevel.Trace,
+        `Stored ${storeItem.key} for ${storeItem.peerId} Data: ${JSON.stringify(storeItem.value)}`
+      );
+    }
   }
 
   private async getFromAllPeers(): Promise<void> {
