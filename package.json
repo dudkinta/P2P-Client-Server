@@ -7,7 +7,7 @@
   "scripts": {
     "server": "set DEBUG=libp2p:multiaddresses && npm run build && node dist/relay.js",
     "build": "npx tsc && cd frontend && npm run build && cd ..",
-    "start": "node dist/node.js",
+    "start": "npm run build && node dist/node.js",
     "node": "set DEBUG=p2p-client && npx tsc && node dist/node.js",
     "node:no-webserver": "npx tsc && node dist/node.js --no-webserver",
     "dev": "concurrently \"npm run node\" \"npm run vite\"",
