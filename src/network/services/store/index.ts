@@ -1,5 +1,10 @@
 import { StoreService as StoreServiceClass } from "./store.js";
-import type { ComponentLogger, PeerStore } from "@libp2p/interface";
+import type {
+  ComponentLogger,
+  PeerStore,
+  TypedEventTarget,
+  Libp2pEvents,
+} from "@libp2p/interface";
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 
 export interface StoreService {
@@ -26,6 +31,7 @@ export interface StoreServiceInit {
   maxInboundStreams?: number;
   maxOutboundStreams?: number;
   runOnLimitedConnection?: boolean;
+  runOnPeerConnect?: boolean;
   timeout?: number;
 }
 
@@ -34,6 +40,7 @@ export interface StoreServiceComponents {
   connectionManager: ConnectionManager;
   peerStore: PeerStore;
   logger: ComponentLogger;
+  events: TypedEventTarget<Libp2pEvents>;
 }
 
 export function store(

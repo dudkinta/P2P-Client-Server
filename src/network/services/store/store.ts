@@ -25,6 +25,7 @@ import type {
   Stream,
   Startable,
   Connection,
+  PeerId,
 } from "@libp2p/interface";
 
 export class StoreService implements Startable, StoreServiceInterface {
@@ -55,9 +56,60 @@ export class StoreService implements Startable, StoreServiceInterface {
     this.maxOutboundStreams = init.maxOutboundStreams ?? MAX_OUTBOUND_STREAMS;
     this.runOnLimitedConnection = init.runOnLimitedConnection ?? true;
     this.handleMessage = this.handleMessage.bind(this);
+    if (init.runOnPeerConnect ?? true) {
+      // Подписываемся на события обнаружения пиров
+      this.components.events.addEventListener(
+        "connection:open",
+        async (event: any) => {
+          this.log(
+            LogLevel.Info,
+            `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
+          );
+          await this.requestStoreFromConnection(event.detail);
+        }
+      );
+    }
   }
 
   readonly [Symbol.toStringTag] = "@libp2p/store";
+
+  private async requestStoreFromConnection(
+    connection: Connection
+  ): Promise<void> {
+    if (connection.status === "open") {
+      const lastUpdate =
+        this.LastUpdateMap.get(`${connection.remotePeer.toString()}:all`) ?? 0;
+      const response = await this.getFromStore(
+        connection,
+        { key: undefined, peerId: undefined, dt: lastUpdate },
+        { signal: AbortSignal.timeout(5000) }
+      ).catch((err) => {
+        this.log(
+          LogLevel.Error,
+          `Failed to get store from ${connection.remotePeer}: ${err}`
+        );
+      });
+      if (response) {
+        this.LastUpdateMap.set(
+          `${connection.remotePeer.toString()}:all`,
+          Date.now()
+        );
+        const lines = JSON.parse(response) as string[];
+        for (const line of lines) {
+          try {
+            const storeItem = JSON.parse(line) as StoreItem;
+            this.putStore(storeItem);
+            this.log(
+              LogLevel.Trace,
+              `I have stored ${storeItem.key} from ${storeItem.peerId}`
+            );
+          } catch (error) {
+            console.error("Failed to parse JSON:", error);
+          }
+        }
+      }
+    }
+  }
 
   async start(): Promise<void> {
     this.log(LogLevel.Info, "Starting store service");
@@ -281,45 +333,17 @@ export class StoreService implements Startable, StoreServiceInterface {
     const connections = this.components.connectionManager.getConnections();
     for (const connection of connections) {
       this.log(LogLevel.Info, `Getting store from ${connection.remotePeer}`);
-      if (connection.status === "open") {
-        const lastUpdate =
-          this.LastUpdateMap.get(`${connection.remotePeer.toString()}:all`) ??
-          0;
-        const response = await this.getFromStore(
-          connection,
-          { key: undefined, peerId: undefined, dt: lastUpdate },
-          { signal: AbortSignal.timeout(5000) }
-        ).catch((err) => {
-          this.log(
-            LogLevel.Error,
-            `Failed to get store from ${connection.remotePeer}: ${err}`
-          );
-        });
-        if (response) {
-          this.LastUpdateMap.set(
-            `${connection.remotePeer.toString()}:all`,
-            Date.now()
-          );
-          const lines = JSON.parse(response) as string[];
-          for (const line of lines) {
-            try {
-              const storeItem = JSON.parse(line) as StoreItem;
-              this.putStore(storeItem);
-              this.log(
-                LogLevel.Trace,
-                `I have stored ${storeItem.key} from ${storeItem.peerId}`
-              );
-            } catch (error) {
-              console.error("Failed to parse JSON:", error);
-            }
-          }
-        }
-      }
+      await this.requestStoreFromConnection(connection).catch((err) => {
+        this.log(
+          LogLevel.Error,
+          `Failed to get store from ${connection}: ${err}`
+        );
+      });
     }
     this.deleteOldStoreItems();
     this.deleteOldRequests();
     setTimeout(async () => {
       await this.getFromAllPeers();
-    }, 10000 * 10);
+    }, 60000 * 10);
   }
 }
