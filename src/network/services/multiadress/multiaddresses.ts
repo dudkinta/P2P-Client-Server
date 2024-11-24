@@ -1,6 +1,6 @@
 import { TimeoutError } from "@libp2p/interface";
 import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
-import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
+import { OutOfLimitError } from "../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendDebug } from "./../../services/socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";

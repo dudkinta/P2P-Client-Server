@@ -8,10 +8,10 @@ import {
   circuitRelayServer,
 } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
-import { roles } from "./../services/roles/index.js";
-import { peerList } from "./../services/peer-list/index.js";
-import { maList } from "./../services/multiadress/index.js";
-import { store } from "./../services/store/index.js";
+import { roles } from "../services/roles/index.js";
+import { peerList } from "../services/peer-list/index.js";
+import { maList } from "../services/multiadress/index.js";
+import { store } from "../services/store/index.js";
 import ConfigLoader from "./config-loader.js";
 
 export async function getRelayClient(

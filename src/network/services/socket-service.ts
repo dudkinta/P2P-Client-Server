@@ -1,6 +1,6 @@
-import { Node } from "./../models/node.js";
+import { Node } from "../models/node.js";
 import { Server, Socket } from "socket.io";
-import { LogLevel } from "./../helpers/log-level.js";
+import { LogLevel } from "../helpers/log-level.js";
 import { NodeService } from "./node-service.js";
 let io: Server | undefined = undefined;
 let networkService: NodeService | undefined = undefined;

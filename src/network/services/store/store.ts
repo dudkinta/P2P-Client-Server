@@ -259,6 +259,24 @@ export class StoreService implements Startable, StoreServiceInterface {
     }
   }
 
+  private deleteOldRequests(): void {
+    for (const [key, value] of this.LastUpdateMap) {
+      const parts: string[] = key.split(":");
+      let isPresent = false;
+      this.components.connectionManager
+        .getConnections()
+        .forEach((connection) => {
+          if (connection.remotePeer.toString() === parts[0]) {
+            isPresent = true;
+          }
+        });
+      if (!isPresent) {
+        this.LastUpdateMap.delete(key);
+        this.log(LogLevel.Trace, `Removed old request ${key}`);
+      }
+    }
+  }
+
   private async getFromAllPeers(): Promise<void> {
     const connections = this.components.connectionManager.getConnections();
     for (const connection of connections) {
@@ -299,7 +317,7 @@ export class StoreService implements Startable, StoreServiceInterface {
       }
     }
     this.deleteOldStoreItems();
-
+    this.deleteOldRequests();
     setTimeout(async () => {
       await this.getFromAllPeers();
     }, 10000 * 10);

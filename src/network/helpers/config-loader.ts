@@ -13,6 +13,7 @@ export interface Roles {
 }
 
 export interface Config {
+  nodeType: string;
   port: number;
   wsport: number;
   listen: string[];
