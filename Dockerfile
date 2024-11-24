@@ -26,4 +26,4 @@ RUN npm run build
 # EXPOSE 6006
 
 # Указываем команду для запуска приложения
-CMD ["npm", "run", "node"]
+CMD ["npm", "run", "start"]
