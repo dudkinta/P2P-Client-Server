@@ -2,11 +2,11 @@ import express, { Request, Response } from "express";
 import path from "path";
 import http from "http";
 import { setupSocketIO } from "./socket-service.js";
-import { NodeService } from "./node-service.js";
+import { NetworkService } from "./network-service.js";
 import ConfigLoader from "../helpers/config-loader.js";
 const __dirname = path.resolve();
 
-export function createServer(ns: NodeService): http.Server {
+export function createServer(ns: NetworkService): http.Server {
   const app = express();
   const config = ConfigLoader.getInstance().getConfig();
   const port = config.wsport ?? 3006;

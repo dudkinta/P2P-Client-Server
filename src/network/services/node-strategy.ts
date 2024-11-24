@@ -1,4 +1,4 @@
-import { Node } from "../models/node.js";
+import { Node } from "..//models/node.js";
 import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection, PeerId } from "@libp2p/interface";
@@ -11,17 +11,19 @@ import {
 import { RequestStore, StoreItem } from "./../services/store/index.js";
 import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
+import {
+  IStrategy,
+  type RequestConnect,
+  type RequestDisconnect,
+  type RequestConnectedPeers,
+  type RequestMultiaddrs,
+  type RequestRoles,
+  type RequestStoreData,
+} from "./network-service.js";
 
 const { debug } = pkg;
-type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
-type RequestDisconnect = (addrr: string) => Promise<void>;
-type RequestRoles = (node: Node) => Promise<string[] | undefined>;
-type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
-type RequestConnectedPeers = (
-  node: Node
-) => Promise<Map<string, string> | undefined>;
-type RequestStoreData = (request: RequestStore) => StoreItem[];
-export class NodeStrategy extends Map<string, Node> {
+
+export class NodeStrategy extends Map<string, Node> implements IStrategy {
   private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
   private nodeCount: number = 0;
@@ -29,7 +31,6 @@ export class NodeStrategy extends Map<string, Node> {
   private penaltyNodes: string[] = [];
   private candidatePeers: Map<string, string> = new Map();
   private banList: Set<string> = new Set();
-  private banDirectAddress: Set<string> = new Set();
   private requestConnect: RequestConnect;
   private requestDisconnect: RequestDisconnect;
   private requestRoles: RequestRoles;
@@ -44,7 +45,6 @@ export class NodeStrategy extends Map<string, Node> {
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
   };
-  private localPeer: string | undefined;
   private PeerId: PeerId | undefined;
 
   constructor(
@@ -85,7 +85,6 @@ export class NodeStrategy extends Map<string, Node> {
 
   async startStrategy(localPeer: PeerId): Promise<void> {
     this.log(LogLevel.Info, `Starting global strategy`);
-    this.localPeer = localPeer.toString();
     this.PeerId = localPeer;
     await this.connectToMainRelay().catch((error) => {
       this.log(LogLevel.Error, `Error in promise connectToMainRelay: ${error}`);
@@ -166,10 +165,12 @@ export class NodeStrategy extends Map<string, Node> {
       this.log(LogLevel.Critical, `No relay in knowsRelay`);
       return;
     }
+
     this.log(LogLevel.Info, `Trying connect to know relay ${relay}`);
     const connRelay = await this.tryConnect(relay).catch((error) => {
       this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
     });
+
     if (!connRelay) {
       this.log(LogLevel.Warning, `Relay not connected`);
     }
@@ -180,10 +181,8 @@ export class NodeStrategy extends Map<string, Node> {
     this.removeDeadNodes();
 
     this.counterConnections();
-    // если никого нет, то подключаемся к релейному узлу
-    if (this.size == 0) {
-      this.log(LogLevel.Warning, `No nodes in storage`);
-      this.banList.clear();
+    // если реле нет, то подключаемся к релейному узлу
+    if (this.relayCount == 0) {
       await this.connectToMainRelay().catch((error) => {
         this.log(
           LogLevel.Error,
@@ -229,9 +228,6 @@ export class NodeStrategy extends Map<string, Node> {
         continue;
       }
       if (this.banList.has(key)) {
-        continue;
-      }
-      if (this.banDirectAddress.has(address)) {
         continue;
       }
       if (this.PeerId?.toString() == key) {
@@ -544,7 +540,7 @@ export class NodeStrategy extends Map<string, Node> {
       connectedPeers.forEach(async (peerInfo: any) => {
         if (
           peerInfo.peerId == node.peerId ||
-          peerInfo.peerId == this.localPeer ||
+          peerInfo.peerId == this.PeerId?.toString() ||
           this.banList.has(peerInfo.peerId)
         ) {
           return;

@@ -1,10 +1,11 @@
 import { Node } from "../models/node.js";
 import { Server, Socket } from "socket.io";
 import { LogLevel } from "../helpers/log-level.js";
-import { NodeService } from "./node-service.js";
-let io: Server | undefined = undefined;
-let networkService: NodeService | undefined = undefined;
-export function setupSocketIO(server: any, ns: NodeService) {
+import { NetworkService } from "./network-service.js";
+
+let io: Server;
+let networkService: NetworkService;
+export function setupSocketIO(server: any, ns: NetworkService) {
   networkService = ns;
   io = new Server(server, {
     cors: {
@@ -25,7 +26,6 @@ export function setupSocketIO(server: any, ns: NodeService) {
   return io;
 }
 
-// Функция для отправки логов
 export function sendDebug(
   service: string,
   level: LogLevel,
@@ -57,17 +57,3 @@ export function sendNodes(nodes: Node[]) {
     }
   }
 }
-/*
-// Функция для отправки сообщения конкретному клиенту по его ID
-export function sendLogToClient(clientId: string, logMessage: string) {
-  if (io) {
-    const socketClient = io.sockets.sockets.get(clientId);
-    if (socketClient) {
-      socketClient.emit("log", { message: logMessage });
-    } else {
-      console.error(`Клиент с ID ${clientId} не найден`);
-    }
-  } else {
-    console.error("Socket.IO не инициализирован");
-  }
-}*/

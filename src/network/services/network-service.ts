@@ -5,15 +5,33 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
+import { RelayStrategy } from "./relay-strategy.js";
 import { OutOfLimitError } from "../models/out-of-limit-error.js";
 import { sendDebug } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
-import pkg from "debug";
 import { RequestStore, StoreItem } from "./store/index.js";
+import pkg from "debug";
 const { debug } = pkg;
-export class NodeService extends EventEmitter {
+
+export interface IStrategy {
+  get: (peer: string) => Node | undefined;
+  set: (peer: string, node: Node) => void;
+  startStrategy(localPeer: PeerId): Promise<void>;
+  stopNodeStrategy(key: string, cause: string, banTimer: number): Promise<void>;
+  getRoot(): { root: Node; connections: Connection[] } | undefined;
+}
+export type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
+export type RequestDisconnect = (addrr: string) => Promise<void>;
+export type RequestRoles = (node: Node) => Promise<string[] | undefined>;
+export type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
+export type RequestConnectedPeers = (
+  node: Node
+) => Promise<Map<string, string> | undefined>;
+export type RequestStoreData = (request: RequestStore) => StoreItem[];
+
+export class NetworkService extends EventEmitter {
   private client: P2PClient;
-  private nodeStorage: NodeStrategy;
+  private storage: IStrategy;
   private localPeer: PeerId | undefined;
   private config = ConfigLoader.getInstance().getConfig();
   private log = (level: LogLevel, message: string) => {
@@ -26,14 +44,25 @@ export class NodeService extends EventEmitter {
   constructor(p2pClient: P2PClient) {
     super();
     this.client = p2pClient;
-    this.nodeStorage = new NodeStrategy(
-      this.RequestConnect.bind(this),
-      this.RequestDisconnect.bind(this),
-      this.RequestRoles.bind(this),
-      this.RequestMultiaddrrs.bind(this),
-      this.RequestConnectedPeers.bind(this),
-      this.RequestStoreData.bind(this)
-    );
+    if (this.config.nodeType == this.config.roles.NODE) {
+      this.storage = new NodeStrategy(
+        this.RequestConnect.bind(this),
+        this.RequestDisconnect.bind(this),
+        this.RequestRoles.bind(this),
+        this.RequestMultiaddrrs.bind(this),
+        this.RequestConnectedPeers.bind(this),
+        this.RequestStoreData.bind(this)
+      );
+    } else {
+      this.storage = new RelayStrategy(
+        this.RequestConnect.bind(this),
+        this.RequestDisconnect.bind(this),
+        this.RequestRoles.bind(this),
+        this.RequestMultiaddrrs.bind(this),
+        this.RequestConnectedPeers.bind(this),
+        this.RequestStoreData.bind(this)
+      );
+    }
   }
 
   async startAsync(): Promise<void> {
@@ -91,7 +120,7 @@ export class NodeService extends EventEmitter {
             LogLevel.Warning,
             `Connection closed to ${peerId.toString()}`
           );
-          await this.nodeStorage.stopNodeStrategy(
+          await this.storage.stopNodeStrategy(
             peerId.toString(),
             `signal from event:peer:disconnect`,
             10000
@@ -103,7 +132,7 @@ export class NodeService extends EventEmitter {
           );
         }
       });
-      await this.nodeStorage.startStrategy(this.localPeer).catch((error) => {
+      await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(
           LogLevel.Error,
           `Error starting nodeStorage ${JSON.stringify(error)}`
@@ -120,10 +149,10 @@ export class NodeService extends EventEmitter {
     connection: Connection | undefined
   ): Node | undefined {
     try {
-      let node = this.nodeStorage.get(peer);
+      let node = this.storage.get(peer);
       if (!node) {
         node = new Node(peerId, connection);
-        this.nodeStorage.set(peer, node);
+        this.storage.set(peer, node);
       } else {
         if (peerId) {
           node.peerId = peerId;
@@ -178,6 +207,7 @@ export class NodeService extends EventEmitter {
       );
     }
   }
+
   private async RequestRoles(node: Node): Promise<string[] | undefined> {
     if (!node.isConnect()) {
       this.log(LogLevel.Warning, `Node is not connected`);
@@ -218,7 +248,7 @@ export class NodeService extends EventEmitter {
       }
     } catch (error) {
       if (error instanceof OutOfLimitError) {
-        this.nodeStorage.stopNodeStrategy(
+        this.storage.stopNodeStrategy(
           node.peerId.toString(),
           "Out of limit",
           10000
@@ -232,6 +262,7 @@ export class NodeService extends EventEmitter {
       return undefined;
     }
   }
+
   private async RequestMultiaddrrs(node: Node): Promise<string[] | undefined> {
     if (!node.isConnect()) {
       this.log(LogLevel.Warning, `Node is not connected`);
@@ -272,7 +303,7 @@ export class NodeService extends EventEmitter {
       }
     } catch (error) {
       if (error instanceof OutOfLimitError) {
-        this.nodeStorage.stopNodeStrategy(
+        this.storage.stopNodeStrategy(
           node.peerId.toString(),
           "Out of limit",
           10000
@@ -286,6 +317,7 @@ export class NodeService extends EventEmitter {
       return undefined;
     }
   }
+
   private async RequestConnectedPeers(node: Node): Promise<any | undefined> {
     if (!node.isConnect()) {
       this.log(LogLevel.Warning, `Node is not connected`);
@@ -326,7 +358,7 @@ export class NodeService extends EventEmitter {
       }
     } catch (error) {
       if (error instanceof OutOfLimitError) {
-        this.nodeStorage.stopNodeStrategy(
+        this.storage.stopNodeStrategy(
           node.peerId.toString(),
           "Out of limit",
           10000
@@ -346,6 +378,6 @@ export class NodeService extends EventEmitter {
   }
 
   getRoot(): { root: Node; connections: Connection[] } | undefined {
-    return this.nodeStorage?.getRoot();
+    return this.storage?.getRoot();
   }
 }
