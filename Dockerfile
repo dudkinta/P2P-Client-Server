@@ -16,15 +16,14 @@ COPY . .
 # Устанавливаем зависимости и собираем фронтенд
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build
 
 # Возвращаемся в корневую директорию
 WORKDIR /app
 RUN npm run build
 
 # Указываем порты, которые слушает приложение
-EXPOSE 3000
-EXPOSE 6006
+ EXPOSE 3000
+ EXPOSE 6000
 
 # Указываем команду для запуска приложения
 CMD ["npm", "run", "start"]

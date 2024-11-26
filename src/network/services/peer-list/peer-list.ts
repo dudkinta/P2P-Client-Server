@@ -1,7 +1,7 @@
 import { TimeoutError } from "@libp2p/interface";
-import { sendAndReceive } from "../../helpers/stream-helper.js";
-import { OutOfLimitError } from "./../../models/out-of-limit-error.js";
+import { OutOfLimitError } from "../../models/out-of-limit-error.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
+import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { sendDebug } from "./../../services/socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
 import {
@@ -13,9 +13,9 @@ import {
   MAX_OUTBOUND_STREAMS,
 } from "./constants.js";
 import type {
-  MultiaddressServiceComponents,
-  MultiaddressServiceInit,
-  MultiaddressService as MultiaddressServiceInterface,
+  PeerListServiceComponents,
+  PeerListServiceInit,
+  PeerListService as PeerListServiceInterface,
 } from "./index.js";
 import type {
   AbortOptions,
@@ -25,11 +25,9 @@ import type {
   Connection,
 } from "@libp2p/interface";
 
-export class MultiaddressService
-  implements Startable, MultiaddressServiceInterface
-{
+export class PeerListService implements Startable, PeerListServiceInterface {
   public readonly protocol: string;
-  private readonly components: MultiaddressServiceComponents;
+  private readonly components: PeerListServiceComponents;
   private started: boolean;
   private readonly timeout: number;
   private readonly maxInboundStreams: number;
@@ -38,15 +36,15 @@ export class MultiaddressService
   private readonly logger: Logger;
   private readonly log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
-    sendDebug("libp2p:multiaddresses", level, timestamp, message);
+    sendDebug("libp2p:peer-list", level, timestamp, message);
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
   constructor(
-    components: MultiaddressServiceComponents,
-    init: MultiaddressServiceInit = {}
+    components: PeerListServiceComponents,
+    init: PeerListServiceInit = {}
   ) {
     this.components = components;
-    this.logger = components.logger.forComponent("libp2p:multiaddresses");
+    this.logger = components.logger.forComponent("@libp2p/peer-list");
     this.started = false;
     this.protocol = `/${
       init.protocolPrefix ?? PROTOCOL_PREFIX
@@ -58,7 +56,7 @@ export class MultiaddressService
     this.handleMessage = this.handleMessage.bind(this);
   }
 
-  readonly [Symbol.toStringTag] = "@libp2p/multiaddresses";
+  readonly [Symbol.toStringTag] = "@libp2p/peer-list";
 
   async start(): Promise<void> {
     await this.components.registrar.handle(this.protocol, this.handleMessage, {
@@ -81,7 +79,7 @@ export class MultiaddressService
   handleMessage(data: IncomingStreamData): void {
     this.log(
       LogLevel.Info,
-      `incoming multiaddresses from ${data.connection.remotePeer.toString()}`
+      `incoming getPeerList from ${data.connection.remotePeer.toString()}`
     );
 
     const { stream } = data;
@@ -89,49 +87,42 @@ export class MultiaddressService
       .then(async () => {
         const signal = AbortSignal.timeout(this.timeout);
         signal.addEventListener("abort", () => {
-          stream?.abort(new TimeoutError("send multiaddresses timeout"));
+          stream?.abort(new TimeoutError("send peers timeout"));
         });
 
-        const connections = await this.components.addressManager.getAddresses();
-
-        connections.forEach((addr) => {
-          this.log(LogLevel.Info, `send multiaddress ${addr.toString()}`);
-        });
-        const addresses = Array.from(connections).map((conn) =>
-          conn.toString()
+        const connections =
+          await this.components.connectionManager.getConnections();
+        const connectedPeers = Array.from(connections)
+          .filter((conn) => conn.status === "open")
+          .map((conn) => ({
+            peerId: conn.remotePeer.toString(),
+            address: conn.remoteAddr.toString(),
+          }));
+        const response = new TextEncoder().encode(
+          JSON.stringify(connectedPeers)
         );
-        const jsonString = JSON.stringify(addresses);
-        await sendAndReceive(stream, jsonString).catch((err) => {
-          this.log(
-            LogLevel.Error,
-            `error while sending multiaddresses${JSON.stringify(err)}`
-          );
-          throw err;
-        });
+        await writeToStream(stream, response, { signal });
       })
       .catch((err) => {
         this.log(
           LogLevel.Error,
-          `incoming multiaddresses from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
+          `incoming peers from ${data.connection.remotePeer.toString()} failed with error ${JSON.stringify(err)}`
         );
         stream?.abort(err);
       })
       .finally(() => {
         this.log(
           LogLevel.Info,
-          `incoming multiaddresses from ${data.connection.remotePeer.toString()} completed`
+          `incoming peers from ${data.connection.remotePeer.toString()} completed`
         );
       });
   }
 
-  async getMultiaddress(
+  async getConnectedPeers(
     connection: Connection,
     options: AbortOptions = {}
   ): Promise<string> {
-    this.log(
-      LogLevel.Info,
-      `send multiaddresses ${connection.remotePeer.toString()}`
-    );
+    this.log(LogLevel.Info, `Send peers ${connection.remotePeer.toString()}`);
     let stream: Stream | undefined;
     try {
       if (connection == null) {
@@ -163,15 +154,15 @@ export class MultiaddressService
         ...options,
         runOnLimitedConnection: this.runOnLimitedConnection,
       });
-      this.log(LogLevel.Info, `send request to ${connection.remotePeer}`);
-      const result = await sendAndReceive(stream, "").catch((err) => {
+      this.log(LogLevel.Info, `Send request to ${connection.remotePeer}`);
+      const result = await readFromStream(stream, options).catch((err) => {
         this.log(
           LogLevel.Error,
-          `error while receiving multiaddresses ${JSON.stringify(err)}`
+          `Error while receiving peerList ${JSON.stringify(err)}`
         );
         throw err;
       });
-      this.log(LogLevel.Info, `received answer: ${result}`);
+      this.log(LogLevel.Info, `Received answer: ${result}`);
       return result;
     } catch (err: any) {
       this.log(

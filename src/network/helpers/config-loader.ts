@@ -1,7 +1,8 @@
+import { multiaddr } from "@multiformats/multiaddr";
 import { promises as fs } from "fs";
 
 export interface Protocols {
-  PING: string;
+  STORE: string;
   ROLE: string;
   PEER_LIST: string;
   MULTIADDRES: string;
@@ -12,7 +13,9 @@ export interface Roles {
 }
 
 export interface Config {
+  nodeType: string;
   port: number;
+  wsport: number;
   listen: string[];
   protocols: Protocols;
   roles: Roles;
@@ -31,10 +34,10 @@ class ConfigLoader {
 
   public static async initialize(): Promise<void> {
     if (!ConfigLoader.instance) {
-      const data = await fs.readFile("./config.json", "utf-8");
+      const data = await fs.readFile("./data/config.json", "utf-8");
       const parsedConfig = JSON.parse(data);
-      const relaysStr = await fs.readFile("./knows/relay.knows", "utf-8");
-      const relaysArr: string[] = relaysStr.split("\r\n");
+      const relaysStr = await fs.readFile("./data/relay.knows", "utf-8");
+      const relaysArr: string[] = JSON.parse(relaysStr);
       ConfigLoader.instance = new ConfigLoader(parsedConfig, relaysArr);
     }
   }
@@ -56,7 +59,18 @@ class ConfigLoader {
   }
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
-    fs.writeFile("./knows/relay.knows", addr + "\r\n", { flag: "a" });
+    fs.writeFile(
+      "./data/relay.knows",
+      JSON.stringify(this.knowsRelay, null, 2)
+    );
+  }
+
+  public isKnownRelay(peer: string): boolean {
+    const relayIds = this.knowsRelay.map((element) => {
+      const ma = multiaddr(element);
+      return ma.getPeerId();
+    });
+    return relayIds.includes(peer);
   }
 }
 

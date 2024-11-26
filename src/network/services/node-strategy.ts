@@ -1,4 +1,4 @@
-import { Node } from "../models/node.js";
+import { Node } from "..//models/node.js";
 import ConfigLoader from "../helpers/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection, PeerId } from "@libp2p/interface";
@@ -8,34 +8,35 @@ import {
   sendDebug as SendLogToSocket,
   sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
+import { RequestStore, StoreItem } from "./../services/store/index.js";
 import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
+import {
+  IStrategy,
+  type RequestConnect,
+  type RequestDisconnect,
+  type RequestConnectedPeers,
+  type RequestMultiaddrs,
+  type RequestRoles,
+  type RequestStoreData,
+} from "./network-service.js";
 
 const { debug } = pkg;
-type RequestConnect = (addrr: string) => Promise<Connection | undefined>;
-type RequestDisconnect = (addrr: string) => Promise<void>;
-type RequestRoles = (node: Node) => Promise<string[] | undefined>;
-type RequestMultiaddrs = (node: Node) => Promise<string[] | undefined>;
-type RequestConnectedPeers = (
-  node: Node
-) => Promise<Map<string, string> | undefined>;
-type RequestPing = (addrr: string) => Promise<number | undefined>;
-export class NodeStrategy extends Map<string, Node> {
-  private config = ConfigLoader.getInstance().getConfig();
-  private knowsRelay = ConfigLoader.getInstance().getRelays();
+
+export class NodeStrategy extends Map<string, Node> implements IStrategy {
+  private config = ConfigLoader.getInstance();
   private relayCount: number = 0;
   private nodeCount: number = 0;
   private unknownCount: number = 0;
   private penaltyNodes: string[] = [];
   private candidatePeers: Map<string, string> = new Map();
   private banList: Set<string> = new Set();
-  private banDirectAddress: Set<string> = new Set();
   private requestConnect: RequestConnect;
   private requestDisconnect: RequestDisconnect;
   private requestRoles: RequestRoles;
   private requestMultiaddrs: RequestMultiaddrs;
   private requestConnectedPeers: RequestConnectedPeers;
-  private requestPing: RequestPing;
+  private requestStoreData: RequestStoreData;
 
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -44,7 +45,6 @@ export class NodeStrategy extends Map<string, Node> {
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
   };
-  private localPeer: string | undefined;
   private PeerId: PeerId | undefined;
 
   constructor(
@@ -53,7 +53,7 @@ export class NodeStrategy extends Map<string, Node> {
     requestRoles: RequestRoles,
     requestMultiaddrs: RequestMultiaddrs,
     requestConnectedPeers: RequestConnectedPeers,
-    requestPing: RequestPing
+    requestStoreData: RequestStoreData
   ) {
     super();
     this.requestConnect = requestConnect;
@@ -61,12 +61,15 @@ export class NodeStrategy extends Map<string, Node> {
     this.requestRoles = requestRoles;
     this.requestMultiaddrs = requestMultiaddrs;
     this.requestConnectedPeers = requestConnectedPeers;
-    this.requestPing = requestPing;
+    this.requestStoreData = requestStoreData;
   }
 
   set(key: string, value: Node): this {
     super.set(key, value);
-    this.log(LogLevel.Info, `Node ${key} added to storage`);
+    this.log(
+      LogLevel.Info,
+      `Node ${key} added to storage. Direction: ${value.getOpenedConnection()?.direction}`
+    );
     this.startNodeStrategy(key, value);
     return this;
   }
@@ -82,7 +85,6 @@ export class NodeStrategy extends Map<string, Node> {
 
   async startStrategy(localPeer: PeerId): Promise<void> {
     this.log(LogLevel.Info, `Starting global strategy`);
-    this.localPeer = localPeer.toString();
     this.PeerId = localPeer;
     await this.connectToMainRelay().catch((error) => {
       this.log(LogLevel.Error, `Error in promise connectToMainRelay: ${error}`);
@@ -90,30 +92,97 @@ export class NodeStrategy extends Map<string, Node> {
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);
+    /*setTimeout(async () => {
+      await this.getCandidates();
+    }, 30000);*/
+    setTimeout(() => {
+      this.getDirectAdressesFromStores(0);
+    }, 30000);
+    setTimeout(async () => {
+      await this.sendToSocket();
+    }, 0);
+  }
+
+  private getDirectAdressesFromStores(dt: number): void {
+    const lastUpdateDt = Date.now();
+    const request: RequestStore = {
+      key: "DirectAddresses",
+      peerId: undefined,
+      dt: 0,
+    };
+    this.log(LogLevel.Trace, `Getting direct addresses from stores`);
+    const res = this.requestStoreData(request);
+    this.log(LogLevel.Trace, `Store size: ${res.length}`);
+    res.forEach((item) => {
+      this.log(LogLevel.Trace, `Store contains: ${JSON.stringify(item)}`);
+      if (item.key == "DirectAddresses") {
+        const addrs = item.value as string[];
+        addrs.forEach((addr) => {
+          this.log(
+            LogLevel.Trace,
+            `Direct address for ${item.peerId}: ${addr}`
+          );
+          if (this.candidatePeers.has(item.peerId)) {
+            if (this.candidatePeers.get(item.peerId) != addr) {
+              this.candidatePeers.set(item.peerId, addr);
+            }
+          } else {
+            this.candidatePeers.set(item.peerId, addr);
+          }
+        });
+      }
+    });
+    setTimeout(() => {
+      this.getDirectAdressesFromStores(lastUpdateDt);
+    }, 60000);
+  }
+
+  private async getCandidates(): Promise<void> {
+    for (const [key, node] of this) {
+      await this.getConnectedPeers(node).catch((error) => {
+        this.log(
+          LogLevel.Error,
+          `Error in promise getConnectedPeers: ${error}`
+        );
+      });
+    }
+    setTimeout(async () => {
+      await this.getCandidates();
+    }, 60000);
+  }
+
+  private async sendToSocket(): Promise<void> {
+    const nodes = Array.from(this.values());
+    SendNodesToSocket(nodes);
+    setTimeout(async () => {
+      await this.sendToSocket();
+    }, 1000);
   }
 
   private async connectToMainRelay(): Promise<void> {
-    const relay = getRandomElement(this.knowsRelay);
+    const relay = getRandomElement(this.config.getRelays());
     if (!relay) {
       this.log(LogLevel.Critical, `No relay in knowsRelay`);
       return;
     }
+
     this.log(LogLevel.Info, `Trying connect to know relay ${relay}`);
     const connRelay = await this.tryConnect(relay).catch((error) => {
       this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
     });
+
     if (!connRelay) {
       this.log(LogLevel.Warning, `Relay not connected`);
     }
   }
 
   private async selfDiag(): Promise<void> {
+    // удаляем мертвые ноды
     this.removeDeadNodes();
+
     this.counterConnections();
-    // если никого нет, то подключаемся к релейному узлу
-    if (this.size == 0) {
-      this.log(LogLevel.Warning, `No nodes in storage`);
-      this.banList.clear();
+    // если реле нет, то подключаемся к релейному узлу
+    if (this.relayCount == 0) {
       await this.connectToMainRelay().catch((error) => {
         this.log(
           LogLevel.Error,
@@ -153,31 +222,28 @@ export class NodeStrategy extends Map<string, Node> {
       );
     }
 
-    // обновляем список кандидатов
-    for (const [key, node] of this) {
-      const connectedPeers = await this.getConnectedPeers(node).catch(
-        (error) => {
-          this.log(
-            LogLevel.Error,
-            `Error in promise getConnectedPeers: ${error}`
-          );
-        }
-      );
-    }
-
     // тест кандидатов и подключение к ним
     for (const [key, address] of this.candidatePeers) {
       if (this.has(key)) {
         continue;
       }
-      if (this.size >= this.config.MAX_NODES) {
+      if (this.banList.has(key)) {
+        continue;
+      }
+      if (this.PeerId?.toString() == key) {
+        continue;
+      }
+      if (this.config.isKnownRelay(key)) {
+        continue;
+      }
+      if (this.size >= this.config.getConfig().MAX_NODES) {
         this.log(
           LogLevel.Info,
-          `Max nodes limit reached. Current nodes: ${this.size}, Max nodes: ${this.config.MAX_NODES}`
+          `Max nodes limit reached. Current nodes: ${this.size}, Max nodes: ${this.config.getConfig().MAX_NODES}`
         );
         break;
       }
-
+      this.log(LogLevel.Debug, `Try connect to candidate ${address}`);
       await this.tryConnect(address).catch((error) => {
         this.log(LogLevel.Error, `Error in promise requestConnect: ${error}`);
         return undefined;
@@ -185,7 +251,7 @@ export class NodeStrategy extends Map<string, Node> {
     }
 
     // поиск прямых адресов у пиров
-    for (const [key, node] of this) {
+    /*for (const [key, node] of this) {
       if (!node) {
         continue;
       }
@@ -194,7 +260,7 @@ export class NodeStrategy extends Map<string, Node> {
         continue;
       }
 
-      if (node.roles.has(this.config.roles.NODE)) {
+      if (node.roles.has(this.config.getConfig().roles.NODE)) {
         const directAddresses = Array.from(node.addresses).find((address) => {
           return (
             !this.banDirectAddress.has(address) &&
@@ -228,29 +294,42 @@ export class NodeStrategy extends Map<string, Node> {
           }, 500);
         }
       }
-    }
+    }*/
 
     //отключение от релейных узлов если достаточно подключенных нод
-    if (this.size > this.config.MAX_NODES) {
-      const relayNodes = Array.from(this.values()).filter((node) => {
-        node.roles.has(this.config.roles.RELAY) &&
-          !node.roles.has(this.config.roles.NODE);
-      });
-      relayNodes.forEach(async (node) => {
+    if (this.size > 5) {
+      this.forEach(async (node) => {
         if (!node || !node.peerId) {
           return;
         }
-        await this.stopNodeStrategy(
-          node.peerId.toString(),
-          `too many connected nodes`,
-          60 * 1000 * 5
-        );
+        if (node.roles.has(this.config.getConfig().roles.RELAY)) {
+          this.log(
+            LogLevel.Trace,
+            `Relay node need disconnect: ${node.peerId}`
+          );
+          await this.stopNodeStrategy(
+            node.peerId.toString(),
+            `too many connected nodes`,
+            60000 * 30
+          );
+        }
       });
     }
 
-    //отправляем все ноды в сокет
-    SendNodesToSocket(Array.from(this.values()));
-
+    //удаление закрытых соединений
+    for (const [key, node] of this) {
+      if (!node) {
+        continue;
+      }
+      if (node.connections.size == 0) {
+        continue;
+      }
+      node.connections.forEach((conn) => {
+        if (conn.status == "closed") {
+          node.connections.delete(conn);
+        }
+      });
+    }
     setTimeout(async () => {
       await this.selfDiag();
     }, 10000);
@@ -324,15 +403,15 @@ export class NodeStrategy extends Map<string, Node> {
         ouBboundCount++;
       }
 
-      if (node.roles.has(this.config.roles.RELAY)) {
+      if (node.roles.has(this.config.getConfig().roles.RELAY)) {
         rCount++;
       }
-      if (node.roles.has(this.config.roles.NODE)) {
+      if (node.roles.has(this.config.getConfig().roles.NODE)) {
         nCount++;
       }
       if (
-        !node.roles.has(this.config.roles.RELAY) &&
-        !node.roles.has(this.config.roles.NODE)
+        !node.roles.has(this.config.getConfig().roles.RELAY) &&
+        !node.roles.has(this.config.getConfig().roles.NODE)
       ) {
         uCount++;
       }
@@ -423,7 +502,7 @@ export class NodeStrategy extends Map<string, Node> {
     node.roles.forEach((role) => {
       this.log(LogLevel.Info, `Node ${key} has role:${role}`);
     });
-    if (node.roles.has(this.config.roles.NODE)) {
+    if (node.roles.has(this.config.getConfig().roles.NODE)) {
       await this.waitMultiaddrs(node).catch((error) => {
         this.log(LogLevel.Error, `Error in promise waitMultiaddrs: ${error}`);
       });
@@ -461,13 +540,17 @@ export class NodeStrategy extends Map<string, Node> {
       connectedPeers.forEach(async (peerInfo: any) => {
         if (
           peerInfo.peerId == node.peerId ||
-          peerInfo.peerId == this.localPeer ||
+          peerInfo.peerId == this.PeerId?.toString() ||
           this.banList.has(peerInfo.peerId)
         ) {
           return;
         }
 
-        if (node.roles.has(this.config.roles.RELAY)) {
+        if (this.config.isKnownRelay(peerInfo.peerId)) {
+          return;
+        }
+
+        if (node.roles.has(this.config.getConfig().roles.RELAY)) {
           const connection = node.getOpenedConnection();
           if (!connection) return;
           const relayAddress = connection.remoteAddr.toString();
@@ -483,7 +566,7 @@ export class NodeStrategy extends Map<string, Node> {
             );
           }
         }
-        if (node.roles.has(this.config.roles.NODE)) {
+        if (node.roles.has(this.config.getConfig().roles.NODE)) {
           if (isDirect(peerInfo.address) && !isLocalAddress(peerInfo.address)) {
             if (
               !this.has(peerInfo.peerId) &&
@@ -591,6 +674,7 @@ export class NodeStrategy extends Map<string, Node> {
   }
 
   private async tryConnect(address: string): Promise<Connection | undefined> {
+    this.log(LogLevel.Info, `Trying to connect to ${address}`);
     const ma = multiaddr(address);
     this.log(
       LogLevel.Info,
@@ -598,6 +682,7 @@ export class NodeStrategy extends Map<string, Node> {
     );
     const peerId = ma.getPeerId();
     if (!peerId) {
+      this.log(LogLevel.Warning, `PeerId not found in address ${address}`);
       return undefined;
     }
     if (this.banList.has(peerId.toString())) {

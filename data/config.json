@@ -1,8 +1,10 @@
 {
-  "port": 9876,
-  "listen": ["/ip4/0.0.0.0/tcp/"],
+  "nodeType": "chainnode",
+  "port": 6000,
+  "wsport": 3000,
+  "listen": ["/ip4/0.0.0.0/tcp/", "/ip6/::/tcp/"],
   "protocols": {
-    "PING": "/chain/ping/1.0.0",
+    "STORE": "/chain/store/1.0.0",
     "ROLE": "/chain/roles/1.0.0",
     "PEER_LIST": "/chain/peers/1.0.0",
     "MULTIADDRES": "/chain/multiadres/1.0.0"
@@ -11,5 +13,5 @@
     "RELAY": "chainrelay",
     "NODE": "chainnode"
   },
-  "MAX_NODES": 3
+  "MAX_NODES": 64
 }

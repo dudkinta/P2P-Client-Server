@@ -1,22 +1,20 @@
 import { EventEmitter } from "events";
-import { createLibp2p, Libp2p } from "libp2p";
-import { TimeoutError, type Connection, type PeerId } from "@libp2p/interface";
-import { ping, PingService } from "./services/ping/index.js";
-import { roles, RolesService } from "./services/roles/index.js";
-import { peerList, PeerListService } from "./services/peer-list/index.js";
-import { maList, MultiaddressService } from "./services/multiadress/index.js";
-import { noise } from "@chainsafe/libp2p-noise";
-import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
-import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
-import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
-import { identify, identifyPush } from "@libp2p/identify";
-import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
+import { Libp2p } from "libp2p";
+import { TimeoutError, Connection, PeerId } from "@libp2p/interface";
+import { RolesService } from "./services/roles/index.js";
+import { PeerListService } from "./services/peer-list/index.js";
+import { MultiaddressService } from "./services/multiadress/index.js";
+import { Multiaddr } from "@multiformats/multiaddr";
 import ConfigLoader from "./helpers/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
-import { loadOrCreatePeerId } from "./helpers/peer-helper.js";
 import pkg from "debug";
+import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
+import {
+  StoreService,
+  RequestStore,
+  StoreItem,
+} from "./services/store/index.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -33,96 +31,37 @@ export class P2PClient extends EventEmitter {
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
   };
-  localPeer: string | undefined;
   localPeerId: PeerId | undefined;
   private port: number;
   private listenAddrs: string[];
-  constructor(port: number, listenAddrs: string[]) {
+  private mainRole: string;
+  constructor(listenAddrs: string[], port: number, role: string) {
     super();
     this.port = port;
     this.listenAddrs = listenAddrs;
+    this.mainRole = role;
   }
 
   private async createNode(): Promise<Libp2p | undefined> {
     try {
-      const privateKey = await loadOrCreatePeerId("peer-id.bin");
-      if (!privateKey) {
-        this.log(LogLevel.Error, "Error loading or creating Peer ID");
-        return undefined;
+      if (this.mainRole === this.config.roles.NODE) {
+        return await getNodeClient(this.listenAddrs, this.port).catch((err) => {
+          this.log(LogLevel.Error, `Error in getNodeClient: ${err}`);
+          return undefined;
+        });
       }
-
-      const addrs = this.listenAddrs.map(
-        (addr: string) => `${addr}${this.port}`
-      );
-      addrs.push("/p2p-circuit");
-      const node = await createLibp2p({
-        start: false,
-        privateKey: privateKey,
-        addresses: {
-          listen: addrs,
-        },
-        transports: [
-          tcp(),
-          circuitRelayTransport({
-            maxInboundStopStreams: 500,
-            maxOutboundStopStreams: 500,
-            stopTimeout: 60000,
-            reservationCompletionTimeout: 20000,
-          }),
-        ],
-        connectionGater: {
-          denyDialMultiaddr: () => {
-            return false;
-          },
-        },
-        connectionEncrypters: [noise()],
-        streamMuxers: [yamux()],
-        services: {
-          aminoDHT: kadDHT({
-            clientMode: true,
-            protocol: "/ipfs/kad/1.0.0",
-            peerInfoMapper: removePrivateAddressesMapper,
-          }),
-          identify: identify(),
-          identifyPush: identifyPush(),
-          ping: ping(),
-          roles: roles({
-            roles: [this.config.roles.NODE],
-          }),
-          peerList: peerList(),
-          maList: maList(),
-        },
-        connectionManager: {
-          maxConnections: 20,
-        },
-      });
-      return node;
-    } catch (error) {
-      this.log(LogLevel.Critical, `Error during createLibp2p: ${error}`);
-      return undefined;
-    }
-  }
-
-  async pingByAddress(peerAddress: string): Promise<number> {
-    if (!this.node) {
-      throw new Error("Node is not initialized for ping");
-    }
-    try {
-      const addr = multiaddr(peerAddress);
-      const ping = this.node.services.ping as PingService;
-      this.log(LogLevel.Info, `Пингуем ${peerAddress}`);
-      const latency = await ping.ping(addr);
-      this.log(LogLevel.Info, `Пинг ${peerAddress}: ${latency}ms`);
-      return latency;
-    } catch (error) {
-      this.log(LogLevel.Error, `Ошибка при пинге: ${JSON.stringify(error)}`);
-      if (error instanceof TimeoutError) {
-        this.log(
-          LogLevel.Error,
-          `Ошибка таймаута при пинге: ${JSON.stringify(error)}`
+      if (this.mainRole === this.config.roles.RELAY) {
+        return await getRelayClient(this.listenAddrs, this.port).catch(
+          (err) => {
+            this.log(LogLevel.Error, `Error in getRelayClient: ${err}`);
+            return undefined;
+          }
         );
       }
-      throw error;
+      return undefined;
+    } catch (error) {
+      this.log(LogLevel.Critical, `Error during createNode: ${error}`);
+      return undefined;
     }
   }
 
@@ -132,9 +71,14 @@ export class P2PClient extends EventEmitter {
     }
     try {
       const roleService = this.node.services.roles as RolesService;
-      const result = await roleService.roles(conn, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const result = await roleService
+        .roles(conn, {
+          signal: AbortSignal.timeout(5000),
+        })
+        .catch((err) => {
+          this.log(LogLevel.Error, `Error in getRoles: ${err}`);
+          throw err;
+        });
       this.log(
         LogLevel.Info,
         `Роли пира (${conn.remotePeer.toString()}): ${result}`
@@ -161,9 +105,14 @@ export class P2PClient extends EventEmitter {
     }
     try {
       const peerListService = this.node.services.peerList as PeerListService;
-      const result = await peerListService.getConnectedPeers(conn, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const result = await peerListService
+        .getConnectedPeers(conn, {
+          signal: AbortSignal.timeout(5000),
+        })
+        .catch((err) => {
+          this.log(LogLevel.Error, `Error in getPeerList: ${err}`);
+          throw err;
+        });
       this.log(
         LogLevel.Info,
         `Подключенные пиры к пиру: (${conn.remotePeer.toString()}): ${result}`
@@ -180,6 +129,27 @@ export class P2PClient extends EventEmitter {
           `Ошибка таймаута при запросе подключеных пиров: ${JSON.stringify(error)}`
         );
       }
+      throw error;
+    }
+  }
+
+  getStore(request: RequestStore): StoreItem[] {
+    if (!this.node) {
+      throw new Error("Node is not initialized for getStore");
+    }
+    const storeService = this.node.services.store as StoreService;
+    if (!storeService) {
+      throw new Error("Store service is not initialized");
+    }
+    try {
+      const result = storeService.getStore(request);
+      this.log(LogLevel.Debug, `Store: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      this.log(
+        LogLevel.Error,
+        `Ошибка при запросе store: ${JSON.stringify(error)}`
+      );
       throw error;
     }
   }
@@ -241,7 +211,10 @@ export class P2PClient extends EventEmitter {
     const signal = AbortSignal.timeout(5000);
     try {
       this.log(LogLevel.Info, `Disconnecting from ${ma.toString()}`);
-      await this.node.hangUp(ma, { signal });
+      await this.node.hangUp(ma, { signal }).catch((err) => {
+        this.log(LogLevel.Error, `Error in hangUp: ${err}`);
+        throw err;
+      });
       this.log(LogLevel.Info, `Disconnected from ${ma.toString()}`);
     } catch (error) {
       this.log(
@@ -249,6 +222,36 @@ export class P2PClient extends EventEmitter {
         `Error in disconnectFromMA: ${JSON.stringify(error)}`
       );
     }
+  }
+
+  async updateSelfMultiaddress(): Promise<void> {
+    if (this.node) {
+      const maService = this.node.services.maList as MultiaddressService;
+      if (maService) {
+        const maList = await maService.getDirectMultiaddress();
+        maList.forEach((ma) => {
+          this.log(LogLevel.Info, `${ma.toString()}`);
+        });
+        if (maList.length > 0) {
+          const storeService = this.node.services.store as StoreService;
+          if (storeService) {
+            storeService.putStore({
+              peerId: this.node.peerId.toString(),
+              key: "DirectAddresses",
+              value: maList,
+              ttl: 60000 * 60,
+              dt: Date.now(),
+              recieved: Date.now(),
+            });
+          }
+        }
+      } else {
+        this.log(LogLevel.Warning, "No multiaddress service found");
+      }
+    }
+    setTimeout(async () => {
+      await this.updateSelfMultiaddress();
+    }, 60000 * 30);
   }
 
   async startNode(): Promise<void> {
@@ -259,8 +262,6 @@ export class P2PClient extends EventEmitter {
         return;
       }
 
-      this.localPeer = this.node.peerId.toString();
-      this.localPeerId = this.node.peerId;
       this.node.addEventListener("connection:open", (event: any) => {
         this.log(
           LogLevel.Info,
@@ -298,9 +299,8 @@ export class P2PClient extends EventEmitter {
 
       await this.node.start();
       this.log(LogLevel.Info, `Libp2p listening on:`);
-      this.node.getMultiaddrs().forEach((ma) => {
-        this.log(LogLevel.Info, `${ma.toString()}`);
-      });
+      this.localPeerId = this.node.peerId;
+      await this.updateSelfMultiaddress();
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
     }

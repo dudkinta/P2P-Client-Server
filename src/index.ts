@@ -1,23 +1,19 @@
-import { P2PClient } from "./p2p-сlient.js";
-import { NetworkService } from "./services/nerwork-service.js";
-import ConfigLoader from "./helpers/config-loader.js";
-import { createServer } from "./services/web-server.js";
+import { P2PClient } from "./network/p2p-сlient.js";
+import { NetworkService } from "./network/services/network-service.js";
+import ConfigLoader from "./network/helpers/config-loader.js";
+import { createServer } from "./network/services/web-server.js";
 
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
   const config = ConfigLoader.getInstance().getConfig();
 
   let port = config.port ?? 6006;
-  const argv = process.argv.slice(2);
-  if (!argv.includes("--no-webserver")) {
-    port = 0;
-  }
   const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-  const networkService = new NetworkService(new P2PClient(port, listenAddrs));
+  const networkService = new NetworkService(
+    new P2PClient(listenAddrs, port, config.nodeType)
+  );
 
-  if (!argv.includes("--no-webserver")) {
-    createServer(networkService);
-  }
+  createServer(networkService);
 
   await networkService.startAsync();
 }
