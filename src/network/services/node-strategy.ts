@@ -1,5 +1,5 @@
 import { Node } from "..//models/node.js";
-import ConfigLoader from "../helpers/config-loader.js";
+import ConfigLoader from "../../common/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection, PeerId } from "@libp2p/interface";
 import pkg from "debug";

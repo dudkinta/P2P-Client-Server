@@ -16,7 +16,7 @@ import {
 } from "./network-service.js";
 import { Node } from "..//models/node.js";
 import { Connection, PeerId } from "@libp2p/interface";
-import ConfigLoader from "../helpers/config-loader.js";
+import ConfigLoader from "../../common/config-loader.js";
 import { multiaddr } from "@multiformats/multiaddr";
 import e from "express";
 

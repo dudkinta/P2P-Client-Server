@@ -12,7 +12,7 @@ import { roles } from "../services/roles/index.js";
 import { peerList } from "../services/peer-list/index.js";
 import { maList } from "../services/multiadress/index.js";
 import { store } from "../services/store/index.js";
-import ConfigLoader from "./config-loader.js";
+import ConfigLoader from "../../common/config-loader.js";
 
 export async function getRelayClient(
   lintenAddrs: string[],
@@ -20,8 +20,8 @@ export async function getRelayClient(
 ): Promise<Libp2p> {
   try {
     const config = ConfigLoader.getInstance().getConfig();
-
-    const privateKey = await loadOrCreatePeerId("./data/peer-id.bin");
+    const net = config.net;
+    const privateKey = await loadOrCreatePeerId(`./data/${net}/peer-id.bin`);
     if (!privateKey) {
       throw new Error("Error loading or creating Peer ID");
     }
@@ -84,7 +84,9 @@ export async function getNodeClient(
   try {
     const config = ConfigLoader.getInstance().getConfig();
 
-    const privateKey = await loadOrCreatePeerId("./data/peer-id.bin");
+    const privateKey = await loadOrCreatePeerId(
+      `./data/${config.net}/peer-id.bin`
+    );
     if (!privateKey) {
       throw new Error("Error loading or creating Peer ID");
     }

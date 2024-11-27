@@ -1,4 +1,5 @@
-import { Block } from "./models/block.js";
+import { AppDataSource } from "./db-context/database.js";
+import { Block } from "./db-context/models/block.js";
 
 export class BlockChain {
   private static instance: BlockChain;
@@ -10,7 +11,9 @@ export class BlockChain {
     return BlockChain.instance;
   }
 
-  public async init(): Promise<void> {}
+  public async init(): Promise<void> {
+    await AppDataSource.initialize();
+  }
 
   private chain: Block[] = [];
   public getChain(): Block[] {

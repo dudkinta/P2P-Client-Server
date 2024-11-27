@@ -1,0 +1,27 @@
+services:
+  node:
+    container_name: NodeApp-1
+    image: dudkinta/tgbc:latest
+    pull_policy: always
+    ports:
+      - "3001:3001"
+      - "6001:6001"
+    volumes:
+      - ./data:/app/data
+    environment:
+      NODE_ENV: production
+    command: sh -c "npm run build && npm run start"
+    depends_on:
+      - postgres
+
+  postgres:
+    container_name: postgres-db
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: blockchain_db
+    volumes:
+      - ./data/testnet/db:/var/lib/postgresql/data

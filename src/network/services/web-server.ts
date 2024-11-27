@@ -3,7 +3,7 @@ import path from "path";
 import http from "http";
 import { setupSocketIO } from "./socket-service.js";
 import { NetworkService } from "./network-service.js";
-import ConfigLoader from "../helpers/config-loader.js";
+import ConfigLoader from "../../common/config-loader.js";
 const __dirname = path.resolve();
 
 export function createServer(ns: NetworkService): http.Server {

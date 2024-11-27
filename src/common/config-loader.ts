@@ -13,6 +13,7 @@ export interface Roles {
 }
 
 export interface Config {
+  net: string;
   nodeType: string;
   port: number;
   wsport: number;
@@ -26,17 +27,19 @@ class ConfigLoader {
   private static instance: ConfigLoader;
   private config: Config;
   private knowsRelay: string[];
-
+  private readonly net: string;
   private constructor(config: Config, knowsRelay: string[]) {
     this.config = config;
+    this.net = config.net;
     this.knowsRelay = knowsRelay;
   }
 
   public static async initialize(): Promise<void> {
     if (!ConfigLoader.instance) {
-      const data = await fs.readFile("./data/config.json", "utf-8");
+      const data = await fs.readFile(`./data/config.json`, "utf-8");
       const parsedConfig = JSON.parse(data);
-      const relaysStr = await fs.readFile("./data/relay.knows", "utf-8");
+      const net = parsedConfig.net;
+      const relaysStr = await fs.readFile(`./data/${net}/relay.knows`, "utf-8");
       const relaysArr: string[] = JSON.parse(relaysStr);
       ConfigLoader.instance = new ConfigLoader(parsedConfig, relaysArr);
     }
@@ -60,7 +63,7 @@ class ConfigLoader {
   public saveRelay(addr: string): void {
     this.knowsRelay.push(addr);
     fs.writeFile(
-      "./data/relay.knows",
+      `./data/${this.net}/relay.knows`,
       JSON.stringify(this.knowsRelay, null, 2)
     );
   }

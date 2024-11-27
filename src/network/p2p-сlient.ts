@@ -5,7 +5,7 @@ import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
 import { Multiaddr } from "@multiformats/multiaddr";
-import ConfigLoader from "./helpers/config-loader.js";
+import ConfigLoader from "../common/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";

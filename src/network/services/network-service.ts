@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import ConfigLoader from "../helpers/config-loader.js";
+import ConfigLoader from "../../common/config-loader.js";
 import { P2PClient } from "../p2p-сlient.js";
 import { multiaddr } from "@multiformats/multiaddr";
 import { Connection, PeerId } from "@libp2p/interface";
