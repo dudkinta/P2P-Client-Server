@@ -52,7 +52,7 @@ export class Block {
         this.index +
           this.previousHash +
           this.timestamp +
-          JSON.stringify(this.transactions.map((_) => _.toJSON())) +
+          JSON.stringify(this.transactions) +
           JSON.stringify(this.smartContracts) +
           JSON.stringify(this.contractTransactions)
       )

@@ -31,24 +31,19 @@ export class Transaction {
     this.timestamp = timestamp;
   }
 
-  // Проверка валидности транзакции
   isValid(): boolean {
-    // 1. Проверка обязательных полей
     if (!this.sender || !this.receiver || !this.amount || !this.signature) {
       console.error("Transaction is missing required fields.");
       return false;
     }
 
-    // 2. Проверка суммы
     if (this.amount <= 0) {
       console.error("Transaction amount must be greater than 0.");
       return false;
     }
 
-    // 3. Проверка подписи
-    const transactionData = `${this.sender}${this.receiver}${this.amount}`;
     const verify = crypto.createVerify("SHA256");
-    verify.update(transactionData).end();
+    verify.update(this.getTransactionData()).end();
 
     const isSignatureValid = verify.verify(this.sender, this.signature, "hex");
     if (!isSignatureValid) {
@@ -61,21 +56,18 @@ export class Transaction {
 
   @BeforeInsert()
   generateHash() {
-    // Вычисляем хэш на основе содержимого транзакции
-    const transactionData = `${this.sender}${this.receiver}${this.amount}${this.timestamp}${this.signature}`;
     this.hash = crypto
       .createHash("sha256")
-      .update(transactionData)
+      .update(this.getTransactionData())
       .digest("hex");
   }
 
-  toJSON(): string {
+  getTransactionData(): string {
     return JSON.stringify({
       sender: this.sender,
       receiver: this.receiver,
       amount: this.amount,
       timestamp: this.timestamp,
-      signature: this.signature,
     });
   }
 }

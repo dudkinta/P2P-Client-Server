@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { Transaction } from "../blockchain/db-context/models/transaction.js";
 import { promises as fs } from "fs";
 import ConfigLoader from "../common/config-loader.js";
+import { SmartContract } from "../blockchain/db-context/models/smartcontract.js";
+import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 
 export class Wallet {
   private privateKey: string | null = null;
@@ -47,7 +49,6 @@ export class Wallet {
     }
   }
 
-  // Подписание транзакции
   signTransaction(transaction: Transaction): void {
     if (!this.privateKey || !this.publicKey) {
       throw new Error("Wallet is not initialized. Call 'initialize()' first.");
@@ -57,11 +58,42 @@ export class Wallet {
       throw new Error("Cannot sign transactions for other wallets!");
     }
 
-    const transactionData = `${transaction.sender}${transaction.receiver}${transaction.amount}`;
+    const transactionData = transaction.getTransactionData();
     const sign = crypto.createSign("SHA256");
     sign.update(transactionData).end();
 
-    // Добавление подписи в транзакцию
+    transaction.signature = sign.sign(this.privateKey, "hex");
+  }
+
+  signSmartContract(contract: SmartContract): void {
+    if (!this.privateKey || !this.publicKey) {
+      throw new Error("Wallet is not initialized. Call 'initialize()' first.");
+    }
+
+    if (contract.owner !== this.publicKey) {
+      throw new Error("Cannot sign transactions for other wallets!");
+    }
+
+    const contractData = contract.getContractData();
+    const sign = crypto.createSign("SHA256");
+    sign.update(contractData).end();
+
+    contract.signature = sign.sign(this.privateKey, "hex");
+  }
+
+  signContractTransaction(transaction: ContractTransaction): void {
+    if (!this.privateKey || !this.publicKey) {
+      throw new Error("Wallet is not initialized. Call 'initialize()' first.");
+    }
+
+    if (transaction.sender !== this.publicKey) {
+      throw new Error("Cannot sign transactions for other wallets!");
+    }
+
+    const transactionData = transaction.getContractTransactionData();
+    const sign = crypto.createSign("SHA256");
+    sign.update(transactionData).end();
+
     transaction.signature = sign.sign(this.privateKey, "hex");
   }
 }
