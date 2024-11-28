@@ -1,23 +1,13 @@
 import crypto from "crypto";
-import { Entity, Column, BeforeInsert } from "typeorm";
-import "reflect-metadata";
 
-@Entity("transactions")
 export class Transaction {
-  @Column()
-  hash: string; // Хэш транзакции
-  @Column()
-  block: string; // Хэш блока, в который включена транзакция
-  @Column()
-  sender: string; // Публичный ключ отправителя
-  @Column()
-  receiver: string; // Публичный ключ получателя
-  @Column()
-  amount: number;
-  @Column("bigint")
-  timestamp: number;
-  @Column()
-  signature?: string; // Подпись транзакции
+  public hash: string;
+  public block?: string;
+  public sender: string;
+  public receiver: string;
+  public amount: number;
+  public timestamp: number;
+  public signature?: string;
 
   constructor(
     sender: string,
@@ -29,6 +19,7 @@ export class Transaction {
     this.receiver = receiver;
     this.amount = amount;
     this.timestamp = timestamp;
+    this.hash = this.calculateHash();
   }
 
   isValid(): boolean {
@@ -54,9 +45,8 @@ export class Transaction {
     return true;
   }
 
-  @BeforeInsert()
-  generateHash() {
-    this.hash = crypto
+  calculateHash() {
+    return crypto
       .createHash("sha256")
       .update(this.getTransactionData())
       .digest("hex");

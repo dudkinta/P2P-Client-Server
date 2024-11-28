@@ -1,22 +1,12 @@
 import crypto from "crypto";
-import { Entity, Column, BeforeInsert } from "typeorm";
-import "reflect-metadata";
 
-@Entity("smartcontracts")
 export class SmartContract {
-  @Column()
   hash: string;
-  @Column()
-  block: string;
-  @Column()
+  block?: string;
   owner: string;
-  @Column()
   code: string;
-  @Column("jsonb")
   initialState: Record<string, string | number | boolean | object | null>;
-  @Column("bigint")
   timestamp: number;
-  @Column()
   signature?: string;
 
   constructor(
@@ -29,6 +19,7 @@ export class SmartContract {
     this.code = code;
     this.initialState = initialState;
     this.timestamp = timestamp;
+    this.hash = this.calculateHash();
   }
   isValid(): boolean {
     if (!this.owner || !this.code || !this.initialState || !this.signature) {
@@ -47,9 +38,8 @@ export class SmartContract {
 
     return true;
   }
-  @BeforeInsert()
-  generateHash() {
-    this.hash = crypto
+  calculateHash() {
+    return crypto
       .createHash("sha256")
       .update(this.getContractData())
       .digest("hex");

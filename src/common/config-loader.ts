@@ -11,7 +11,13 @@ export interface Roles {
   RELAY: string;
   NODE: string;
 }
-
+export interface Storage {
+  db_host: string;
+  db_port: number;
+  db_name: string;
+  db_user: string;
+  db_password: string;
+}
 export interface Config {
   net: string;
   nodeType: string;
@@ -20,6 +26,7 @@ export interface Config {
   listen: string[];
   protocols: Protocols;
   roles: Roles;
+  storage: Storage;
   MAX_NODES: number;
 }
 

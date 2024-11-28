@@ -38,10 +38,8 @@
     "axios": "^1.7.7",
     "debug": "^4.3.7",
     "express": "^4.21.1",
+    "level": "^8.0.1",
     "libp2p": "^2.2.1",
-    "pg": "^8.13.1",
-    "reflect-metadata": "^0.2.2",
-    "socket.io": "^4.8.1",
-    "typeorm": "^0.3.20"
+    "socket.io": "^4.8.1"
   }
 }

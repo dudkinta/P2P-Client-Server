@@ -1,6 +1,4 @@
 import crypto from "crypto";
-import { Entity, Column, BeforeInsert } from "typeorm";
-import "reflect-metadata";
 
 export enum TransactionStatus {
   Pending = "pending",
@@ -8,29 +6,15 @@ export enum TransactionStatus {
   Failed = "failed",
 }
 
-@Entity("contracttransactions")
 export class ContractTransaction {
-  @Column()
   hash: string;
-  @Column()
   contract: string;
-  @Column()
-  block: string;
-  @Column()
+  block?: string;
   functionName: string;
-  @Column("jsonb")
   arguments: Record<string, string | number | boolean | object | null>;
-  @Column()
   sender: string;
-  @Column({
-    type: "enum",
-    enum: TransactionStatus,
-    default: TransactionStatus.Pending,
-  })
   status: TransactionStatus;
-  @Column()
   timestamp: number;
-  @Column()
   signature?: string;
 
   constructor(
@@ -45,11 +29,12 @@ export class ContractTransaction {
     this.arguments = argumentList;
     this.sender = sender;
     this.timestamp = timestamp;
+    this.status = TransactionStatus.Pending;
+    this.hash = this.calculateHash();
   }
 
-  @BeforeInsert()
-  generateHash() {
-    this.hash = crypto
+  calculateHash() {
+    return crypto
       .createHash("sha256")
       .update(this.getContractTransactionData())
       .digest("hex");

@@ -2,46 +2,32 @@ import crypto from "crypto";
 import { Transaction } from "./transaction.js";
 import { SmartContract } from "./smartcontract.js";
 import { ContractTransaction } from "./contract-transaction.js";
-import { Entity, Column, OneToMany } from "typeorm";
-import "reflect-metadata";
 
-@Entity("blocks")
 export class Block {
-  @Column()
   public hash: string;
-
-  @Column()
+  public merkleRoot: string;
   public previousHash: string;
-
-  @Column()
   public index: number;
-
-  @Column("bigint")
   public timestamp: number;
-
-  @OneToMany(() => Transaction, (transaction) => transaction.block, {
-    cascade: true,
-  })
   public transactions: Transaction[];
-
-  @OneToMany(() => SmartContract, (smartContract) => smartContract.block, {
-    cascade: true,
-  })
   public smartContracts: SmartContract[];
-
-  @OneToMany(
-    () => ContractTransaction,
-    (smartContract) => smartContract.block,
-    {
-      cascade: true,
-    }
-  )
   public contractTransactions: ContractTransaction[];
 
-  constructor(index: number, previousHash: string, timestamp: number) {
+  constructor(
+    index: number,
+    previousHash: string,
+    timestamp: number,
+    transactions: Transaction[] = [],
+    smartContracts: SmartContract[] = [],
+    contractTransactions: ContractTransaction[] = []
+  ) {
     this.index = index;
     this.previousHash = previousHash;
     this.timestamp = timestamp;
+    this.transactions = transactions;
+    this.smartContracts = smartContracts;
+    this.contractTransactions = contractTransactions;
+    this.merkleRoot = this.calculateMerkleRoot();
     this.hash = this.calculateHash();
   }
 
@@ -50,6 +36,7 @@ export class Block {
       .createHash("sha256")
       .update(
         this.index +
+          this.merkleRoot +
           this.previousHash +
           this.timestamp +
           JSON.stringify(this.transactions) +
@@ -81,9 +68,32 @@ export class Block {
       Timestamp: ${this.timestamp}
       Previous Hash: ${this.previousHash}
       Hash: ${this.hash}
+      MerkleRoot: ${this.merkleRoot}
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
     `;
+  }
+
+  calculateMerkleRoot(): string {
+    const transactionHashes = this.transactions.map((tx) => tx.hash);
+    return this.buildMerkleTree(transactionHashes);
+  }
+
+  private buildMerkleTree(hashes: string[]): string {
+    if (hashes.length === 1) return hashes[0];
+
+    const nextLevel: string[] = [];
+    for (let i = 0; i < hashes.length; i += 2) {
+      const left = hashes[i];
+      const right = hashes[i + 1] || hashes[i]; // Дублируем последний хэш, если нечетное число
+      const combinedHash = crypto
+        .createHash("sha256")
+        .update(left + right)
+        .digest("hex");
+      nextLevel.push(combinedHash);
+    }
+
+    return this.buildMerkleTree(nextLevel);
   }
 }
