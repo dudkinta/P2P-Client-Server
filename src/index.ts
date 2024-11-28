@@ -2,7 +2,7 @@ import { P2PClient } from "./network/p2p-сlient.js";
 import { NetworkService } from "./network/services/network-service.js";
 import ConfigLoader from "./common/config-loader.js";
 import { createServer } from "./network/services/web-server.js";
-import { Wallet } from "./wallet/wallet.js";
+
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
   const config = ConfigLoader.getInstance().getConfig();
@@ -16,8 +16,6 @@ async function main(): Promise<void> {
   createServer(networkService);
 
   await networkService.startAsync();
-  const wallet = new Wallet();
-  await wallet.initialize();
 }
 
 process.on("uncaughtException", (err) => {

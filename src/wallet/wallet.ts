@@ -5,7 +5,7 @@ import ConfigLoader from "../common/config-loader.js";
 import { SmartContract } from "../blockchain/db-context/models/smartcontract.js";
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 
-export class Wallet {
+export class Wallets {
   private privateKey: string | null = null;
   public publicKey: string | null = null;
   private config = ConfigLoader.getInstance();

@@ -4,10 +4,14 @@ import http from "http";
 import { setupSocketIO } from "./socket-service.js";
 import { NetworkService } from "./network-service.js";
 import ConfigLoader from "../../common/config-loader.js";
+import walletRoutes from "../../wallet/api/wallet-routes.js";
+
 const __dirname = path.resolve();
 
 export function createServer(ns: NetworkService): http.Server {
   const app = express();
+  app.use("/api/wallet", walletRoutes);
+
   const config = ConfigLoader.getInstance().getConfig();
   const port = config.wsport ?? 3006;
   const server = http.createServer(app);
