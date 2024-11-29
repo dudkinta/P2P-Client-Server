@@ -31,7 +31,7 @@ export interface Config {
 }
 
 class ConfigLoader {
-  private static instance: ConfigLoader;
+  static instance: ConfigLoader;
   private config: Config;
   private knowsRelay: string[];
   private readonly net: string;

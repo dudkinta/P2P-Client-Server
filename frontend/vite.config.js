@@ -13,7 +13,7 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${config.wsport}`, // URL вашего сервера Express
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '') // убирает /api, если не нужно
+        //rewrite: (path) => path.replace(/^\/api/, '') // убирает /api, если не нужно
       }
     }
   }

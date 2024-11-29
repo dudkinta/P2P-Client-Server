@@ -1,8 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Nodes from './../pages/nodes.vue';
 import DebugInfo from './../pages/debug-info.vue';
+import Wallet from './../pages/wallet.vue';
 
 const routes = [
+    {
+        path: '/wallet',
+        name: 'Wallet',
+        component: Wallet,
+    },
     {
         path: '/nodes',
         name: 'Nodes',

@@ -1,13 +1,78 @@
 import { Router } from "express";
-import { Wallets } from "./../wallet.js"; // Подключаем существующую реализацию кошельков
+import { Wallet } from "./../wallet.js"; // Подключаем существующую реализацию кошельков
+import path from "path";
 
 const router = Router();
 
-// Создать кошелек
-router.post("/create", (req, res) => {
+//получение всех кошельков
+router.get("/", async (req, res) => {
   try {
-    const wallet = new Wallets();
-    wallet.initialize();
+    await Wallet.initialize();
+    const wallets = Wallet.instances;
+    if (wallets.length === 0) {
+      res.status(400).json({ error: "No wallets found", wallets: [] });
+      return;
+    }
+    res.json(
+      wallets.map((wallet) => ({
+        publicKey: wallet.publicKey,
+        name: wallet.walletName,
+        path: wallet.keyPath,
+        subname: wallet.subname,
+      }))
+    );
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ error: "Failed to create wallet", details: error.message });
+  }
+});
+
+router.get("/create", async (req, res) => {
+  try {
+    const name = req.query.name as string;
+
+    if (!name) {
+      res.status(400).json({ error: "No name provided" });
+      return;
+    }
+
+    const wallet = await Wallet.create(name);
+    res.json({
+      publicKey: wallet.publicKey,
+      name: wallet.walletName,
+      path: wallet.keyPath,
+      subname: wallet.subname,
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ error: "Failed to create wallet", details: error.message });
+  }
+});
+
+router.put("/use", async (req, res) => {
+  const name = req.query.name as string;
+  const subname = req.query.subname as string;
+  const wallets = Wallet.instances;
+  const wallet = wallets.find(
+    (_) => _.walletName === name && _.subname === subname
+  );
+  if (!wallet) {
+    res.status(400).json({ error: "No wallet found" });
+    return;
+  }
+  Wallet.use(wallet);
+  res
+    .status(200)
+    .json({ message: `Wallet ${wallet.walletName}/${wallet.subname} in use` });
+});
+
+// Создать кошелек
+/*router.post("/create", (req, res) => {
+  try {
+    const wallet = new Wallet();
+    //wallet.initialize();
     res.json({
       publicKey: wallet.publicKey,
     });
@@ -16,7 +81,7 @@ router.post("/create", (req, res) => {
       .status(500)
       .json({ error: "Failed to create wallet", details: error.message });
   }
-});
+});*/
 
 // Получить баланс
 /*router.post("/balance", (req, res) => {

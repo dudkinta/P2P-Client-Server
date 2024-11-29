@@ -5,8 +5,14 @@ export const useWalletStore = defineStore('wallet', {
         wallets: [],
     }),
     actions: {
-        addWallet(wallet) {
-            this.logs.push(wallet);
+        addWallets(wallets) {
+            for (const wallet of wallets) {
+                console.log(wallet);
+                this.addWallet(wallet);
+            }
         },
-    },
+        addWallet(wallet) {
+            this.wallets.push(wallet);
+        },
+    }
 });
