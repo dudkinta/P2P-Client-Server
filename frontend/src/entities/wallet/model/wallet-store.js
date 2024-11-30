@@ -7,7 +7,6 @@ export const useWalletStore = defineStore('wallet', {
     actions: {
         addWallets(wallets) {
             for (const wallet of wallets) {
-                console.log(wallet);
                 this.addWallet(wallet);
             }
         },

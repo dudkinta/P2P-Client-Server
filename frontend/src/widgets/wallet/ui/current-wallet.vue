@@ -1,77 +1,55 @@
 <template>
-  <div class="current-wallet">
-    <label for="wallet-dropdown">Выберите кошелек:</label>
-    <select id="wallet-dropdown" v-model="selectedWallet">
-      <option v-for="wallet in wallets" :key="wallet.publicKey" :value="wallet">
-        {{ wallet.name }} - {{ wallet.subname }}
-      </option>
-    </select>
-    <div v-if="selectedWallet">
-      <h3>Выбранный кошелек:</h3>
-      <div>Public Key: {{ selectedWallet.publicKey }}</div>
-      <div>Имя: {{ selectedWallet.name }}</div>
-      <div>Подимя: {{ selectedWallet.subname }}</div>
+  <main class="wallet-details">
+    <div v-if="wallet" class="details-box">
+      <h2>Детали кошелька</h2>
+      <p><strong>Имя:</strong> {{ wallet.name }}</p>
+      <p><strong>Public Key:</strong> {{ wallet.publicKey }}</p>
+      <p><strong>Баланс:</strong> {{ wallet.balance }} ₽</p>
+      <button class="btn btn-primary" @click="openTransactionModal">
+        Создать транзакцию
+      </button>
     </div>
-  </div>
+    <div v-else>
+      <p>Выберите кошелек для просмотра деталей.</p>
+    </div>
+  </main>
 </template>
 
 <script>
-import { useWalletStore } from "../../../entities/wallet/model/wallet-store";
-import WalletApi from "./../api/wallet-api";
 export default {
   name: "CurrentWallet",
-  data() {
-    return {
-      wallets: [],
-      walletApi: new WalletApi(),
-      selectedWallet: null,
-    };
+  props: {
+    wallet: Object | undefined,
   },
-  created() {
-    this.loadWallets();
-  },
-  watch: {
-    selectedWallet(wallet) {
-      if (wallet) {
-        this.useWallet(wallet);
-      }
-    },
-  },
+
   methods: {
-    async loadWallets() {
-      try {
-        const response = await this.walletApi.getWallets();
-        const wallets = response;
-        const walletStore = useWalletStore();
-        walletStore.addWallets(wallets); // Обновляем данные в хранилище, если необходимо
-        this.wallets = wallets;
-        console.log("Кошельки:", response);
-      } catch (error) {
-        if (error.response && error.response.status === 400) {
-          console.warn("Ошибка 400: Кошельки не найдены.");
-        } else if (error.response && error.response.status === 500) {
-          console.error("Ошибка 500: Внутренняя ошибка сервера.");
-        } else {
-          console.error("Ошибка загрузки кошельков:", error);
-        }
-      }
-    },
-    async useWallet(wallet) {
-      console.log("Выбран кошелек:", wallet);
-      try {
-        const response = await this.walletApi.useWallet(wallet);
-      } catch (error) {
-        if (error.response && error.response.status === 400) {
-          console.warn("Ошибка 400: Кошелек не найден.");
-        } else if (error.response && error.response.status === 500) {
-          console.error("Ошибка 500: Внутренняя ошибка сервера.");
-        } else {
-          console.error("Ошибка выбора кошелька:", error);
-        }
-      }
+    openTransactionModal() {
+      console.log("Открыть модальное окно для создания транзакции");
     },
   },
 };
 </script>
 
-<style scoped></style>
+<style scoped>
+.wallet-details,
+.transactions {
+  flex: 1;
+}
+.details-box {
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 5px;
+  background-color: #fff;
+}
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+.btn-primary {
+  background-color: #007bff;
+  color: #fff;
+}
+</style>
