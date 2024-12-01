@@ -12,6 +12,9 @@ class WalletApi extends ApiService {
     async getWallets() {
         return this.get(`/`);
     }
+    async getCurrentWallet() {
+        return this.get(`/current`);
+    }
 
     async useWallet(wallet) {
         return this.put(`/use?name=${wallet.name}&subname=${wallet.subname}`);

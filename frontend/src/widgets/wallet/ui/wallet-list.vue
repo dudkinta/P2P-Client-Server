@@ -31,6 +31,7 @@ export default {
   },
   created() {
     this.loadWallets();
+    this.getCurrentWallet();
   },
   watch: {
     selectedWallet(wallet) {
@@ -44,6 +45,21 @@ export default {
       try {
         const response = await this.walletApi.getWallets();
         this.$emit("load-wallets", response);
+      } catch (error) {
+        if (error.response && error.response.status === 400) {
+          console.warn("Ошибка 400: Кошельки не найдены.");
+        } else if (error.response && error.response.status === 500) {
+          console.error("Ошибка 500: Внутренняя ошибка сервера.");
+        } else {
+          console.error("Ошибка загрузки кошельков:", error);
+        }
+      }
+    },
+    async getCurrentWallet() {
+      try {
+        const response = await this.walletApi.getCurrentWallet();
+        this.selectedWallet = response;
+        this.$emit("wallet-selected", response);
       } catch (error) {
         if (error.response && error.response.status === 400) {
           console.warn("Ошибка 400: Кошельки не найдены.");

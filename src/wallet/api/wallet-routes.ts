@@ -28,6 +28,27 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/current", async (req, res) => {
+  try {
+    const wallet = Wallet.current;
+    if (!wallet) {
+      res.status(400).json({ error: "No current wallet" });
+      return;
+    }
+    res.json({
+      publicKey: wallet.publicKey,
+      name: wallet.walletName,
+      path: wallet.keyPath,
+      subname: wallet.subname,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      error: "Failed to select current wallet",
+      details: error.message,
+    });
+  }
+});
+
 router.get("/create", async (req, res) => {
   try {
     const name = req.query.name as string;
@@ -67,21 +88,6 @@ router.put("/use", async (req, res) => {
     .status(200)
     .json({ message: `Wallet ${wallet.walletName}/${wallet.subname} in use` });
 });
-
-// Создать кошелек
-/*router.post("/create", (req, res) => {
-  try {
-    const wallet = new Wallet();
-    //wallet.initialize();
-    res.json({
-      publicKey: wallet.publicKey,
-    });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ error: "Failed to create wallet", details: error.message });
-  }
-});*/
 
 // Получить баланс
 /*router.post("/balance", (req, res) => {

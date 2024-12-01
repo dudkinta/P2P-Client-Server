@@ -4,26 +4,34 @@ export class Transaction {
   public hash: string;
   public block?: string;
   public sender: string;
-  public receiver: string;
+  public receiver?: string;
   public amount: number;
   public timestamp: number;
   public signature?: string;
-
+  public type: "TRANSFER" | "STAKE" | "UNSTAKE";
   constructor(
     sender: string,
     receiver: string,
     amount: number,
+    type: "TRANSFER" | "STAKE" | "UNSTAKE",
     timestamp: number
   ) {
     this.sender = sender;
     this.receiver = receiver;
     this.amount = amount;
     this.timestamp = timestamp;
+    this.type = type;
     this.hash = this.calculateHash();
   }
 
   isValid(): boolean {
-    if (!this.sender || !this.receiver || !this.amount || !this.signature) {
+    if (
+      !this.sender ||
+      !this.amount ||
+      !this.signature ||
+      !this.type ||
+      (this.type === "TRANSFER" && !this.receiver)
+    ) {
       console.error("Transaction is missing required fields.");
       return false;
     }
@@ -57,6 +65,7 @@ export class Transaction {
       sender: this.sender,
       receiver: this.receiver,
       amount: this.amount,
+      type: this.type,
       timestamp: this.timestamp,
     });
   }
