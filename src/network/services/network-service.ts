@@ -11,6 +11,7 @@ import { sendDebug } from "./socket-service.js";
 import { LogLevel } from "../helpers/log-level.js";
 import { RequestStore, StoreItem } from "./store/index.js";
 import pkg from "debug";
+import { MessageChain } from "./messages/index.js";
 const { debug } = pkg;
 
 export interface IStrategy {
@@ -65,7 +66,7 @@ export class NetworkService extends EventEmitter {
     }
   }
 
-  async startAsync(): Promise<void> {
+  public async startAsync(): Promise<void> {
     try {
       await this.client.startNode();
       this.localPeer = this.client.localPeerId;
@@ -383,7 +384,11 @@ export class NetworkService extends EventEmitter {
     return this.client.getStore(request);
   }
 
-  getRoot(): { root: Node; connections: Connection[] } | undefined {
+  public getRoot(): { root: Node; connections: Connection[] } | undefined {
     return this.storage?.getRoot();
+  }
+
+  public async broadcastMessage(message: MessageChain): Promise<void> {
+    await this.client.broadcastMessage(message);
   }
 }

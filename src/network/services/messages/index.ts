@@ -11,7 +11,7 @@ import type {
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
-import { SmartContract } from "../../../blockchain/db-context/models/smartcontract.js";
+import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
 
 export interface MessageServiceEvents {
@@ -23,25 +23,61 @@ export interface MessagesService
   extends TypedEventEmitter<MessageServiceEvents> {
   broadcastMessage(message: MessageChain): Promise<void>;
 }
+export enum MessageType {
+  BLOCK = "BLOCK",
+  TRANSACTION = "TRANSACTION",
+  SMART_CONTRACT = "SMART_CONTRACT",
+  CONTRACT_TRANSACTION = "CONTRACT_TRANSACTION",
+}
 
 export class MessageChain {
   sender?: Connection;
-  key: string;
+  type: MessageType;
   dt: number;
   value: Block | Transaction | SmartContract | ContractTransaction;
   constructor(
-    key: string,
+    type: MessageType,
     value: Block | Transaction | SmartContract | ContractTransaction
   ) {
-    this.key = key;
+    this.type = type;
     this.dt = Date.now();
     this.value = value;
   }
   toJSON(): string {
-    return JSON.stringify({ key: this.key, value: this.value });
+    return JSON.stringify({ type: this.type, value: this.value });
   }
   getHash(): string {
     return crypto.createHash("sha256").update(this.toJSON()).digest("hex");
+  }
+  toProtobuf(root: protobuf.Root): any {
+    const ProtobufMessageChain = root.lookupType("MessageChain");
+    const message = {
+      type: this.type,
+      [this.type.toLowerCase()]: this.value,
+    };
+
+    const errMsg = ProtobufMessageChain.verify(message);
+    if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
+
+    return ProtobufMessageChain.create(message);
+  }
+
+  static fromProtobuf(root: protobuf.Root, protobufMessage: any): MessageChain {
+    const ProtobufMessageChain = root.lookupType("MessageChain");
+    const decoded = ProtobufMessageChain.decode(protobufMessage) as any;
+
+    if (!decoded.type) {
+      throw new Error("Decoded message does not contain a valid 'type' field.");
+    }
+
+    const valueKey = decoded.type.toLowerCase();
+    const value = decoded[valueKey];
+    if (!value) {
+      throw new Error(
+        `Decoded message does not contain a valid value for type '${decoded.type}'.`
+      );
+    }
+    return new MessageChain(decoded.type, value);
   }
 }
 

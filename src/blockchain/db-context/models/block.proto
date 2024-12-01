@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "transaction.proto";
+import "contract-transaction.proto";
+import "smart-contract.proto";
+
+message Block {
+    string hash = 1;
+    string merkleRoot = 2;
+    string previousHash = 3;
+    int32 index = 4;
+    int64 timestamp = 5;
+    repeated Transaction transactions = 6;
+    repeated SmartContract smartContracts = 7;
+    repeated ContractTransaction contractTransactions = 8;
+}

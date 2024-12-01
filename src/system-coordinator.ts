@@ -18,9 +18,13 @@ export class SystemCoordinator {
     );
     this.blockChain = BlockChain.getInstance();
     this.webServer = createWebServer(this.networkService);
+    this.blockChain.on("newmessage", async (message) => {
+      await this.networkService.broadcastMessage(message);
+    });
   }
 
   public async startAsync(): Promise<void> {
     await this.networkService.startAsync();
+    await this.blockChain.initAsync();
   }
 }

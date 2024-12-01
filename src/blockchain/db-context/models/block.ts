@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { Transaction } from "./transaction.js";
-import { SmartContract } from "./smartcontract.js";
+import { SmartContract } from "./smart-contract.js";
 import { ContractTransaction } from "./contract-transaction.js";
 
 export class Block {

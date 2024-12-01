@@ -1,10 +1,14 @@
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
-import { SmartContract } from "./db-context/models/smartcontract.js";
+import { SmartContract } from "./db-context/models/smart-contract.js";
 import { Transaction } from "./db-context/models/transaction.js";
 import { ContractTransaction } from "./db-context/models/contract-transaction.js";
-
-export class BlockChain {
+import { EventEmitter } from "events";
+import {
+  MessageChain,
+  MessageType,
+} from "./../network/services/messages/index.js";
+export class BlockChain extends EventEmitter {
   private static instance: BlockChain;
   private db: dbContext;
   private chain: Block[] = [];
@@ -12,6 +16,7 @@ export class BlockChain {
   private pendingSmartContracts: SmartContract[] = [];
   private pendingContractTransactions: ContractTransaction[] = [];
   private constructor() {
+    super();
     this.db = new dbContext();
   }
   static getInstance(): BlockChain {
@@ -19,6 +24,25 @@ export class BlockChain {
       BlockChain.instance = new BlockChain();
     }
     return BlockChain.instance;
+  }
+
+  public async initAsync(): Promise<void> {
+    setTimeout(async () => {
+      this.sendTestMessage();
+    }, 1000);
+  }
+
+  private sendTestMessage() {
+    this.emit(
+      "newmessage",
+      new MessageChain(
+        MessageType.TRANSACTION,
+        new Transaction("sender", "recipient", 100, "TRANSFER", 0)
+      )
+    );
+    setTimeout(async () => {
+      this.sendTestMessage();
+    }, 1000);
   }
 
   getChain(): Block[] {

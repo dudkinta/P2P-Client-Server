@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+message SmartContract {
+    string hash = 1;
+    string block = 2; // Optional
+    string owner = 3;
+    string code = 4;
+    map<string, google.protobuf.Value> initialState = 5;
+    int64 timestamp = 6;
+    string signature = 7; // Optional
+}
+
+import "google/protobuf/struct.proto";

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+message Transaction {
+    string hash = 1;
+    string block = 2; // Optional
+    string sender = 3;
+    string receiver = 4; // Optional
+    double amount = 5;
+    int64 timestamp = 6;
+    string signature = 7; // Optional
+    string type = 8; // Enum-like string: "TRANSFER", "STAKE", "UNSTAKE"
+}

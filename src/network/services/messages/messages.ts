@@ -1,8 +1,11 @@
+import { OutOfLimitError } from "../../models/out-of-limit-error.js";
 import { TimeoutError, TypedEventEmitter } from "@libp2p/interface";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { readFromStream, writeToStream } from "../../helpers/stream-helper.js";
 import { sendDebug } from "../socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
+import protobuf from "protobufjs";
+import { pbStream } from "it-protobuf-stream";
+import { Uint8ArrayList } from "uint8arraylist";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -12,11 +15,11 @@ import {
   MAX_OUTBOUND_STREAMS,
   MESSAGE_EXPIRATION_TIME,
 } from "./constants.js";
+import { MessageChain } from "./index.js";
 import type {
   MessagesServiceComponents,
   MessagesServiceInit,
   MessagesService as MessagesServiceInterface,
-  MessageChain,
   MessageServiceEvents,
 } from "./index.js";
 import type { Logger, Startable, Connection } from "@libp2p/interface";
@@ -39,6 +42,8 @@ export class MessagesService
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
   private messageHistory: Map<string, MessageChain> = new Map();
+  private proto_root?: protobuf.Root;
+
   constructor(
     components: MessagesServiceComponents,
     init: MessagesServiceInit = {}
@@ -64,6 +69,7 @@ export class MessagesService
       maxOutboundStreams: this.maxOutboundStreams,
       runOnLimitedConnection: this.runOnLimitedConnection,
     });
+    this.proto_root = await protobuf.load("message_chain.proto");
     this.started = true;
     this.log(LogLevel.Info, "Started store service");
     setTimeout(() => {
@@ -92,36 +98,87 @@ export class MessagesService
   }
 
   async handleMessage(data: IncomingStreamData): Promise<void> {
-    const { stream } = data;
-    this.log(
-      LogLevel.Info,
-      `Incoming getStore from ${data.connection.remotePeer}`
-    );
+    const { stream, connection } = data;
+    this.log(LogLevel.Info, `Incoming message from ${connection.remotePeer}`);
 
     try {
-      const signal = AbortSignal.timeout(this.timeout);
+      if (!this.proto_root) {
+        throw new Error("Proto root is not loaded");
+      }
 
+      const root = this.proto_root;
+      const ProtobufMessageChain = root.lookupType("MessageChain");
+
+      // Настраиваем pbStream
+      const pbstr = pbStream(stream);
+
+      // Устанавливаем таймаут
+      const signal = AbortSignal.timeout(this.timeout);
       signal.addEventListener("abort", () => {
         this.log(LogLevel.Warning, "Timeout reached, aborting stream");
         stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
 
-      const messageStr = await readFromStream(stream, { signal });
-      this.log(LogLevel.Trace, `Received messageStr: ${messageStr}`);
-      const message = JSON.parse(messageStr) as MessageChain;
-      message.sender = data.connection;
-      const hash = message.getHash();
-      if (this.messageHistory.has(hash)) {
-        return;
+      let decodedMessage: any;
+
+      while (true) {
+        try {
+          // Читаем следующее сообщение из потока
+          const messageData = await pbstr.read(
+            {
+              decode: (data: Uint8ArrayList | Uint8Array) => {
+                // Преобразуем Uint8ArrayList в Uint8Array, если необходимо
+                const buffer =
+                  data instanceof Uint8Array ? data : data.subarray();
+                return ProtobufMessageChain.decode(buffer);
+              },
+            },
+            { signal }
+          );
+
+          decodedMessage = messageData;
+        } catch (err: any) {
+          if (err.name === "AbortError") {
+            this.log(LogLevel.Warning, "Stream reading aborted due to timeout");
+          } else {
+            this.log(LogLevel.Error, `Failed to read message: ${err.message}`);
+          }
+          break;
+        }
+
+        this.log(LogLevel.Trace, `Received decoded message: ${decodedMessage}`);
+
+        // Преобразуем в MessageChain
+        const message = MessageChain.fromProtobuf(root, decodedMessage);
+
+        // Добавляем отправителя
+        message.sender = connection;
+
+        // Проверка на дублирование
+        const hash = message.getHash();
+        if (this.messageHistory.has(hash)) {
+          this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
+          continue;
+        }
+
+        // Сохраняем сообщение в историю
+        this.messageHistory.set(hash, message);
+
+        // Диспетчеризация события
+        this.safeDispatchEvent<MessageChain>("message:receive", {
+          detail: message,
+        });
+
+        // Рассылка сообщения
+        this.broadcastMessage(message);
       }
-      this.messageHistory.set(hash, message);
-      this.safeDispatchEvent<MessageChain>("message:receive", {
-        detail: message,
-      });
-      this.broadcastMessage(message);
-    } catch (err) {
-      this.log(LogLevel.Error, `Failed to handle incoming store: ${err}`);
+    } catch (err: any) {
+      this.log(
+        LogLevel.Error,
+        `Failed to handle incoming message: ${err.message}`
+      );
     } finally {
+      // Закрытие потока
       await stream.close().catch((err) => {
         this.log(LogLevel.Warning, `Failed to close stream: ${err.message}`);
       });
@@ -133,6 +190,21 @@ export class MessagesService
       LogLevel.Info,
       `Sending message to ${connection.remotePeer.toString()}: ${message}`
     );
+    if (connection == null) {
+      throw new Error("connection is null");
+    }
+    if (connection.status !== "open") {
+      throw new Error("connection is not open");
+    }
+
+    if (connection.limits) {
+      if (connection.limits.seconds && connection.limits.seconds < 10000) {
+        throw new OutOfLimitError("connection has time limits");
+      }
+      if (connection.limits.bytes && connection.limits.bytes < 10000) {
+        throw new OutOfLimitError("connection has byte limits");
+      }
+    }
     const signal = AbortSignal.timeout(this.timeout);
     signal.addEventListener("abort", () => {
       this.log(LogLevel.Warning, "Timeout reached, aborting stream");
@@ -140,10 +212,15 @@ export class MessagesService
     });
 
     const stream = await connection.newStream([this.protocol]);
-    const buff = new TextEncoder().encode(message.toJSON());
-    await writeToStream(stream, buff, { signal });
-    await stream.close().catch((err) => {
-      this.log(LogLevel.Warning, `Failed to close stream: ${err.message}`);
+    if (this.proto_root == null) {
+      throw new Error("Proto root is not loaded");
+    }
+    const root = this.proto_root;
+    const pbstr = pbStream(stream);
+    const msgstr = pbstr.pb(message.toProtobuf(root));
+    await msgstr.write({
+      type: message.type,
+      value: message.value,
     });
   }
 

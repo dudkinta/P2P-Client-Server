@@ -1,5 +1,5 @@
 import { Level } from "level";
-import { SmartContract } from "./models/smartcontract.js";
+import { SmartContract } from "./models/smart-contract.js";
 
 export class SmartContractStorage {
   private db: Level<string, object>;

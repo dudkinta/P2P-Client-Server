@@ -15,7 +15,7 @@ import {
   RequestStore,
   StoreItem,
 } from "./services/store/index.js";
-import { MessagesService } from "./services/messages/index.js";
+import { MessagesService, MessageChain } from "./services/messages/index.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -253,6 +253,25 @@ export class P2PClient extends EventEmitter {
     setTimeout(async () => {
       await this.updateSelfMultiaddress();
     }, 60000 * 30);
+  }
+
+  public async broadcastMessage(message: MessageChain): Promise<void> {
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
+      return;
+    }
+    const messageService = this.node.services.messages as MessagesService;
+    if (!messageService) {
+      this.log(LogLevel.Error, "Message service is not initialized");
+      return;
+    }
+    try {
+      await messageService.broadcastMessage(message).catch((err) => {
+        this.log(LogLevel.Error, `Error in broadcastMessage: ${err}`);
+      });
+    } catch (error) {
+      this.log(LogLevel.Error, `Error in broadcastMessage: ${error}`);
+    }
   }
 
   async startNode(): Promise<void> {

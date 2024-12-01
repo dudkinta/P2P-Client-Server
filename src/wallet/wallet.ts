@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { Transaction } from "../blockchain/db-context/models/transaction.js";
 import { promises as fs } from "fs";
 import ConfigLoader from "../common/config-loader.js";
-import { SmartContract } from "../blockchain/db-context/models/smartcontract.js";
+import { SmartContract } from "../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 
 export class Wallet {
