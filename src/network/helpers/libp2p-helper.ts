@@ -9,6 +9,7 @@ import {
 } from "@libp2p/circuit-relay-v2";
 import { identify, identifyPush } from "@libp2p/identify";
 import { roles } from "../services/roles/index.js";
+import { messages } from "../services/messages/index.js";
 import { peerList } from "../services/peer-list/index.js";
 import { maList } from "../services/multiadress/index.js";
 import { store } from "../services/store/index.js";
@@ -66,6 +67,7 @@ export async function getRelayClient(
         }),
         peerList: peerList(),
         maList: maList(),
+        messages: messages(),
       },
       connectionManager: {
         maxConnections: 128,
@@ -133,6 +135,7 @@ export async function getNodeClient(
         }),
         peerList: peerList(),
         maList: maList(),
+        messages: messages(),
       },
       connectionManager: {
         maxConnections: 128,

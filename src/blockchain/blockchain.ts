@@ -1,18 +1,25 @@
-import { BlockStorage } from "./db-context/database.js";
+import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
+import { SmartContract } from "./db-context/models/smartcontract.js";
+import { Transaction } from "./db-context/models/transaction.js";
+import { ContractTransaction } from "./db-context/models/contract-transaction.js";
 
 export class BlockChain {
   private static instance: BlockChain;
+  private db: dbContext;
   private chain: Block[] = [];
-  private constructor() {}
+  private pendingTransactions: Transaction[] = [];
+  private pendingSmartContracts: SmartContract[] = [];
+  private pendingContractTransactions: ContractTransaction[] = [];
+  private constructor() {
+    this.db = new dbContext();
+  }
   static getInstance(): BlockChain {
     if (!BlockChain.instance) {
       BlockChain.instance = new BlockChain();
     }
     return BlockChain.instance;
   }
-
-  async init(): Promise<void> {}
 
   getChain(): Block[] {
     return this.chain;
@@ -26,23 +33,14 @@ export class BlockChain {
     return this.chain[this.chain.length - 1];
   }
 
-  /**
-   * Ленивая загрузка блока по индексу
-   */
   async getBlock(index: number): Promise<Block | undefined> {
-    // Проверяем, есть ли блок в памяти
     const block = this.chain.find((b) => b.index === index);
     if (block) return block;
-
-    // Если блока нет в памяти, загружаем его из базы
-    return await BlockStorage.get(index);
+    return await this.db.blockStorage.get(index);
   }
 
-  /**
-   * Ленивая загрузка диапазона блоков
-   */
   async getBlocksInRange(start: number, end: number): Promise<Block[]> {
-    return await BlockStorage.getByRange(start, end);
+    return await this.db.blockStorage.getByRange(start, end);
   }
 
   isValidBlock(block: Block): boolean {

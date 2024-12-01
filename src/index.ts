@@ -1,21 +1,10 @@
-import { P2PClient } from "./network/p2p-сlient.js";
-import { NetworkService } from "./network/services/network-service.js";
 import ConfigLoader from "./common/config-loader.js";
-import { createServer } from "./network/services/web-server.js";
+import { SystemCoordinator } from "./system-coordinator.js";
 
 async function main(): Promise<void> {
   await ConfigLoader.initialize();
-  const config = ConfigLoader.getInstance().getConfig();
-
-  let port = config.port ?? 6006;
-  const listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
-  const networkService = new NetworkService(
-    new P2PClient(listenAddrs, port, config.nodeType)
-  );
-
-  createServer(networkService);
-
-  await networkService.startAsync();
+  const coordinator = new SystemCoordinator();
+  await coordinator.startAsync();
 }
 
 process.on("uncaughtException", (err) => {

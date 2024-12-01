@@ -8,7 +8,7 @@ import walletRoutes from "../../wallet/api/wallet-routes.js";
 
 const __dirname = path.resolve();
 
-export function createServer(ns: NetworkService): http.Server {
+export function createWebServer(ns: NetworkService): http.Server {
   const app = express();
   app.use("/api/wallet", walletRoutes);
 
