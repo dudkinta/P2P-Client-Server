@@ -132,6 +132,12 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
+      this.client.on("message:receive", async (event) => {
+        this.log(
+          LogLevel.Debug,
+          `on chain message:receive ${JSON.stringify(event)}`
+        );
+      });
       await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(
           LogLevel.Error,
