@@ -1,6 +1,7 @@
 import { MessagesService as MessagesServiceClass } from "./messages.js";
 import crypto from "crypto";
 import type {
+  TypedEventEmitter,
   ComponentLogger,
   PeerStore,
   TypedEventTarget,
@@ -13,7 +14,13 @@ import { Transaction } from "../../../blockchain/db-context/models/transaction.j
 import { SmartContract } from "../../../blockchain/db-context/models/smartcontract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
 
-export interface MessagesService {
+export interface MessageServiceEvents {
+  "message:receive": CustomEvent<MessageChain>;
+  "message:error": CustomEvent<Error>;
+}
+
+export interface MessagesService
+  extends TypedEventEmitter<MessageServiceEvents> {
   broadcastMessage(message: MessageChain): Promise<void>;
 }
 

@@ -15,6 +15,7 @@ import {
   RequestStore,
   StoreItem,
 } from "./services/store/index.js";
+import { MessagesService } from "./services/messages/index.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -296,8 +297,13 @@ export class P2PClient extends EventEmitter {
       this.node.addEventListener("start", (event: any) => {
         this.log(LogLevel.Info, "Libp2p node started");
       });
-
+      const messageService = this.node.services.messages as MessagesService;
+      messageService.addEventListener("message:receive", (event: any) => {
+        this.log(LogLevel.Info, "Libp2p node started");
+        this.emit("message:receive", event.detail);
+      });
       await this.node.start();
+
       this.log(LogLevel.Info, `Libp2p listening on:`);
       this.localPeerId = this.node.peerId;
       await this.updateSelfMultiaddress();

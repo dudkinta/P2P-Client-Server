@@ -17,13 +17,9 @@ import type {
   MessagesServiceInit,
   MessagesService as MessagesServiceInterface,
   MessageChain,
+  MessageServiceEvents,
 } from "./index.js";
 import type { Logger, Startable, Connection } from "@libp2p/interface";
-
-export interface MessageServiceEvents {
-  "message:receive": CustomEvent<MessageChain>;
-  "message:error": CustomEvent<Error>;
-}
 
 export class MessagesService
   extends TypedEventEmitter<MessageServiceEvents>
