@@ -28,7 +28,7 @@ export class BlockChain extends EventEmitter {
 
   public async initAsync(): Promise<void> {
     setTimeout(async () => {
-      this.sendTestMessage();
+      //this.sendTestMessage();
     }, 1000);
   }
 
