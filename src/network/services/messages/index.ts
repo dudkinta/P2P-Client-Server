@@ -83,24 +83,25 @@ export class MessageChain {
   static fromProtobuf(root: protobuf.Root, protobufMessage: any): MessageChain {
     const ProtobufMessageChain = root.lookupType("MessageChain");
     if (!ProtobufMessageChain) {
-      throw new Error("Protobuf message not found.");
+      throw new Error("Protobuf message type 'MessageChain' not found.");
     }
+
     if (!(protobufMessage instanceof Uint8Array)) {
+      console.error("Received data is not Uint8Array:", protobufMessage);
       throw new Error("Protobuf message must be a Uint8Array.");
     }
-    const errMsg = ProtobufMessageChain.verify(protobufMessage);
-    if (errMsg) {
-      throw new Error(`Invalid protobuf message: ${errMsg}`);
-    }
-    let decoded;
+
+    let decoded: any;
     try {
-      decoded = ProtobufMessageChain.decode(protobufMessage) as any;
+      decoded = ProtobufMessageChain.decode(protobufMessage);
     } catch (e) {
-      throw new Error("Error decoding protobuf message.");
+      throw new Error(`Error decoding protobuf message: ${e.message}`);
     }
+
     if (!decoded) {
       throw new Error("Decoded message is empty.");
     }
+
     if (!decoded.type) {
       throw new Error("Decoded message does not contain a valid 'type' field.");
     }
@@ -113,7 +114,6 @@ export class MessageChain {
         if (!value) {
           throw new Error("Decoded message does not contain a transaction.");
         }
-        // Преобразование для TRANSACTION
         if (value.timestamp) {
           value.timestamp = parseInt(value.timestamp, 10);
         }
