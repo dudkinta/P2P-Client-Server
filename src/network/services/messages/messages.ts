@@ -126,15 +126,13 @@ export class MessagesService
         throw new Error(`Failed to read message: ${err.message}`);
       });
 
-      decodedMessage.sender = connection;
-
-      const hash = decodedMessage.getHash();
+      const message = new MessageChain(decodedMessage.type, decodedMessage);
+      message.sender = connection;
+      const hash = message.getHash();
       if (this.messageHistory.has(hash)) {
         this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
         return;
       }
-
-      const message = new MessageChain(decodedMessage.type, decodedMessage);
 
       this.messageHistory.set(hash, message);
 
