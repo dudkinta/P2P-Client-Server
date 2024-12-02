@@ -33,18 +33,6 @@ export async function writeToConnection(
       }
     }
 
-    const abortController = new AbortController();
-    const signal = abortController.signal;
-
-    // Устанавливаем таймаут
-    const timeoutId = setTimeout(() => {
-      abortController.abort(); // Уведомляем об отмене
-    }, timeout);
-
-    //signal.addEventListener("abort", () => {
-    //  throw new Error("Timeout reached, aborting stream");
-    //});
-
     const stream = await connection.newStream([protocol]);
     if (proto_root == null) {
       throw new Error("Proto root is not loaded");
@@ -55,7 +43,6 @@ export async function writeToConnection(
     const pbstr = pbStream(stream);
 
     const protobufMessage = data.toProtobuf(root);
-    console.log(protobufMessage);
     // Отправляем сообщение
     await pbstr.write(protobufMessage, {
       encode: (data: any) => {
@@ -64,9 +51,7 @@ export async function writeToConnection(
         return protoType.encode(data).finish();
       },
     });
-
-    // Если отправка завершена, отменяем таймаут
-    clearTimeout(timeoutId);
+    stream.close();
   } catch (err: any) {
     if (err.name === "AbortError") {
       throw new Error("Operation aborted due to timeout");
