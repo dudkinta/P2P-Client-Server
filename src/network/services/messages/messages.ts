@@ -181,6 +181,9 @@ export class MessagesService
       this.log(LogLevel.Warning, "No connections to broadcast message to");
     }
     for (const connection of connections) {
+      if (connection.limits) {
+        continue;
+      }
       try {
         if (connection !== message.sender) {
           await this.sendMessage(connection, message);
