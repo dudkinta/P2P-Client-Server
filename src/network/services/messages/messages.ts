@@ -162,7 +162,7 @@ export class MessagesService
           `Received decoded message: ${JSON.stringify(decodedMessage)}`
         );
 
-        const message = MessageChain.fromProtobuf(root, decodedMessage);
+        const message = MessageChain.fromProtobuf(decodedMessage);
 
         message.sender = connection;
 

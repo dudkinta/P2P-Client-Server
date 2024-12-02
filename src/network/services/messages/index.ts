@@ -80,37 +80,16 @@ export class MessageChain {
     return ProtobufMessageChain.create(message);
   }
 
-  static fromProtobuf(root: protobuf.Root, protobufMessage: any): MessageChain {
-    const ProtobufMessageChain = root.lookupType("MessageChain");
-    if (!ProtobufMessageChain) {
-      throw new Error("Protobuf message type 'MessageChain' not found.");
-    }
-
-    if (!(protobufMessage instanceof Uint8Array)) {
-      console.error("Received data is not Uint8Array:", protobufMessage);
-      throw new Error("Protobuf message must be a Uint8Array.");
-    }
-
-    let decoded: any;
-    try {
-      decoded = ProtobufMessageChain.decode(protobufMessage);
-    } catch (e: any) {
-      throw new Error(`Error decoding protobuf message: ${e.message}`);
-    }
-
-    if (!decoded) {
-      throw new Error("Decoded message is empty.");
-    }
-
-    if (!decoded.type) {
+  static fromProtobuf(decodedMessage: any): MessageChain {
+    if (!decodedMessage || !decodedMessage.type) {
       throw new Error("Decoded message does not contain a valid 'type' field.");
     }
 
     let value: any;
 
-    switch (decoded.type) {
+    switch (decodedMessage.type) {
       case MessageType.TRANSACTION:
-        value = decoded.transaction;
+        value = decodedMessage.transaction;
         if (!value) {
           throw new Error("Decoded message does not contain a transaction.");
         }
@@ -121,35 +100,9 @@ export class MessageChain {
           value.type = AllowedTypes[value.type as keyof typeof AllowedTypes];
         }
         break;
-
-      case MessageType.BLOCK:
-        value = decoded.block;
-        if (!value) {
-          throw new Error("Decoded message does not contain a block.");
-        }
-        break;
-
-      case MessageType.SMART_CONTRACT:
-        value = decoded.smart_contract;
-        if (!value) {
-          throw new Error("Decoded message does not contain a smart contract.");
-        }
-        break;
-
-      case MessageType.CONTRACT_TRANSACTION:
-        value = decoded.contract_transaction;
-        if (!value) {
-          throw new Error(
-            "Decoded message does not contain a contract transaction."
-          );
-        }
-        break;
-
-      default:
-        throw new Error(`Unsupported message type: ${decoded.type}`);
     }
 
-    return new MessageChain(decoded.type, value);
+    return new MessageChain(decodedMessage.type, value);
   }
 }
 
