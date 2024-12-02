@@ -1,17 +1,16 @@
 import crypto from "crypto";
-
+import { AllowedValue } from "./common.js";
 export enum TransactionStatus {
   Pending = "pending",
   Success = "success",
   Failed = "failed",
 }
-
 export class ContractTransaction {
   hash: string;
   contract: string;
   block?: string;
   functionName: string;
-  arguments: Record<string, string | number | boolean | object | null>;
+  arguments: Record<string, AllowedValue>;
   sender: string;
   status: TransactionStatus;
   timestamp: number;
@@ -20,7 +19,7 @@ export class ContractTransaction {
   constructor(
     contract: string,
     functionName: string,
-    argumentList: Record<string, string | number | boolean | object | null>,
+    argumentList: Record<string, AllowedValue>,
     sender: string,
     timestamp: number
   ) {

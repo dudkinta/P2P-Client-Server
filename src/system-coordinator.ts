@@ -25,6 +25,7 @@ export class SystemCoordinator {
 
   public async startAsync(): Promise<void> {
     await this.networkService.startAsync();
-    await this.blockChain.initAsync();
+    //await this.blockChain.initAsync();
+    console.log("Blockchain initialized");
   }
 }

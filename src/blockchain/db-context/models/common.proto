@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package blockchain.common;
+
+message AllowedValue {
+    oneof value {
+        string str = 1;
+        int64 num = 2;
+        bool bool = 3;
+        string obj = 4; // JSON-строка для представления объекта
+        NullValue null_value = 5;
+    }
+}
+
+enum NullValue {
+    NULL_VALUE = 0;
+}
+

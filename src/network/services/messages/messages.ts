@@ -23,6 +23,10 @@ import type {
   MessageServiceEvents,
 } from "./index.js";
 import type { Logger, Startable, Connection } from "@libp2p/interface";
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class MessagesService
   extends TypedEventEmitter<MessageServiceEvents>
@@ -69,7 +73,10 @@ export class MessagesService
       maxOutboundStreams: this.maxOutboundStreams,
       runOnLimitedConnection: this.runOnLimitedConnection,
     });
-    this.proto_root = await protobuf.load("message_chain.proto");
+
+    this.proto_root = await protobuf.load(
+      path.resolve(__dirname, "./message-chain.proto")
+    );
     this.started = true;
     this.log(LogLevel.Info, "Started store service");
     setTimeout(() => {
@@ -227,7 +234,9 @@ export class MessagesService
   async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     const connections = this.components.connectionManager.getConnections();
-
+    if (connections.length === 0) {
+      this.log(LogLevel.Warning, "No connections to broadcast message to");
+    }
     for (const connection of connections) {
       try {
         if (connection !== message.sender) {

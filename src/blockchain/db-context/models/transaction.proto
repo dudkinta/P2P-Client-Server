@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package blockchain.transaction;
+
 message Transaction {
     string hash = 1;
     string block = 2; // Optional

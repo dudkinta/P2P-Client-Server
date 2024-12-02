@@ -1,18 +1,19 @@
 import crypto from "crypto";
+import { AllowedValue } from "./common.js";
 
 export class SmartContract {
   hash: string;
   block?: string;
   owner: string;
   code: string;
-  initialState: Record<string, string | number | boolean | object | null>;
+  initialState: Record<string, AllowedValue>;
   timestamp: number;
   signature?: string;
 
   constructor(
     owner: string,
     code: string,
-    initialState: Record<string, any>,
+    initialState: Record<string, AllowedValue>,
     timestamp: number
   ) {
     this.owner = owner;

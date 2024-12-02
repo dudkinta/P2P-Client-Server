@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package blockchain.message;
+
+import "../../../blockchain/db-context/models/block.proto";
+import "../../../blockchain/db-context/models/transaction.proto";
+import "../../../blockchain/db-context/models/smart-contract.proto";
+import "../../../blockchain/db-context/models/contract-transaction.proto";
+
+enum MessageType {
+    BLOCK = 0;
+    TRANSACTION = 1;
+    SMART_CONTRACT = 2;
+    CONTRACT_TRANSACTION = 3;
+}
+
+message MessageChain {
+    MessageType type = 1;
+    oneof value {
+        blockchain.block.Block block = 2;
+        blockchain.transaction.Transaction transaction = 3;
+        blockchain.contract.SmartContract smart_contract = 4;
+        blockchain.contract.ContractTransaction contract_transaction = 5;
+    }
+}

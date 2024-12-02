@@ -27,12 +27,12 @@ export class BlockChain extends EventEmitter {
   }
 
   public async initAsync(): Promise<void> {
-    //setTimeout(async () => {
-    //this.sendTestMessage();
-    //}, 1000);
+    setTimeout(async () => {
+      this.sendTestMessage();
+    }, 1000);
   }
 
-  /*private sendTestMessage() {
+  private sendTestMessage() {
     this.emit(
       "newmessage",
       new MessageChain(
@@ -43,7 +43,7 @@ export class BlockChain extends EventEmitter {
     setTimeout(async () => {
       this.sendTestMessage();
     }, 1000);
-  }*/
+  }
 
   getChain(): Block[] {
     return this.chain;

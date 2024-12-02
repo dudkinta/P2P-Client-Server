@@ -328,6 +328,7 @@ export class P2PClient extends EventEmitter {
       await this.updateSelfMultiaddress();
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
+      console.error(err);
     }
   }
 }

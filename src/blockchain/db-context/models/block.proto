@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package blockchain.block;
+
 import "transaction.proto";
 import "contract-transaction.proto";
 import "smart-contract.proto";
@@ -10,7 +12,7 @@ message Block {
     string previousHash = 3;
     int32 index = 4;
     int64 timestamp = 5;
-    repeated Transaction transactions = 6;
-    repeated SmartContract smartContracts = 7;
-    repeated ContractTransaction contractTransactions = 8;
+    repeated blockchain.transaction.Transaction transactions = 6;
+    repeated blockchain.contract.SmartContract smartContracts = 7;
+    repeated blockchain.contract.ContractTransaction contractTransactions = 8;
 }
