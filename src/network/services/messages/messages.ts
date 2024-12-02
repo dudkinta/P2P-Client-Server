@@ -171,6 +171,7 @@ export class MessagesService
       "MessageChain",
       message
     ).catch((err) => {
+      this.log(LogLevel.Error, `Failed to write message: ${err.message}`);
       throw new Error(`Failed to write message: ${err.message}`);
     });
   }
