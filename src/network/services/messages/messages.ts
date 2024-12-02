@@ -116,28 +116,27 @@ export class MessagesService
       const root = this.proto_root;
       const ProtobufMessageChain = root.lookupType("MessageChain");
 
-      // Настраиваем pbStream
       const pbstr = pbStream(stream);
 
-      // Устанавливаем таймаут
       const signal = AbortSignal.timeout(this.timeout);
       signal.addEventListener("abort", () => {
         this.log(LogLevel.Warning, "Timeout reached, aborting stream");
         stream.abort(new TimeoutError("Timeout during handleMessage"));
       });
 
-      let decodedMessage: any;
-
       while (true) {
+        let decodedMessage: any;
+
         try {
-          // Читаем следующее сообщение из потока
+          // Чтение сообщения из потока
           const messageData = await pbstr.read(
             {
-              decode: (data: Uint8ArrayList | Uint8Array) => {
-                // Преобразуем Uint8ArrayList в Uint8Array, если необходимо
-                const buffer =
-                  data instanceof Uint8Array ? data : data.subarray();
-                return ProtobufMessageChain.decode(buffer);
+              decode: (buffer: Uint8Array | Uint8ArrayList) => {
+                const data =
+                  buffer instanceof Uint8Array
+                    ? buffer
+                    : new Uint8Array(buffer.subarray());
+                return ProtobufMessageChain.decode(data);
               },
             },
             { signal }
@@ -147,36 +146,38 @@ export class MessagesService
         } catch (err: any) {
           if (err.name === "AbortError") {
             this.log(LogLevel.Warning, "Stream reading aborted due to timeout");
-          } else {
-            this.log(LogLevel.Error, `Failed to read message: ${err.message}`);
+            break;
           }
+          this.log(LogLevel.Error, `Failed to read message: ${err.message}`);
           break;
         }
 
-        this.log(LogLevel.Trace, `Received decoded message: ${decodedMessage}`);
+        if (!decodedMessage) {
+          this.log(LogLevel.Info, "No message received, ending stream");
+          break;
+        }
 
-        // Преобразуем в MessageChain
+        this.log(
+          LogLevel.Trace,
+          `Received decoded message: ${JSON.stringify(decodedMessage)}`
+        );
+
         const message = MessageChain.fromProtobuf(root, decodedMessage);
 
-        // Добавляем отправителя
         message.sender = connection;
 
-        // Проверка на дублирование
         const hash = message.getHash();
         if (this.messageHistory.has(hash)) {
           this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
           continue;
         }
 
-        // Сохраняем сообщение в историю
         this.messageHistory.set(hash, message);
 
-        // Диспетчеризация события
         this.safeDispatchEvent<MessageChain>("message:receive", {
           detail: message,
         });
 
-        // Рассылка сообщения
         this.broadcastMessage(message);
       }
     } catch (err: any) {
@@ -185,7 +186,6 @@ export class MessagesService
         `Failed to handle incoming message: ${err.message}`
       );
     } finally {
-      // Закрытие потока
       await stream.close().catch((err) => {
         this.log(LogLevel.Warning, `Failed to close stream: ${err.message}`);
       });
