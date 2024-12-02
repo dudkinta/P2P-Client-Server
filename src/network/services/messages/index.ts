@@ -85,6 +85,13 @@ export class MessageChain {
     if (!ProtobufMessageChain) {
       throw new Error("Protobuf message not found.");
     }
+    if (!(protobufMessage instanceof Uint8Array)) {
+      throw new Error("Protobuf message must be a Uint8Array.");
+    }
+    const errMsg = ProtobufMessageChain.verify(protobufMessage);
+    if (errMsg) {
+      throw new Error(`Invalid protobuf message: ${errMsg}`);
+    }
     let decoded;
     try {
       decoded = ProtobufMessageChain.decode(protobufMessage) as any;
