@@ -122,7 +122,9 @@ export class MessagesService
         this.proto_root,
         this.timeout,
         "MessageChain"
-      );
+      ).catch((err) => {
+        throw new Error(`Failed to read message: ${err.message}`);
+      });
 
       decodedMessage.sender = connection;
 
@@ -161,14 +163,16 @@ export class MessagesService
     if (this.proto_root == null) {
       throw new Error("Proto root is not loaded");
     }
-    writeToConnection(
+    await writeToConnection(
       connection,
       this.timeout,
       this.proto_root,
       this.protocol,
       "MessageChain",
       message
-    );
+    ).catch((err) => {
+      throw new Error(`Failed to write message: ${err.message}`);
+    });
   }
 
   async broadcastMessage(message: MessageChain): Promise<void> {

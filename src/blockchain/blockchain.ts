@@ -9,6 +9,8 @@ import {
   MessageType,
 } from "./../network/services/messages/index.js";
 import { AllowedTypes } from "./db-context/models/common.js";
+import { randomInt } from "crypto";
+
 export class BlockChain extends EventEmitter {
   private static instance: BlockChain;
   private db: dbContext;
@@ -38,7 +40,13 @@ export class BlockChain extends EventEmitter {
       "newmessage",
       new MessageChain(
         MessageType.TRANSACTION,
-        new Transaction("sender", "recipient", 100, AllowedTypes.TRANSFER, 0)
+        new Transaction(
+          "sender",
+          "recipient",
+          randomInt(1000),
+          AllowedTypes.TRANSFER,
+          0
+        )
       )
     );
     setTimeout(async () => {
