@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package blockchain.common;
 
+// Представление различных типов значений
 message AllowedValue {
     oneof value {
         string str = 1;
@@ -12,7 +13,14 @@ message AllowedValue {
     }
 }
 
+// Перечисление для представления null
 enum NullValue {
     NULL_VALUE = 0;
 }
 
+// Перечисление для AllowedTypes
+enum AllowedTypes {
+    TRANSFER = 0;
+    STAKE = 1;
+    UNSTAKE = 2;
+}

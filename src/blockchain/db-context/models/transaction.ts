@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { AllowedTypes } from "./common.js";
 
 export class Transaction {
   public hash: string;
@@ -8,12 +9,12 @@ export class Transaction {
   public amount: number;
   public timestamp: number;
   public signature?: string;
-  public type: "TRANSFER" | "STAKE" | "UNSTAKE";
+  public type: AllowedTypes;
   constructor(
     sender: string,
     receiver: string,
     amount: number,
-    type: "TRANSFER" | "STAKE" | "UNSTAKE",
+    type: AllowedTypes,
     timestamp: number
   ) {
     this.sender = sender;
@@ -30,7 +31,7 @@ export class Transaction {
       !this.amount ||
       !this.signature ||
       !this.type ||
-      (this.type === "TRANSFER" && !this.receiver)
+      ((this.type as AllowedTypes) == AllowedTypes.TRANSFER && !this.receiver)
     ) {
       console.error("Transaction is missing required fields.");
       return false;

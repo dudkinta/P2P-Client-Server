@@ -223,11 +223,19 @@ export class MessagesService
       throw new Error("Proto root is not loaded");
     }
     const root = this.proto_root;
+    const ProtobufMessageChain = root.lookupType("MessageChain");
     const pbstr = pbStream(stream);
-    const msgstr = pbstr.pb(message.toProtobuf(root));
-    await msgstr.write({
-      type: message.type,
-      value: message.value,
+
+    // Создаём Protobuf-сообщение
+    const protobufMessage = message.toProtobuf(root);
+
+    // Отправляем сообщение
+    await pbstr.write(protobufMessage, {
+      encode: (data: any) => {
+        const errMsg = ProtobufMessageChain.verify(data);
+        if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
+        return ProtobufMessageChain.encode(data).finish();
+      },
     });
   }
 

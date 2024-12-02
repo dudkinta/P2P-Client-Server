@@ -24,10 +24,10 @@ export interface MessagesService
   broadcastMessage(message: MessageChain): Promise<void>;
 }
 export enum MessageType {
-  BLOCK = "BLOCK",
-  TRANSACTION = "TRANSACTION",
-  SMART_CONTRACT = "SMART_CONTRACT",
-  CONTRACT_TRANSACTION = "CONTRACT_TRANSACTION",
+  BLOCK = 0,
+  TRANSACTION = 1,
+  SMART_CONTRACT = 2,
+  CONTRACT_TRANSACTION = 3,
 }
 
 export class MessageChain {
@@ -51,11 +51,29 @@ export class MessageChain {
   }
   toProtobuf(root: protobuf.Root): any {
     const ProtobufMessageChain = root.lookupType("MessageChain");
-    const message = {
+    const message: any = {
       type: this.type,
-      [this.type.toLowerCase()]: this.value,
     };
 
+    // Динамически добавляем соответствующее значение в зависимости от типа
+    switch (this.type) {
+      case MessageType.BLOCK:
+        message.block = this.value;
+        break;
+      case MessageType.TRANSACTION:
+        message.transaction = this.value;
+        break;
+      case MessageType.SMART_CONTRACT:
+        message.smart_contract = this.value;
+        break;
+      case MessageType.CONTRACT_TRANSACTION:
+        message.contract_transaction = this.value;
+        break;
+      default:
+        throw new Error(`Unsupported type: ${this.type}`);
+    }
+
+    // Проверяем сообщение перед сериализацией
     const errMsg = ProtobufMessageChain.verify(message);
     if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
 
@@ -70,13 +88,24 @@ export class MessageChain {
       throw new Error("Decoded message does not contain a valid 'type' field.");
     }
 
-    const valueKey = decoded.type.toLowerCase();
-    const value = decoded[valueKey];
-    if (!value) {
-      throw new Error(
-        `Decoded message does not contain a valid value for type '${decoded.type}'.`
-      );
+    let value: any;
+    switch (decoded.type) {
+      case MessageType.BLOCK:
+        value = decoded.block;
+        break;
+      case MessageType.TRANSACTION:
+        value = decoded.transaction;
+        break;
+      case MessageType.SMART_CONTRACT:
+        value = decoded.smart_contract;
+        break;
+      case MessageType.CONTRACT_TRANSACTION:
+        value = decoded.contract_transaction;
+        break;
+      default:
+        throw new Error(`Unsupported type: ${decoded.type}`);
     }
+
     return new MessageChain(decoded.type, value);
   }
 }

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package blockchain.transaction;
 
+import "common.proto"; 
+
 message Transaction {
     string hash = 1;
     string block = 2; // Optional
@@ -10,5 +12,5 @@ message Transaction {
     double amount = 5;
     int64 timestamp = 6;
     string signature = 7; // Optional
-    string type = 8; // Enum-like string: "TRANSFER", "STAKE", "UNSTAKE"
+    blockchain.common.AllowedTypes type = 8; 
 }
