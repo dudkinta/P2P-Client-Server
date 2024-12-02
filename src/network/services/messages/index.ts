@@ -82,8 +82,18 @@ export class MessageChain {
 
   static fromProtobuf(root: protobuf.Root, protobufMessage: any): MessageChain {
     const ProtobufMessageChain = root.lookupType("MessageChain");
-    const decoded = ProtobufMessageChain.decode(protobufMessage) as any;
-
+    if (!ProtobufMessageChain) {
+      throw new Error("Protobuf message not found.");
+    }
+    let decoded;
+    try {
+      decoded = ProtobufMessageChain.decode(protobufMessage) as any;
+    } catch (e) {
+      throw new Error("Error decoding protobuf message.");
+    }
+    if (!decoded) {
+      throw new Error("Decoded message is empty.");
+    }
     if (!decoded.type) {
       throw new Error("Decoded message does not contain a valid 'type' field.");
     }
