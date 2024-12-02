@@ -13,7 +13,7 @@ import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
 import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
-
+import { AllowedTypes } from "../../../blockchain/db-context/models/common.js";
 export interface MessageServiceEvents {
   "message:receive": CustomEvent<MessageChain>;
   "message:error": CustomEvent<Error>;
@@ -89,21 +89,47 @@ export class MessageChain {
     }
 
     let value: any;
+
     switch (decoded.type) {
-      case MessageType.BLOCK:
-        value = decoded.block;
-        break;
       case MessageType.TRANSACTION:
         value = decoded.transaction;
+        if (!value) {
+          throw new Error("Decoded message does not contain a transaction.");
+        }
+        // Преобразование для TRANSACTION
+        if (value.timestamp) {
+          value.timestamp = parseInt(value.timestamp, 10);
+        }
+        if (typeof value.type === "string") {
+          value.type = AllowedTypes[value.type as keyof typeof AllowedTypes];
+        }
         break;
+
+      case MessageType.BLOCK:
+        value = decoded.block;
+        if (!value) {
+          throw new Error("Decoded message does not contain a block.");
+        }
+        break;
+
       case MessageType.SMART_CONTRACT:
         value = decoded.smart_contract;
+        if (!value) {
+          throw new Error("Decoded message does not contain a smart contract.");
+        }
         break;
+
       case MessageType.CONTRACT_TRANSACTION:
         value = decoded.contract_transaction;
+        if (!value) {
+          throw new Error(
+            "Decoded message does not contain a contract transaction."
+          );
+        }
         break;
+
       default:
-        throw new Error(`Unsupported type: ${decoded.type}`);
+        throw new Error(`Unsupported message type: ${decoded.type}`);
     }
 
     return new MessageChain(decoded.type, value);

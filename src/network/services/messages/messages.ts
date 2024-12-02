@@ -228,7 +228,7 @@ export class MessagesService
 
     // Создаём Protobuf-сообщение
     const protobufMessage = message.toProtobuf(root);
-
+    console.log(protobufMessage);
     // Отправляем сообщение
     await pbstr.write(protobufMessage, {
       encode: (data: any) => {
