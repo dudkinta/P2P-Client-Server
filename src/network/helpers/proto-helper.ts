@@ -90,9 +90,9 @@ export async function readFromConnection(
 
     const signal = AbortSignal.timeout(timeout);
 
-    signal.addEventListener("abort", () => {
-      throw new Error("Timeout reached, aborting stream");
-    });
+    //signal.addEventListener("abort", () => {
+    //throw new Error("Timeout reached, aborting stream");
+    //});
     while (true) {
       let decodedMessage: any;
 
