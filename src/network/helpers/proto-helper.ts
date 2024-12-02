@@ -1,11 +1,6 @@
 import { Uint8ArrayList } from "uint8arraylist";
 import { OutOfLimitError } from "../models/out-of-limit-error.js";
-import {
-  Stream,
-  AbortOptions,
-  Connection,
-  TimeoutError,
-} from "@libp2p/interface";
+import { Stream, Connection } from "@libp2p/interface";
 import { pbStream } from "it-protobuf-stream";
 
 export async function writeToConnection(
@@ -16,25 +11,29 @@ export async function writeToConnection(
   typeName: string,
   data: any
 ): Promise<void> {
+  let stream: Stream | null = null;
+
   try {
-    if (connection == null) {
-      throw new Error("connection is null");
+    if (!connection) {
+      throw new Error("Connection is null");
     }
     if (connection.status !== "open") {
-      throw new Error("connection is not open");
+      throw new Error("Connection is not open");
     }
 
     if (connection.limits) {
       if (connection.limits.seconds && connection.limits.seconds < 10000) {
-        throw new OutOfLimitError("connection has time limits");
+        throw new OutOfLimitError("Connection has time limits");
       }
       if (connection.limits.bytes && connection.limits.bytes < 10000) {
-        throw new OutOfLimitError("connection has byte limits");
+        throw new OutOfLimitError("Connection has byte limits");
       }
     }
+    const signal = AbortSignal.timeout(timeout);
+    // Создаём новый поток
+    stream = await connection.newStream([protocol]);
 
-    const stream = await connection.newStream([protocol]);
-    if (proto_root == null) {
+    if (!proto_root) {
       throw new Error("Proto root is not loaded");
     }
 
@@ -42,23 +41,33 @@ export async function writeToConnection(
     const protoType = root.lookupType(typeName);
     const pbstr = pbStream(stream);
 
+    // Создаём Protobuf-сообщение
     const protobufMessage = data.toProtobuf(root);
+
     // Отправляем сообщение
-    await pbstr.write(protobufMessage, {
-      encode: (data: any) => {
-        const errMsg = protoType.verify(data);
-        if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
-        return protoType.encode(data).finish();
+    await pbstr.write(
+      protobufMessage,
+      {
+        encode: (data: any) => {
+          const errMsg = protoType.verify(data);
+          if (errMsg) {
+            throw new Error(`Invalid message: ${errMsg}`);
+          }
+          return protoType.encode(data).finish();
+        },
       },
-    });
-    stream.close();
-  } catch (err: any) {
-    if (err.name === "AbortError") {
-      throw new Error("Operation aborted due to timeout");
-    }
-    throw new Error(
-      `Failed to write message in writeToConnection: ${err.message}`
+      { signal }
     );
+  } catch (err: any) {
+    throw err;
+  } finally {
+    if (stream) {
+      try {
+        await stream.close();
+      } catch (closeErr: any) {
+        console.error(`Failed to close stream: ${closeErr.message}`);
+      }
+    }
   }
 }
 
@@ -75,9 +84,6 @@ export async function readFromConnection(
 
     const signal = AbortSignal.timeout(timeout);
 
-    //signal.addEventListener("abort", () => {
-    //throw new Error("Timeout reached, aborting stream");
-    //});
     while (true) {
       let decodedMessage: any;
 
