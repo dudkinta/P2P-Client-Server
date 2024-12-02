@@ -94,7 +94,7 @@ export class MessageChain {
     let decoded: any;
     try {
       decoded = ProtobufMessageChain.decode(protobufMessage);
-    } catch (e) {
+    } catch (e: any) {
       throw new Error(`Error decoding protobuf message: ${e.message}`);
     }
 
