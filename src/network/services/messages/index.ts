@@ -13,7 +13,6 @@ import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
 import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
-import { AllowedTypes } from "../../../blockchain/db-context/models/common.js";
 export interface MessageServiceEvents {
   "message:receive": CustomEvent<MessageChain>;
   "message:error": CustomEvent<Error>;
@@ -78,31 +77,6 @@ export class MessageChain {
     if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
 
     return ProtobufMessageChain.create(message);
-  }
-
-  static fromProtobuf(decodedMessage: any): MessageChain {
-    if (!decodedMessage || !decodedMessage.type) {
-      throw new Error("Decoded message does not contain a valid 'type' field.");
-    }
-
-    let value: any;
-
-    switch (decodedMessage.type) {
-      case MessageType.TRANSACTION:
-        value = decodedMessage.transaction;
-        if (!value) {
-          throw new Error("Decoded message does not contain a transaction.");
-        }
-        if (value.timestamp) {
-          value.timestamp = parseInt(value.timestamp, 10);
-        }
-        if (typeof value.type === "string") {
-          value.type = AllowedTypes[value.type as keyof typeof AllowedTypes];
-        }
-        break;
-    }
-
-    return new MessageChain(decodedMessage.type, value);
   }
 }
 

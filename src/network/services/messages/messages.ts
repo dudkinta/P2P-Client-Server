@@ -7,6 +7,10 @@ import protobuf from "protobufjs";
 import { pbStream } from "it-protobuf-stream";
 import { Uint8ArrayList } from "uint8arraylist";
 import {
+  writeToConnection,
+  readFromConnection,
+} from "../../helpers/proto-helper.js";
+import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
   PROTOCOL_VERSION,
@@ -113,73 +117,30 @@ export class MessagesService
         throw new Error("Proto root is not loaded");
       }
 
-      const root = this.proto_root;
-      const ProtobufMessageChain = root.lookupType("MessageChain");
+      const decodedMessage = await readFromConnection(
+        stream,
+        this.proto_root,
+        this.timeout,
+        "MessageChain"
+      );
 
-      const pbstr = pbStream(stream);
+      decodedMessage.sender = connection;
 
-      const signal = AbortSignal.timeout(this.timeout);
-      signal.addEventListener("abort", () => {
-        this.log(LogLevel.Warning, "Timeout reached, aborting stream");
-        stream.abort(new TimeoutError("Timeout during handleMessage"));
+      const hash = decodedMessage.getHash();
+      if (this.messageHistory.has(hash)) {
+        this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
+        return;
+      }
+
+      const message = new MessageChain(decodedMessage.type, decodedMessage);
+
+      this.messageHistory.set(hash, message);
+
+      this.safeDispatchEvent<MessageChain>("message:receive", {
+        detail: message,
       });
 
-      while (true) {
-        let decodedMessage: any;
-
-        try {
-          // Чтение сообщения из потока
-          const messageData = await pbstr.read(
-            {
-              decode: (buffer: Uint8Array | Uint8ArrayList) => {
-                const data =
-                  buffer instanceof Uint8Array
-                    ? buffer
-                    : new Uint8Array(buffer.subarray());
-                return ProtobufMessageChain.decode(data);
-              },
-            },
-            { signal }
-          );
-
-          decodedMessage = messageData;
-        } catch (err: any) {
-          if (err.name === "AbortError") {
-            this.log(LogLevel.Warning, "Stream reading aborted due to timeout");
-            break;
-          }
-          this.log(LogLevel.Error, `Failed to read message: ${err.message}`);
-          break;
-        }
-
-        if (!decodedMessage) {
-          this.log(LogLevel.Info, "No message received, ending stream");
-          break;
-        }
-
-        this.log(
-          LogLevel.Trace,
-          `Received decoded message: ${JSON.stringify(decodedMessage)}`
-        );
-
-        const message = MessageChain.fromProtobuf(decodedMessage);
-
-        message.sender = connection;
-
-        const hash = message.getHash();
-        if (this.messageHistory.has(hash)) {
-          this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
-          continue;
-        }
-
-        this.messageHistory.set(hash, message);
-
-        this.safeDispatchEvent<MessageChain>("message:receive", {
-          detail: message,
-        });
-
-        this.broadcastMessage(message);
-      }
+      this.broadcastMessage(message);
     } catch (err: any) {
       this.log(
         LogLevel.Error,
@@ -197,46 +158,17 @@ export class MessagesService
       LogLevel.Info,
       `Sending message to ${connection.remotePeer.toString()}: ${message}`
     );
-    if (connection == null) {
-      throw new Error("connection is null");
-    }
-    if (connection.status !== "open") {
-      throw new Error("connection is not open");
-    }
-
-    if (connection.limits) {
-      if (connection.limits.seconds && connection.limits.seconds < 10000) {
-        throw new OutOfLimitError("connection has time limits");
-      }
-      if (connection.limits.bytes && connection.limits.bytes < 10000) {
-        throw new OutOfLimitError("connection has byte limits");
-      }
-    }
-    const signal = AbortSignal.timeout(this.timeout);
-    signal.addEventListener("abort", () => {
-      this.log(LogLevel.Warning, "Timeout reached, aborting stream");
-      connection.close();
-    });
-
-    const stream = await connection.newStream([this.protocol]);
     if (this.proto_root == null) {
       throw new Error("Proto root is not loaded");
     }
-    const root = this.proto_root;
-    const ProtobufMessageChain = root.lookupType("MessageChain");
-    const pbstr = pbStream(stream);
-
-    // Создаём Protobuf-сообщение
-    const protobufMessage = message.toProtobuf(root);
-    console.log(protobufMessage);
-    // Отправляем сообщение
-    await pbstr.write(protobufMessage, {
-      encode: (data: any) => {
-        const errMsg = ProtobufMessageChain.verify(data);
-        if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
-        return ProtobufMessageChain.encode(data).finish();
-      },
-    });
+    writeToConnection(
+      connection,
+      this.timeout,
+      this.proto_root,
+      this.protocol,
+      "MessageChain",
+      message
+    );
   }
 
   async broadcastMessage(message: MessageChain): Promise<void> {
