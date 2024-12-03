@@ -6,12 +6,14 @@ import "../../../blockchain/db-context/models/block.proto";
 import "../../../blockchain/db-context/models/transaction.proto";
 import "../../../blockchain/db-context/models/smart-contract.proto";
 import "../../../blockchain/db-context/models/contract-transaction.proto";
+import "../../wallet/wallet.proto"
 
 enum MessageType {
     BLOCK = 0;
     TRANSACTION = 1;
     SMART_CONTRACT = 2;
     CONTRACT_TRANSACTION = 3;
+    WALLET = 4;
 }
 
 message MessageChain {
@@ -21,5 +23,6 @@ message MessageChain {
         blockchain.transaction.Transaction transaction = 3;
         blockchain.contract.SmartContract smart_contract = 4;
         blockchain.contract.ContractTransaction contract_transaction = 5;
+        blockchain.wallet.Wallet wallet = 6;
     }
 }

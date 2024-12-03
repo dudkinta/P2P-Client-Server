@@ -8,8 +8,16 @@ import { promises as fs } from "fs";
 import ConfigLoader from "../common/config-loader.js";
 import { SmartContract } from "../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
+import EventEmitter from "events";
 
-export class Wallet {
+export interface WalletEvents {
+  "wallet:change": [Wallet];
+  "wallet:error": [Error];
+  "wallet:connected": [{ peerId: string; publicKey: string }];
+}
+
+export class Wallet extends EventEmitter<WalletEvents> {
+  private static eventEmitter: EventEmitter = new EventEmitter();
   public static instances: Wallet[] = [];
   public static current: Wallet | null = null;
   private mnemonic: string | null = null;
@@ -18,7 +26,9 @@ export class Wallet {
   public walletName: string | null = null;
   public publicKey: string | null = null;
   public subname: string | null = null;
-  constructor() {}
+  constructor() {
+    super();
+  }
 
   public static async initialize(): Promise<void> {
     this.instances = [];
@@ -97,8 +107,23 @@ export class Wallet {
     return wallet;
   }
 
+  public static onEvent<K extends keyof WalletEvents>(
+    event: K,
+    listener: (...args: WalletEvents[K]) => void
+  ): void {
+    this.eventEmitter.on(event, listener);
+  }
+
+  private static emitEvent<K extends keyof WalletEvents>(
+    event: K,
+    ...args: WalletEvents[K]
+  ): void {
+    this.eventEmitter.emit(event, ...args);
+  }
+
   public static use(wallet: Wallet): void {
     this.current = wallet;
+    this.emitEvent("wallet:change", wallet);
   }
   private static async isExist(path: string): Promise<boolean> {
     try {

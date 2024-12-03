@@ -317,10 +317,24 @@ export class P2PClient extends EventEmitter {
         this.log(LogLevel.Info, "Libp2p node started");
       });
       const messageService = this.node.services.messages as MessagesService;
-      messageService.addEventListener("message:receive", (event: any) => {
-        this.log(LogLevel.Info, "Libp2p node started");
-        this.emit("message:receive", event.detail);
+      messageService.addEventListener(
+        "message:blockchainData",
+        (event: any) => {
+          this.log(LogLevel.Info, "message receive");
+          this.emit("message:blockchainData", event.detail);
+        }
+      );
+      messageService.addEventListener("message:addValidator", (event: any) => {
+        this.log(LogLevel.Info, "add validator");
+        this.emit("message:addValidator", event.detail);
       });
+      messageService.addEventListener(
+        "message:removeValidator",
+        (event: any) => {
+          this.log(LogLevel.Info, "remove validator");
+          this.emit("message:removeValidator", event.detail);
+        }
+      );
       await this.node.start();
 
       this.log(LogLevel.Info, `Libp2p listening on:`);

@@ -133,11 +133,17 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
-      this.client.on("message:receive", async (event) => {
-        this.log(
-          LogLevel.Debug,
-          `on chain message:receive ${JSON.stringify(event)}`
-        );
+      this.client.on("message:blockchainData", async (event) => {
+        this.log(LogLevel.Debug, `on chain message:receive`);
+        this.emit("message:blockchainData", event);
+      });
+      this.client.on("message:addValidator", async (event) => {
+        this.log(LogLevel.Debug, `on add validator`);
+        this.emit("message:addValidator", event);
+      });
+      this.client.on("message:removeValidator", async (event) => {
+        this.log(LogLevel.Debug, `on remove validator`);
+        this.emit("message:removeValidator", event);
       });
       await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(

@@ -60,6 +60,7 @@ export class BlockChain extends EventEmitter {
 
   addBlock(block: Block): void {
     this.chain.push(block);
+    this.db.blockStorage.save(block);
   }
 
   getLastBlock(): Block | undefined {
@@ -74,10 +75,6 @@ export class BlockChain extends EventEmitter {
 
   async getBlocksInRange(start: number, end: number): Promise<Block[]> {
     return await this.db.blockStorage.getByRange(start, end);
-  }
-
-  isValidBlock(block: Block): boolean {
-    return block.isValid();
   }
 
   calculateBlockReward(
@@ -108,5 +105,32 @@ export class BlockChain extends EventEmitter {
     const reward = initialReward / Math.pow(2, currentStage);
 
     return reward;
+  }
+
+  public async addBlockchainData(message: MessageChain): Promise<void> {
+    if (message.type === MessageType.BLOCK) {
+      const block = message.value as Block;
+      if (block.isValid()) {
+        this.addBlock(block);
+      }
+    }
+    if (message.type === MessageType.TRANSACTION) {
+      const transaction = message.value as Transaction;
+      if (transaction.isValid()) {
+        this.pendingTransactions.push(transaction);
+      }
+    }
+    if (message.type === MessageType.SMART_CONTRACT) {
+      const contract = message.value as SmartContract;
+      if (contract.isValid()) {
+        this.pendingSmartContracts.push(contract);
+      }
+    }
+    if (message.type === MessageType.CONTRACT_TRANSACTION) {
+      const contract_transaction = message.value as ContractTransaction;
+      if (contract_transaction.isValid()) {
+        this.pendingContractTransactions.push(contract_transaction);
+      }
+    }
   }
 }

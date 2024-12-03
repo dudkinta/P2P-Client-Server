@@ -19,7 +19,7 @@ import {
   MAX_OUTBOUND_STREAMS,
   MESSAGE_EXPIRATION_TIME,
 } from "./constants.js";
-import { MessageChain } from "./index.js";
+import { MessageChain, MessageType } from "./index.js";
 import type {
   MessagesServiceComponents,
   MessagesServiceInit,
@@ -91,6 +91,11 @@ export class MessagesService
   private clearMessageHistory() {
     for (const [key, message] of this.messageHistory) {
       if (Date.now() - message.dt > MESSAGE_EXPIRATION_TIME) {
+        if (message.type == MessageType.WALLET) {
+          this.safeDispatchEvent<MessageChain>("message:removeValidator", {
+            detail: message,
+          });
+        }
         this.messageHistory.delete(key);
       }
     }
@@ -129,14 +134,20 @@ export class MessagesService
       const message = new MessageChain(decodedMessage.type, decodedMessage);
       message.sender = connection;
       const hash = message.getHash();
+      if (message.type == MessageType.WALLET) {
+        this.messageHistory.set(hash, message);
+        this.safeDispatchEvent<MessageChain>("message:addValidator", {
+          detail: message,
+        });
+        return;
+      }
       if (this.messageHistory.has(hash)) {
         this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
         return;
       }
-
       this.messageHistory.set(hash, message);
 
-      this.safeDispatchEvent<MessageChain>("message:receive", {
+      this.safeDispatchEvent<MessageChain>("message:blockchainData", {
         detail: message,
       });
 
