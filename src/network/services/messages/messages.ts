@@ -1,11 +1,9 @@
-import { OutOfLimitError } from "../../models/out-of-limit-error.js";
-import { TimeoutError, TypedEventEmitter } from "@libp2p/interface";
+import { TypedEventEmitter } from "@libp2p/interface";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { sendDebug } from "../socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
 import protobuf from "protobufjs";
-import { pbStream } from "it-protobuf-stream";
-import { Uint8ArrayList } from "uint8arraylist";
+import { Wallet } from "./../../../wallet/wallet.js";
 import {
   writeToConnection,
   readFromConnection,
@@ -68,6 +66,40 @@ export class MessagesService
     this.maxOutboundStreams = init.maxOutboundStreams ?? MAX_OUTBOUND_STREAMS;
     this.runOnLimitedConnection = init.runOnLimitedConnection ?? true;
     this.handleMessage = this.handleMessage.bind(this);
+    if (init.runOnPeerConnect ?? true) {
+      this.components.events.addEventListener(
+        "connection:open",
+        async (event: any) => {
+          this.log(
+            LogLevel.Info,
+            `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
+          );
+          if (Wallet.current) {
+            await this.sendMessage(
+              event.detail,
+              new MessageChain(MessageType.WALLET, Wallet.current)
+            );
+          }
+        }
+      );
+      this.components.events.addEventListener(
+        "connection:close",
+        async (event: any) => {
+          this.log(
+            LogLevel.Info,
+            `Connection close to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
+          );
+          const removeMessage = new MessageChain(
+            MessageType.WALLET,
+            new Wallet()
+          );
+          removeMessage.sender = event.detail;
+          this.safeDispatchEvent<MessageChain>("message:removeValidator", {
+            detail: removeMessage,
+          });
+        }
+      );
+    }
   }
 
   async start(): Promise<void> {

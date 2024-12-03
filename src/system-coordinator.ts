@@ -39,10 +39,10 @@ export class SystemCoordinator {
       this.blockChain.addBlockchainData(message.value);
     });
     this.networkService.on("message:addValidator", async (message) => {
-      this.validator.addValidator(message.value as Wallet);
+      this.validator.addValidator(message);
     });
     this.networkService.on("message:removeValidator", async (message) => {
-      this.validator.removeValidator(message.value as Wallet);
+      this.validator.removeValidator(message);
     });
   }
 
