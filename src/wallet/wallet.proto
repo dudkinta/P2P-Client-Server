@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package blockchain.wallet;
-
-message Wallet {
-    string publickey = 1;
-}

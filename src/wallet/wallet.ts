@@ -10,13 +10,20 @@ import { SmartContract } from "../blockchain/db-context/models/smart-contract.js
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 import EventEmitter from "events";
 
+export interface WalletPublicKey {
+  publicKey: string | null;
+}
+
 export interface WalletEvents {
   "wallet:change": [Wallet];
   "wallet:error": [Error];
   "wallet:connected": [{ peerId: string; publicKey: string }];
 }
 
-export class Wallet extends EventEmitter<WalletEvents> {
+export class Wallet
+  extends EventEmitter<WalletEvents>
+  implements WalletPublicKey
+{
   private static eventEmitter: EventEmitter = new EventEmitter();
   public static instances: Wallet[] = [];
   public static current: Wallet | null = null;
@@ -214,5 +221,14 @@ export class Wallet extends EventEmitter<WalletEvents> {
     sign.update(transactionData).end();
 
     transaction.signature = sign.sign(this.privateKey, "hex");
+  }
+
+  public toWalletPublicKey(): WalletPublicKey {
+    if (!this.publicKey) {
+      throw new Error("Wallet publicKey is not set");
+    }
+    return {
+      publicKey: this.publicKey,
+    };
   }
 }

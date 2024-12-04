@@ -13,7 +13,7 @@ import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
 import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
-import { Wallet } from "../../../wallet/wallet.js";
+import { WalletPublicKey } from "../../../wallet/wallet.js";
 
 export interface MessageServiceEvents {
   "message:blockchainData": CustomEvent<MessageChain>;
@@ -38,10 +38,20 @@ export class MessageChain {
   sender?: Connection;
   type: MessageType;
   dt: number;
-  value: Block | Transaction | SmartContract | ContractTransaction | Wallet;
+  value:
+    | Block
+    | Transaction
+    | SmartContract
+    | ContractTransaction
+    | WalletPublicKey;
   constructor(
     type: MessageType,
-    value: Block | Transaction | SmartContract | ContractTransaction | Wallet
+    value:
+      | Block
+      | Transaction
+      | SmartContract
+      | ContractTransaction
+      | WalletPublicKey
   ) {
     this.type = type;
     this.dt = Date.now();
