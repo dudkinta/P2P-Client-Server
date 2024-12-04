@@ -43,6 +43,7 @@
     "debug": "^4.3.7",
     "express": "^4.21.1",
     "it-protobuf-stream": "^1.1.5",
+    "copyfiles": "^2.4.1",
     "level": "^8.0.1",
     "libp2p": "^2.2.1",
     "protobufjs": "^7.4.0",
