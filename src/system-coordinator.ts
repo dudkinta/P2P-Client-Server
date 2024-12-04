@@ -27,9 +27,12 @@ export class SystemCoordinator {
     createWebServer(this.networkService);
 
     Wallet.onEvent("wallet:change", async (wallet: Wallet) => {
-      await this.networkService.broadcastMessage(
-        new MessageChain(MessageType.WALLET, wallet.toWalletPublicKey())
+      const message = new MessageChain(
+        MessageType.WALLET,
+        wallet.toWalletPublicKey()
       );
+      console.log("Wallet changed", message);
+      await this.networkService.broadcastMessage(message);
     });
     this.blockChain.on("message:new", async (message) => {
       await this.networkService.broadcastMessage(message);

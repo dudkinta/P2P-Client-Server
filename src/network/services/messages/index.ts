@@ -83,6 +83,9 @@ export class MessageChain {
       case MessageType.CONTRACT_TRANSACTION:
         message.contract_transaction = this.value;
         break;
+      case MessageType.WALLET:
+        message.wallet = this.value;
+        break;
       default:
         throw new Error(`Unsupported type: ${this.type}`);
     }
