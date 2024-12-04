@@ -8,11 +8,12 @@ import {
   MessageChain,
   MessageType,
 } from "./../network/services/messages/index.js";
-import { AllowedTypes } from "./db-context/models/common.js";
-import { randomInt } from "crypto";
 import { Wallet } from "./../wallet/wallet.js";
+import { Validator, REQUIRE_VALIDATOR_COUNT } from "../validator/validator.js";
+
 export class BlockChain extends EventEmitter {
   private static instance: BlockChain;
+  private validator?: Validator;
   private db: dbContext;
   private chain: Block[] = [];
   private pendingTransactions: Transaction[] = [];
@@ -22,6 +23,7 @@ export class BlockChain extends EventEmitter {
     super();
     this.db = new dbContext();
   }
+
   public static getInstance(): BlockChain {
     if (!BlockChain.instance) {
       BlockChain.instance = new BlockChain();
@@ -29,29 +31,9 @@ export class BlockChain extends EventEmitter {
     return BlockChain.instance;
   }
 
-  public async initAsync(): Promise<void> {
-    setTimeout(async () => {
-      this.sendTestMessage();
-    }, 30000);
-  }
-
-  private sendTestMessage() {
-    this.emit(
-      "newmessage",
-      new MessageChain(
-        MessageType.TRANSACTION,
-        new Transaction(
-          "sender",
-          "recipient",
-          randomInt(1000),
-          AllowedTypes.TRANSFER,
-          0
-        )
-      )
-    );
-    setTimeout(async () => {
-      this.sendTestMessage();
-    }, 1000);
+  public async initAsync(validator: Validator): Promise<void> {
+    this.validator = validator;
+    this.chain = await this.db.blockStorage.getAll();
   }
 
   public getChain(): Block[] {
@@ -165,8 +147,23 @@ export class BlockChain extends EventEmitter {
 
   private async createBlock(): Promise<void> {
     const lastBlock = this.getLastBlock();
+    if (!this.validator) {
+      throw new Error("Validator is not initialized.");
+    }
+    const validators = this.validator.selectValidators();
+    if (validators.length != REQUIRE_VALIDATOR_COUNT) {
+      throw new Error("Validators are not selected.");
+    }
     if (!lastBlock) {
-      const genesisBlock = new Block(0, "0", Date.now(), [], [], []);
+      const genesisBlock = new Block(
+        0,
+        "0",
+        Date.now(),
+        [],
+        [],
+        [],
+        this.validator.selectValidators()
+      );
       this.addBlock(genesisBlock);
     } else {
       const block = new Block(
@@ -181,7 +178,7 @@ export class BlockChain extends EventEmitter {
       this.pendingSmartContracts = [];
       this.pendingContractTransactions = [];
       this.addBlock(block);
-      this.emit("newmessage", new MessageChain(MessageType.BLOCK, block));
+      this.emit("message:new", new MessageChain(MessageType.BLOCK, block));
     }
   }
 }

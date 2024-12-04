@@ -1,5 +1,8 @@
 import { Wallet } from "../wallet/wallet.js";
 import { MessageChain } from "../network/services/messages/index.js";
+
+export const REQUIRE_VALIDATOR_COUNT: number = 5;
+
 class ValidatorEntry {
   public sender: string;
   public publicKey: string;
@@ -15,7 +18,7 @@ class ValidatorEntry {
 
 export class Validator {
   private walletValidators: ValidatorEntry[] = [];
-  private requiredValidators = 5;
+
   constructor() {}
   public addValidator(message: MessageChain): void {
     const wallet = message.value as Wallet;
@@ -46,7 +49,7 @@ export class Validator {
           a.lastValidation - b.lastValidation || now - b.dt - (now - a.dt)
       );
 
-    const selected = elibgilePeers.slice(0, this.requiredValidators);
+    const selected = elibgilePeers.slice(0, REQUIRE_VALIDATOR_COUNT);
     selected.forEach((validator) => (validator.lastValidation = now));
     return selected.map((validator) => validator.publicKey);
   }

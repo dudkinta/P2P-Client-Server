@@ -2,7 +2,6 @@ import { P2PClient } from "./network/p2p-сlient.js";
 import { BlockChain } from "./blockchain/blockchain.js";
 import { createWebServer } from "./network/services/web-server.js";
 import { NetworkService } from "./network/services/network-service.js";
-import http from "http";
 import ConfigLoader from "./common/config-loader.js";
 import { Wallet } from "./wallet/wallet.js";
 import {
@@ -32,7 +31,7 @@ export class SystemCoordinator {
         new MessageChain(MessageType.WALLET, wallet)
       );
     });
-    this.blockChain.on("newmessage", async (message) => {
+    this.blockChain.on("message:new", async (message) => {
       await this.networkService.broadcastMessage(message);
     });
     this.networkService.on("message:blockchainData", async (message) => {
@@ -48,7 +47,7 @@ export class SystemCoordinator {
 
   public async startAsync(): Promise<void> {
     await this.networkService.startAsync();
-    //await this.blockChain.initAsync();
+    await this.blockChain.initAsync(this.validator);
     console.log("Blockchain initialized");
   }
 }

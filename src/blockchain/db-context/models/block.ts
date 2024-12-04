@@ -21,7 +21,8 @@ export class Block {
     timestamp: number,
     transactions: Transaction[] = [],
     smartContracts: SmartContract[] = [],
-    contractTransactions: ContractTransaction[] = []
+    contractTransactions: ContractTransaction[] = [],
+    validators: string[] = []
   ) {
     this.index = index;
     this.previousHash = previousHash;
@@ -29,6 +30,7 @@ export class Block {
     this.transactions = transactions;
     this.smartContracts = smartContracts;
     this.contractTransactions = contractTransactions;
+    this.validators = validators;
     this.merkleRoot = this.calculateMerkleRoot();
     this.hash = this.calculateHash();
   }
@@ -74,6 +76,7 @@ export class Block {
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
+      Validators: ${JSON.stringify(this.validators, null, 2)}
     `;
   }
 

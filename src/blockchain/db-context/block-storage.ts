@@ -20,6 +20,14 @@ export class BlockStorage {
     }
   }
 
+  async getAll(): Promise<Block[]> {
+    const blocks: Block[] = [];
+    for await (const [key, value] of this.db.iterator()) {
+      blocks.push(value as Block);
+    }
+    return blocks;
+  }
+
   async getByRange(start: number, end: number): Promise<Block[]> {
     const blocks: Block[] = [];
     for await (const [key, value] of this.db.iterator({

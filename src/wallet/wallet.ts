@@ -66,7 +66,27 @@ export class Wallet extends EventEmitter<WalletEvents> {
         this.instances.push(wallet);
       }
     }
+
+    setTimeout(
+      () => {
+        this.reUseWallet();
+      },
+      30 * 60 * 1000
+    );
   }
+
+  private static reUseWallet() {
+    if (Wallet.current) {
+      this.emitEvent("wallet:change", Wallet.current);
+    }
+    setTimeout(
+      () => {
+        this.reUseWallet();
+      },
+      30 * 60 * 1000
+    );
+  }
+
   public static async create(name: string): Promise<Wallet> {
     const mnemonic = generateMnemonic();
     const seed = mnemonicToSeedSync(mnemonic);
@@ -125,6 +145,7 @@ export class Wallet extends EventEmitter<WalletEvents> {
     this.current = wallet;
     this.emitEvent("wallet:change", wallet);
   }
+
   private static async isExist(path: string): Promise<boolean> {
     try {
       await fs.access(path);
