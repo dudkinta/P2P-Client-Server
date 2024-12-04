@@ -20,7 +20,7 @@ RUN npm install
 # Возвращаемся в корневую директорию
 WORKDIR /app
 RUN npm run build
-RUN mkdir -p /app/dist && find /app/src -name "*.proto" -exec cp --parents {} /app/dist \;
+RUN mkdir -p /app/dist && find /app/src -name "*.proto" -exec cp {} /app/dist \;
 
 # Указываем порты, которые слушает приложение
  EXPOSE 3000
