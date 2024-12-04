@@ -21,6 +21,7 @@ RUN npm install
 WORKDIR /app
 RUN npm run build
 
+RUN ls -R /app/dist
 # Указываем порты, которые слушает приложение
  EXPOSE 3000
  EXPOSE 6000
