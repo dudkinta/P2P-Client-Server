@@ -6,7 +6,7 @@ import "../../../blockchain/db-context/models/block.proto";
 import "../../../blockchain/db-context/models/transaction.proto";
 import "../../../blockchain/db-context/models/smart-contract.proto";
 import "../../../blockchain/db-context/models/contract-transaction.proto";
-import "../../wallet/wallet.proto"
+import "../../../wallet/wallet.proto";
 
 enum MessageType {
     BLOCK = 0;
