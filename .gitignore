@@ -16,8 +16,12 @@ peer-id.bin
 package-lock.json
 .DS_Store
 Thumbs.db
-/data/testnet/
-data/keys/
+/data/testnet/keys/
+/data/mainnet/keys/
+/data/testnet/leveldb/
+/data/mainnet/leveldb/
+/data/testnet/peer-id.bin
+/data/mainnet/peer-id.bin
 # Папка с собранным кодом и временными файлами
 bin/
 obj/
