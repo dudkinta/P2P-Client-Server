@@ -34,7 +34,6 @@ export class SystemCoordinator {
         MessageType.WALLET,
         wallet.toWalletPublicKey()
       );
-      console.log("Wallet changed", message);
       await this.networkService.broadcastMessage(message);
     });
 
