@@ -108,7 +108,7 @@ export class MessageChain {
         message.chain = this.value;
         break;
       case MessageType.REQUEST_CHAIN:
-        message.range = this.value;
+        message.request = this.value;
         break;
       default:
         throw new Error(`Unsupported type: ${this.type}`);

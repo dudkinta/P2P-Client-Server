@@ -37,7 +37,7 @@ message MessageChain {
         blockchain.contract.SmartContract smart_contract = 4;
         blockchain.contract.ContractTransaction contract_transaction = 5;
         blockchain.wallet.WalletPublicKey wallet = 6;
-        BlockChainMessage blocks = 7;
-        MessageRange range = 8;
+        BlockChainMessage chain = 7;
+        MessageRequest request = 8;
     }
 }
