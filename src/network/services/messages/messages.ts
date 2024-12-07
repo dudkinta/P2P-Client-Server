@@ -205,7 +205,8 @@ export class MessagesService
       `Sending message to ${connection.remotePeer.toString()}: ${message}`
     );
     if (this.proto_root == null) {
-      throw new Error("Proto root is not loaded");
+      this.log(LogLevel.Error, `Proto root is not loaded`);
+      return;
     }
     await writeToConnection(
       connection,
@@ -216,7 +217,6 @@ export class MessagesService
       message
     ).catch((err) => {
       this.log(LogLevel.Error, `Failed to write message: ${err.message}`);
-      throw new Error(`Failed to write message: ${err.message}`);
     });
   }
 
