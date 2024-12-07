@@ -111,7 +111,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     }
   }
 
-  async start(): Promise<void> {
+  public async start(): Promise<void> {
     this.log(LogLevel.Info, "Starting store service");
     await this.components.registrar.handle(this.protocol, this.handleMessage, {
       maxInboundStreams: this.maxInboundStreams,
@@ -125,16 +125,16 @@ export class StoreService implements Startable, StoreServiceInterface {
     this.log(LogLevel.Info, "Started store service");
   }
 
-  async stop(): Promise<void> {
+  public async stop(): Promise<void> {
     await this.components.registrar.unhandle(this.protocol);
     this.started = false;
   }
 
-  isStarted(): boolean {
+  public isStarted(): boolean {
     return this.started;
   }
 
-  async handleMessage(data: IncomingStreamData): Promise<void> {
+  public async handleMessage(data: IncomingStreamData): Promise<void> {
     const { stream } = data;
     this.log(
       LogLevel.Info,
@@ -186,7 +186,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     }
   }
 
-  getStore(request: RequestStore): StoreItem[] {
+  public getStore(request: RequestStore): StoreItem[] {
     const storeItems: StoreItem[] = [];
     const dtStart = request?.dt ?? 0;
     if (request?.key) {
@@ -277,7 +277,7 @@ export class StoreService implements Startable, StoreServiceInterface {
     return hash.digest("hex");
   }
 
-  putStore(storeItem: StoreItem): void {
+  public putStore(storeItem: StoreItem): void {
     const hash = this.getHash(storeItem.peerId, storeItem.key);
     storeItem.recieved = Date.now();
     if (this.Store.has(hash)) {

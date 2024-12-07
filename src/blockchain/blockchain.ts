@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
 import { SmartContract } from "./db-context/models/smart-contract.js";
@@ -7,9 +8,15 @@ import { EventEmitter } from "events";
 import {
   MessageChain,
   MessageType,
+  BlockChainMessage,
+  MessageRequest,
 } from "./../network/services/messages/index.js";
 import { Wallet } from "./../wallet/wallet.js";
 import { Validator, REQUIRE_VALIDATOR_COUNT } from "../validator/validator.js";
+import { LogLevel } from "../network/helpers/log-level.js";
+import { sendDebug } from "./../network/services/socket-service.js";
+import pkg from "debug";
+const { debug } = pkg;
 
 export class BlockChain extends EventEmitter {
   private static instance: BlockChain;
@@ -19,6 +26,16 @@ export class BlockChain extends EventEmitter {
   private pendingTransactions: Transaction[] = [];
   private pendingSmartContracts: SmartContract[] = [];
   private pendingContractTransactions: ContractTransaction[] = [];
+  private requestsChain: MessageChain[] = [];
+  private headIndex: number = 0;
+  private log = (level: LogLevel, message: string) => {
+    const timestamp = new Date();
+    sendDebug("blockchain", level, timestamp, message);
+    debug("blockchain")(
+      `[${timestamp.toISOString().slice(11, 23)}] ${message}`
+    );
+  };
+
   private constructor() {
     super();
     this.db = new dbContext();
@@ -34,13 +51,47 @@ export class BlockChain extends EventEmitter {
   public async initAsync(validator: Validator): Promise<void> {
     this.validator = validator;
     this.chain = await this.db.blockStorage.getAll();
+    this.chain.sort((a, b) => a.index - b.index);
+    let lastBlock: Block;
+    let errorIndex: number | undefined = undefined;
+    this.chain.forEach((block) => {
+      if (!lastBlock) {
+        lastBlock = block;
+        return;
+      }
+      if (block.previousHash !== lastBlock.hash) {
+        if (!errorIndex) {
+          errorIndex = block.index;
+        }
+      }
+      lastBlock = block;
+    });
+    if (errorIndex) {
+      const firstErorBlock = await this.getBlock(errorIndex);
+      if (firstErorBlock) {
+        this.chain = this.chain.filter((b) => b.index < firstErorBlock.index);
+        await this.db.blockStorage.delete(errorIndex);
+      }
+    }
+    const maxIndex = Math.max(...this.chain.map((block) => block.index));
+    this.emit("store:putHeadBlock", maxIndex);
+    this.log(LogLevel.Info, "Blockchain initialized.");
   }
 
   public getChain(): Block[] {
     return this.chain;
   }
 
-  public addBlock(block: Block): void {
+  public async addBlock(block: Block): Promise<void> {
+    const existBlock = await this.getBlock(block.index);
+    if (existBlock) {
+      if (existBlock.hash === block.hash) {
+        return;
+      } else {
+        await this.replaceBlock(existBlock, block);
+        return;
+      }
+    }
     this.chain.push(block);
     this.pendingTransactions = this.pendingTransactions.filter(
       (transaction) =>
@@ -71,11 +122,13 @@ export class BlockChain extends EventEmitter {
         this.createBlock();
       }, 60 * 1000);
     }
-    this.db.blockStorage.save(block);
+    await this.db.blockStorage.save(block);
+    this.headIndex = block.index;
+    this.emit("store:putHeadBlock", block.index);
   }
 
-  public getLastBlock(): Block | undefined {
-    return this.chain[this.chain.length - 1];
+  public async getLastBlock(): Promise<Block | undefined> {
+    return await this.getBlock(this.chain.length - 1);
   }
 
   public async getBlock(index: number): Promise<Block | undefined> {
@@ -122,7 +175,46 @@ export class BlockChain extends EventEmitter {
     if (message.type === MessageType.BLOCK) {
       const block = message.value as Block;
       if (block.isValid()) {
-        this.addBlock(block);
+        const lastBlock = await this.getLastBlock();
+        if (!lastBlock && block.index === 0) {
+          await this.addBlock(block);
+          return;
+        }
+        if (
+          lastBlock &&
+          block.previousHash === lastBlock.hash &&
+          block.index === lastBlock.index + 1
+        ) {
+          await this.addBlock(block);
+        }
+        if (!lastBlock && block.index !== 0) {
+          //ignore block/ need to request missing blocks
+          /*const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
+            start: 0,
+            end: block.index,
+            key: crypto
+              .createHash("sha256")
+              .update(`${0}:${block.index}:${Date.now()}`)
+              .digest("hex"),
+          });
+          requestBlock.sender = message.sender;
+          this.requestsChain.push(requestBlock);
+          this.emit("message:request", requestBlock);*/
+        }
+        if (lastBlock && lastBlock.index + 1 !== block.index) {
+          //ignore block/ need to request missing blocks
+          /*const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
+            start: lastBlock.index + 1,
+            end: block.index,
+            key: crypto
+              .createHash("sha256")
+              .update(`${lastBlock.index + 1}:${block.index}:${Date.now()}`)
+              .digest("hex"),
+          });
+          requestBlock.sender = message.sender;
+          this.requestsChain.push(requestBlock);
+          this.emit("message:request", requestBlock);*/
+        }
       }
     }
     if (message.type === MessageType.TRANSACTION) {
@@ -143,10 +235,55 @@ export class BlockChain extends EventEmitter {
         this.pendingContractTransactions.push(contract_transaction);
       }
     }
+    if (message.type == MessageType.REQUEST_CHAIN) {
+      const messageValue = message.value as MessageRequest;
+      const key = messageValue.key;
+      const index = messageValue.index;
+      const block = await this.getBlock(index);
+      if (block) {
+        const messageChain = new MessageChain(MessageType.CHAIN, {
+          key: key,
+          maxIndex: this.chain.length - 1,
+          block: block,
+        });
+        messageChain.sender = message.sender;
+        this.emit("message:chain", messageChain);
+      }
+    }
+    if (message.type == MessageType.CHAIN) {
+      const messageValue = message.value as BlockChainMessage;
+      const key = messageValue.key;
+      const maxIndex = messageValue.maxIndex;
+      const request = this.requestsChain.find(
+        (r) => (r.value as MessageRequest).key === key
+      );
+      if (request) {
+        this.requestsChain = this.requestsChain.filter(
+          (r) => (r.value as MessageRequest).key !== key
+        );
+      } else {
+        return;
+      }
+      const block = messageValue.block;
+      if (block.isValid()) {
+        const index = block.index;
+        if (block.index === 0) {
+          await this.addBlock(block);
+          return;
+        }
+        const lastBlock = await this.getBlock(index - 1);
+        if (lastBlock && lastBlock.hash === block.previousHash) {
+          await this.addBlock(block);
+          if (index < maxIndex) {
+            this.setHeadIndex(index + 1);
+          }
+        }
+      }
+    }
   }
 
   private async createBlock(): Promise<void> {
-    const lastBlock = this.getLastBlock();
+    const lastBlock = await this.getLastBlock();
     if (!this.validator) {
       throw new Error("Validator is not initialized.");
     }
@@ -164,7 +301,7 @@ export class BlockChain extends EventEmitter {
         [],
         this.validator.selectValidators()
       );
-      this.addBlock(genesisBlock);
+      await this.addBlock(genesisBlock);
     } else {
       const block = new Block(
         lastBlock.index + 1,
@@ -177,8 +314,38 @@ export class BlockChain extends EventEmitter {
       this.pendingTransactions = [];
       this.pendingSmartContracts = [];
       this.pendingContractTransactions = [];
-      this.addBlock(block);
-      this.emit("message:new", new MessageChain(MessageType.BLOCK, block));
+      await this.addBlock(block);
+      this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block));
+    }
+  }
+
+  private async replaceBlock(oldBlock: Block, newBlock: Block): Promise<void> {
+    oldBlock.transactions.forEach(async (transaction) => {
+      this.pendingTransactions.push(transaction);
+    });
+    oldBlock.smartContracts.forEach(async (contract) => {
+      this.pendingSmartContracts.push(contract);
+    });
+    oldBlock.contractTransactions.forEach(async (transaction) => {
+      this.pendingContractTransactions.push(transaction);
+    });
+    this.chain = this.chain.filter((b) => b.hash !== oldBlock.hash);
+    this.db.blockStorage.delete(oldBlock.index);
+    await this.addBlock(newBlock);
+  }
+
+  public setHeadIndex(index: number): void {
+    if (index > this.headIndex) {
+      const requestIndex = this.headIndex + 1;
+      const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
+        index: requestIndex,
+        key: crypto
+          .createHash("sha256")
+          .update(`${requestIndex}:${Date.now()}`)
+          .digest("hex"),
+      });
+      this.requestsChain.push(requestBlock);
+      this.emit("message:request", requestBlock);
     }
   }
 }

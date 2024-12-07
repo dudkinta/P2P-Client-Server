@@ -8,12 +8,25 @@ import "../../../blockchain/db-context/models/smart-contract.proto";
 import "../../../blockchain/db-context/models/contract-transaction.proto";
 import "../../../wallet/wallet-publickey.proto";
 
+message MessageRequest {
+    string key = 0;
+    int32 index = 1;
+}
+
+message BlockChainMessage {
+    string key = 0;
+    int32 maxIndex = 1;
+    blockchain.block.Block block = 2;
+}
+
 enum MessageType {
     BLOCK = 0;
     TRANSACTION = 1;
     SMART_CONTRACT = 2;
     CONTRACT_TRANSACTION = 3;
     WALLET = 4;
+    CHAIN = 5;
+    REQUEST_CHAIN = 6;
 }
 
 message MessageChain {
@@ -24,5 +37,7 @@ message MessageChain {
         blockchain.contract.SmartContract smart_contract = 4;
         blockchain.contract.ContractTransaction contract_transaction = 5;
         blockchain.wallet.WalletPublicKey wallet = 6;
+        BlockChainMessage blocks = 7;
+        MessageRange range = 8;
     }
 }

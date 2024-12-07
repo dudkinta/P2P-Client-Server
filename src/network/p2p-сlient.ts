@@ -255,6 +255,22 @@ export class P2PClient extends EventEmitter {
     }, 60000 * 30);
   }
 
+  public async putStoreHeadBlock(index: number): Promise<void> {
+    if (this.node) {
+      const storeService = this.node.services.store as StoreService;
+      if (storeService) {
+        storeService.putStore({
+          peerId: this.node.peerId.toString(),
+          key: "HeadBlock",
+          value: index,
+          ttl: 60000 * 60,
+          dt: Date.now(),
+          recieved: Date.now(),
+        });
+      }
+    }
+  }
+
   public async broadcastMessage(message: MessageChain): Promise<void> {
     if (!this.node) {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
@@ -271,6 +287,31 @@ export class P2PClient extends EventEmitter {
       });
     } catch (error) {
       this.log(LogLevel.Error, `Error in broadcastMessage: ${error}`);
+    }
+  }
+  public async sendMessageToConnection(message: MessageChain): Promise<void> {
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
+      return;
+    }
+    const messageService = this.node.services.messages as MessagesService;
+    if (!messageService) {
+      this.log(LogLevel.Error, "Message service is not initialized");
+      return;
+    }
+    try {
+      if (!message.sender) {
+        this.log(
+          LogLevel.Error,
+          "Sender is not initialized for sendMessageToConnection"
+        );
+        return;
+      }
+      await messageService.sendMessage(message.sender, message).catch((err) => {
+        this.log(LogLevel.Error, `Error in sendMessage: ${err}`);
+      });
+    } catch (error) {
+      this.log(LogLevel.Error, `Error in sendMessage: ${error}`);
     }
   }
 

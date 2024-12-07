@@ -19,12 +19,24 @@ export interface MessageServiceEvents {
   "message:blockchainData": CustomEvent<MessageChain>;
   "message:addValidator": CustomEvent<MessageChain>;
   "message:removeValidator": CustomEvent<MessageChain>;
+  "message:requestchain": CustomEvent<MessageChain>;
   "message:error": CustomEvent<Error>;
 }
 
 export interface MessagesService
   extends TypedEventEmitter<MessageServiceEvents> {
   broadcastMessage(message: MessageChain): Promise<void>;
+  sendMessage(connection: Connection, message: MessageChain): Promise<void>;
+}
+
+export interface MessageRequest {
+  key: string;
+  index: number;
+}
+export interface BlockChainMessage {
+  key: string;
+  maxIndex: number;
+  block: Block;
 }
 export enum MessageType {
   BLOCK = 0,
@@ -32,6 +44,8 @@ export enum MessageType {
   SMART_CONTRACT = 2,
   CONTRACT_TRANSACTION = 3,
   WALLET = 4,
+  CHAIN = 5,
+  REQUEST_CHAIN = 6,
 }
 
 export class MessageChain {
@@ -43,7 +57,9 @@ export class MessageChain {
     | Transaction
     | SmartContract
     | ContractTransaction
-    | WalletPublicKey;
+    | WalletPublicKey
+    | BlockChainMessage
+    | MessageRequest;
   constructor(
     type: MessageType,
     value:
@@ -52,6 +68,8 @@ export class MessageChain {
       | SmartContract
       | ContractTransaction
       | WalletPublicKey
+      | BlockChainMessage
+      | MessageRequest
   ) {
     this.type = type;
     this.dt = Date.now();
@@ -85,6 +103,12 @@ export class MessageChain {
         break;
       case MessageType.WALLET:
         message.wallet = this.value;
+        break;
+      case MessageType.CHAIN:
+        message.chain = this.value;
+        break;
+      case MessageType.REQUEST_CHAIN:
+        message.range = this.value;
         break;
       default:
         throw new Error(`Unsupported type: ${this.type}`);

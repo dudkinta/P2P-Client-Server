@@ -196,7 +196,10 @@ export class MessagesService
     }
   }
 
-  private async sendMessage(connection: Connection, message: MessageChain) {
+  public async sendMessage(
+    connection: Connection,
+    message: MessageChain
+  ): Promise<void> {
     this.log(
       LogLevel.Info,
       `Sending message to ${connection.remotePeer.toString()}: ${message}`

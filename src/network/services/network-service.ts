@@ -386,8 +386,12 @@ export class NetworkService extends EventEmitter {
     }
   }
 
-  private RequestStoreData(request: RequestStore): StoreItem[] {
+  public RequestStoreData(request: RequestStore): StoreItem[] {
     return this.client.getStore(request);
+  }
+
+  public async putStoreHeadBlock(index: number): Promise<void> {
+    await this.client.putStoreHeadBlock(index);
   }
 
   public getRoot(): { root: Node; connections: Connection[] } | undefined {
@@ -396,5 +400,8 @@ export class NetworkService extends EventEmitter {
 
   public async broadcastMessage(message: MessageChain): Promise<void> {
     await this.client.broadcastMessage(message);
+  }
+  public async sendMessageToConnection(message: MessageChain) {
+    await this.client.sendMessageToConnection(message);
   }
 }

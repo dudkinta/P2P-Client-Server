@@ -9,6 +9,7 @@ import {
   MessageType,
 } from "./network/services/messages/index.js";
 import { Validator } from "./validator/validator.js";
+import { RequestStore } from "./network/services/store/index.js";
 
 export class SystemCoordinator {
   private config = ConfigLoader.getInstance().getConfig();
@@ -21,7 +22,9 @@ export class SystemCoordinator {
     this.networkService = new NetworkService(
       new P2PClient(listenAddrs, port, this.config.nodeType)
     );
-
+    setTimeout(() => {
+      this.updateBlockHead();
+    }, 20 * 1000);
     this.blockChain = BlockChain.getInstance();
     this.validator = new Validator();
     createWebServer(this.networkService);
@@ -34,8 +37,18 @@ export class SystemCoordinator {
       console.log("Wallet changed", message);
       await this.networkService.broadcastMessage(message);
     });
-    this.blockChain.on("message:new", async (message) => {
+
+    this.blockChain.on("message:newBlock", async (message) => {
       await this.networkService.broadcastMessage(message);
+    });
+    this.blockChain.on("store:putHeadBlock", async (index) => {
+      await this.networkService.putStoreHeadBlock(index);
+    });
+    this.blockChain.on("message:request", async (message) => {
+      await this.networkService.broadcastMessage(message);
+    });
+    this.blockChain.on("message:chain", async (message) => {
+      await this.networkService.sendMessageToConnection(message);
     });
     this.networkService.on("message:blockchainData", async (message) => {
       this.blockChain.addBlockchainData(message.value);
@@ -52,5 +65,18 @@ export class SystemCoordinator {
     await this.networkService.startAsync();
     await this.blockChain.initAsync(this.validator);
     console.log("Blockchain initialized");
+  }
+
+  private updateBlockHead() {
+    const indexBlocks = this.networkService.RequestStoreData({
+      key: "HeadBlock",
+      peerId: undefined,
+      dt: undefined,
+    });
+    if (indexBlocks.length > 0) {
+      const maxIndex = Math.max(...indexBlocks.map((x) => x.value));
+      this.blockChain.setHeadIndex(maxIndex);
+    }
+    setTimeout(() => this.updateBlockHead(), 20 * 1000);
   }
 }
