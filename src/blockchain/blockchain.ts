@@ -91,7 +91,7 @@ export class BlockChain extends EventEmitter {
     return this.chain;
   }
 
-  public async addBlock(block: Block): Promise<void> {
+  public async addBlock(block: Block, isFillChain: boolean): Promise<void> {
     const existBlock = await this.getBlock(block.index);
     if (existBlock) {
       if (existBlock.hash === block.hash) {
@@ -110,7 +110,7 @@ export class BlockChain extends EventEmitter {
           );
         }
         if (existRewartIndexReceiver > currentRewartIndexReceiver) {
-          await this.replaceBlock(existBlock, block);
+          await this.replaceBlock(existBlock, block, isFillChain);
         }
         return;
       }
@@ -137,6 +137,7 @@ export class BlockChain extends EventEmitter {
         )
     );
     if (
+      !isFillChain &&
       Wallet.current &&
       Wallet.current.publicKey &&
       block.selectedDelegates.includes(Wallet.current.publicKey)
@@ -196,7 +197,7 @@ export class BlockChain extends EventEmitter {
       if (block.isValid()) {
         const lastBlock = await this.getLastBlock();
         if (!lastBlock && block.index === 0) {
-          await this.addBlock(block);
+          await this.addBlock(block, false);
           return;
         }
         if (
@@ -204,7 +205,7 @@ export class BlockChain extends EventEmitter {
           block.previousHash === lastBlock.hash &&
           block.index === lastBlock.index + 1
         ) {
-          await this.addBlock(block);
+          await this.addBlock(block, false);
         }
         if (!lastBlock && block.index !== 0) {
           //ignore block/ need to request missing blocks
@@ -275,12 +276,12 @@ export class BlockChain extends EventEmitter {
       if (block.isValid()) {
         const index = block.index;
         if (block.index === 0) {
-          await this.addBlock(block);
+          await this.addBlock(block, true);
           return;
         }
         const lastBlock = await this.getBlock(index - 1);
         if (lastBlock && lastBlock.hash === block.previousHash) {
-          await this.addBlock(block);
+          await this.addBlock(block, true);
           if (index < maxIndex) {
             this.setHeadIndex(index + 1);
           }
@@ -332,7 +333,7 @@ export class BlockChain extends EventEmitter {
         neighbors,
         selectedDelegates
       );
-      await this.addBlock(genesisBlock);
+      await this.addBlock(genesisBlock, false);
     } else {
       const block = new Block(
         lastBlock.index + 1,
@@ -348,12 +349,16 @@ export class BlockChain extends EventEmitter {
       this.pendingTransactions = [];
       this.pendingSmartContracts = [];
       this.pendingContractTransactions = [];
-      await this.addBlock(block);
+      await this.addBlock(block, false);
       this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block));
     }
   }
 
-  private async replaceBlock(oldBlock: Block, newBlock: Block): Promise<void> {
+  private async replaceBlock(
+    oldBlock: Block,
+    newBlock: Block,
+    isFillChain: boolean
+  ): Promise<void> {
     oldBlock.transactions.forEach(async (transaction) => {
       this.pendingTransactions.push(transaction);
     });
@@ -365,7 +370,7 @@ export class BlockChain extends EventEmitter {
     });
     this.chain = this.chain.filter((b) => b.hash !== oldBlock.hash);
     this.db.blockStorage.delete(oldBlock.index);
-    await this.addBlock(newBlock);
+    await this.addBlock(newBlock, isFillChain);
   }
 
   public setHeadIndex(index: number): void {
