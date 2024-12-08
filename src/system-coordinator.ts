@@ -8,14 +8,14 @@ import {
   MessageChain,
   MessageType,
 } from "./network/services/messages/index.js";
-import { Validator } from "./validator/validator.js";
+import { Delegator } from "./delegator/delegator.js";
 import { RequestStore } from "./network/services/store/index.js";
 
 export class SystemCoordinator {
   private config = ConfigLoader.getInstance().getConfig();
   private networkService: NetworkService;
   private blockChain: BlockChain;
-  private validator: Validator;
+  private delegator: Delegator;
   constructor() {
     let port = this.config.port ?? 6006;
     const listenAddrs = this.config.listen ?? ["/ip4/0.0.0.0/tcp/"];
@@ -26,7 +26,7 @@ export class SystemCoordinator {
       this.updateBlockHead();
     }, 20 * 1000);
     this.blockChain = BlockChain.getInstance();
-    this.validator = new Validator();
+    this.delegator = new Delegator();
     createWebServer(this.networkService);
 
     Wallet.onEvent("wallet:change", async (wallet: Wallet) => {
@@ -53,16 +53,16 @@ export class SystemCoordinator {
       this.blockChain.addBlockchainData(message.value);
     });
     this.networkService.on("message:addValidator", async (message) => {
-      this.validator.addValidator(message);
+      this.delegator.addDelegate(message);
     });
     this.networkService.on("message:removeValidator", async (message) => {
-      this.validator.removeValidator(message);
+      this.delegator.removeDelegate(message);
     });
   }
 
   public async startAsync(): Promise<void> {
     await this.networkService.startAsync();
-    await this.blockChain.initAsync(this.validator);
+    await this.blockChain.initAsync(this.delegator);
     console.log("Blockchain initialized");
   }
 

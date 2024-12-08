@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { Transaction } from "./transaction.js";
 import { SmartContract } from "./smart-contract.js";
 import { ContractTransaction } from "./contract-transaction.js";
-import { Validator } from "../../../validator/validator.js";
+import { selectDelegates } from "./../../../delegator/delegator.js";
 
 export class Block {
   public hash: string;
@@ -10,27 +10,33 @@ export class Block {
   public previousHash: string;
   public index: number;
   public timestamp: number;
+  public reward: Transaction;
   public transactions: Transaction[];
   public smartContracts: SmartContract[];
   public contractTransactions: ContractTransaction[];
-  public validators: string[] = [];
+  public neighbors: string[] = [];
+  public selectedDelegates: string[] = [];
 
   constructor(
     index: number,
     previousHash: string,
     timestamp: number,
+    reward: Transaction,
     transactions: Transaction[] = [],
     smartContracts: SmartContract[] = [],
     contractTransactions: ContractTransaction[] = [],
-    validators: string[] = []
+    neighbors: string[] = [],
+    selectedDelegates: string[] = []
   ) {
     this.index = index;
     this.previousHash = previousHash;
     this.timestamp = timestamp;
+    this.reward = reward;
     this.transactions = transactions;
     this.smartContracts = smartContracts;
     this.contractTransactions = contractTransactions;
-    this.validators = validators;
+    this.neighbors = neighbors;
+    this.selectedDelegates = selectedDelegates;
     this.merkleRoot = this.calculateMerkleRoot();
     this.hash = this.calculateHash();
   }
@@ -45,13 +51,24 @@ export class Block {
           this.timestamp +
           JSON.stringify(this.transactions) +
           JSON.stringify(this.smartContracts) +
-          JSON.stringify(this.contractTransactions)
+          JSON.stringify(this.contractTransactions) +
+          JSON.stringify(this.neighbors) +
+          JSON.stringify(this.selectedDelegates)
       )
       .digest("hex");
   }
 
   isValid(): boolean {
-    return this.hash === this.calculateHash();
+    const checkDelegates = selectDelegates(
+      this.previousHash,
+      this.timestamp,
+      this.neighbors
+    );
+    return (
+      JSON.stringify(checkDelegates) ===
+        JSON.stringify(this.selectedDelegates) &&
+      this.hash === this.calculateHash()
+    );
   }
 
   addTransaction(tx: Transaction): void {
@@ -76,7 +93,7 @@ export class Block {
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
-      Validators: ${JSON.stringify(this.validators, null, 2)}
+      Delegates: ${JSON.stringify(this.selectedDelegates, null, 2)}
     `;
   }
 

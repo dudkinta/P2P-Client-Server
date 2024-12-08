@@ -12,15 +12,25 @@ import {
   MessageRequest,
 } from "./../network/services/messages/index.js";
 import { Wallet } from "./../wallet/wallet.js";
-import { Validator, REQUIRE_VALIDATOR_COUNT } from "../validator/validator.js";
+import {
+  Delegator,
+  selectDelegates,
+  REQUIRE_DELEGATE_COUNT,
+} from "../delegator/delegator.js";
 import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
+import { AllowedTypes } from "./db-context/models/common.js";
 const { debug } = pkg;
+
+const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
+const TOTAL_YEARS: number = 50; // Общее количество лет (50 лет)
+const BLOCK_INTERVAL: number = 60; // Интервал между блоками в секундах (5 секунд)
+const HALVINGS: number = 16; // Количество халвингов (16)
 
 export class BlockChain extends EventEmitter {
   private static instance: BlockChain;
-  private validator?: Validator;
+  private delegator?: Delegator;
   private db: dbContext;
   private chain: Block[] = [];
   private pendingTransactions: Transaction[] = [];
@@ -47,8 +57,8 @@ export class BlockChain extends EventEmitter {
     return BlockChain.instance;
   }
 
-  public async initAsync(validator: Validator): Promise<void> {
-    this.validator = validator;
+  public async initAsync(delegator: Delegator): Promise<void> {
+    this.delegator = delegator;
     this.chain = await this.db.blockStorage.getAll();
     this.chain.sort((a, b) => a.index - b.index);
     let lastBlock: Block;
@@ -87,7 +97,21 @@ export class BlockChain extends EventEmitter {
       if (existBlock.hash === block.hash) {
         return;
       } else {
-        await this.replaceBlock(existBlock, block);
+        let existRewartIndexReceiver: number = 999;
+        if (existBlock.reward.receiver) {
+          existRewartIndexReceiver = existBlock.selectedDelegates.indexOf(
+            existBlock.reward.receiver
+          );
+        }
+        let currentRewartIndexReceiver: number = 999;
+        if (block.reward.receiver) {
+          currentRewartIndexReceiver = block.selectedDelegates.indexOf(
+            block.reward.receiver
+          );
+        }
+        if (existRewartIndexReceiver > currentRewartIndexReceiver) {
+          await this.replaceBlock(existBlock, block);
+        }
         return;
       }
     }
@@ -115,11 +139,11 @@ export class BlockChain extends EventEmitter {
     if (
       Wallet.current &&
       Wallet.current.publicKey &&
-      block.validators.includes(Wallet.current.publicKey)
+      block.selectedDelegates.includes(Wallet.current.publicKey)
     ) {
       setTimeout(async () => {
         this.createBlock();
-      }, 60 * 1000);
+      }, BLOCK_INTERVAL * 1000);
     }
     await this.db.blockStorage.save(block);
     this.headIndex = block.index;
@@ -141,25 +165,21 @@ export class BlockChain extends EventEmitter {
   }
 
   public calculateBlockReward(
-    totalCoins: number, // Общее количество монет (1 миллиард)
-    totalYears: number, // Общее количество лет (50 лет)
-    blockInterval: number, // Интервал между блоками в секундах (5 секунд)
-    halvings: number, // Количество халвингов (16)
     blockNumber: number // Номер блока, для которого рассчитывается вознаграждение
   ): number {
     // Количество блоков в год
-    const blocksPerYear = Math.floor((365 * 24 * 60 * 60) / blockInterval);
+    const blocksPerYear = Math.floor((365 * 24 * 60 * 60) / BLOCK_INTERVAL);
 
     // Общее количество блоков за весь период
-    const totalBlocks = blocksPerYear * totalYears;
+    const totalBlocks = blocksPerYear * TOTAL_YEARS;
 
     // Количество блоков на один этап (до следующего халвинга)
-    const blocksPerStage = totalBlocks / halvings;
+    const blocksPerStage = totalBlocks / HALVINGS;
 
     // Начальное вознаграждение
     const initialReward =
-      totalCoins /
-      ((blocksPerStage * (1 - Math.pow(0.5, halvings))) / (1 - 0.5));
+      TOTAL_COINS /
+      ((blocksPerStage * (1 - Math.pow(0.5, HALVINGS))) / (1 - 0.5));
 
     // Определяем текущий этап (номер халвинга)
     const currentStage = Math.floor(blockNumber / blocksPerStage);
@@ -271,32 +291,59 @@ export class BlockChain extends EventEmitter {
 
   private async createBlock(): Promise<void> {
     const lastBlock = await this.getLastBlock();
-    if (!this.validator) {
-      throw new Error("Validator is not initialized.");
+    if (!this.delegator) {
+      throw new Error("Delegator is not initialized.");
     }
-    const validators = this.validator.selectValidators();
-    if (validators.length != REQUIRE_VALIDATOR_COUNT) {
+    const dtNow = Date.now();
+    const neighbors = this.delegator.walletDelegates.map(
+      (delegate) => delegate.publicKey
+    );
+    const selectedDelegates = selectDelegates(
+      lastBlock?.hash ?? "0",
+      dtNow,
+      neighbors
+    );
+    if (selectedDelegates.length != REQUIRE_DELEGATE_COUNT) {
       throw new Error("Validators are not selected.");
     }
+    if (!Wallet.current) {
+      throw new Error("Current wallet is null");
+    }
+    if (!Wallet.current.publicKey) {
+      throw new Error("Public key is null");
+    }
+    const rewardTransaction = new Transaction(
+      Wallet.current.publicKey,
+      Wallet.current.publicKey,
+      this.calculateBlockReward(lastBlock?.index ?? 0),
+      AllowedTypes.REWART,
+      dtNow
+    );
+    Wallet.current.signTransaction(rewardTransaction);
     if (!lastBlock) {
       const genesisBlock = new Block(
         0,
         "0",
-        Date.now(),
-        [],
-        [],
-        [],
-        this.validator.selectValidators()
+        dtNow,
+        rewardTransaction,
+        this.pendingTransactions,
+        this.pendingSmartContracts,
+        this.pendingContractTransactions,
+        neighbors,
+        selectedDelegates
       );
       await this.addBlock(genesisBlock);
     } else {
       const block = new Block(
         lastBlock.index + 1,
         lastBlock.hash,
-        Date.now(),
+        dtNow,
+        rewardTransaction,
         this.pendingTransactions,
         this.pendingSmartContracts,
-        this.pendingContractTransactions
+        this.pendingContractTransactions,
+        neighbors,
+        selectedDelegates
       );
       this.pendingTransactions = [];
       this.pendingSmartContracts = [];
