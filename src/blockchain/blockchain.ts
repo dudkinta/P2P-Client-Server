@@ -26,7 +26,6 @@ export class BlockChain extends EventEmitter {
   private pendingTransactions: Transaction[] = [];
   private pendingSmartContracts: SmartContract[] = [];
   private pendingContractTransactions: ContractTransaction[] = [];
-  private requestsChain: MessageChain[] = [];
   private headIndex: number = 0;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -189,31 +188,9 @@ export class BlockChain extends EventEmitter {
         }
         if (!lastBlock && block.index !== 0) {
           //ignore block/ need to request missing blocks
-          /*const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
-            start: 0,
-            end: block.index,
-            key: crypto
-              .createHash("sha256")
-              .update(`${0}:${block.index}:${Date.now()}`)
-              .digest("hex"),
-          });
-          requestBlock.sender = message.sender;
-          this.requestsChain.push(requestBlock);
-          this.emit("message:request", requestBlock);*/
         }
         if (lastBlock && lastBlock.index + 1 !== block.index) {
           //ignore block/ need to request missing blocks
-          /*const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
-            start: lastBlock.index + 1,
-            end: block.index,
-            key: crypto
-              .createHash("sha256")
-              .update(`${lastBlock.index + 1}:${block.index}:${Date.now()}`)
-              .digest("hex"),
-          });
-          requestBlock.sender = message.sender;
-          this.requestsChain.push(requestBlock);
-          this.emit("message:request", requestBlock);*/
         }
       }
     }
@@ -254,17 +231,27 @@ export class BlockChain extends EventEmitter {
       const messageValue = message.value as BlockChainMessage;
       const key = messageValue.key;
       const maxIndex = messageValue.maxIndex;
-      const request = this.requestsChain.find(
-        (r) => (r.value as MessageRequest).key === key
-      );
-      if (request) {
-        this.requestsChain = this.requestsChain.filter(
-          (r) => (r.value as MessageRequest).key !== key
-        );
-      } else {
+      const block = messageValue.block;
+      if (!Wallet.current) {
+        this.log(LogLevel.Error, "Current wallet is null");
         return;
       }
-      const block = messageValue.block;
+      if (!Wallet.current.publicKey) {
+        this.log(LogLevel.Error, "Publick key is null");
+        return;
+      }
+      const verify = crypto.createVerify("SHA256");
+      verify.update(`${block.index}`).end();
+      const isSignatureValid = verify.verify(
+        Wallet.current.publicKey,
+        key,
+        "hex"
+      );
+      if (!isSignatureValid) {
+        this.log(LogLevel.Error, "Invalid signature for chain message.");
+        return;
+      }
+
       if (block.isValid()) {
         const index = block.index;
         if (block.index === 0) {
@@ -335,17 +322,15 @@ export class BlockChain extends EventEmitter {
   }
 
   public setHeadIndex(index: number): void {
-    if (index > this.headIndex) {
-      const requestIndex = this.headIndex + 1;
-      const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
-        index: requestIndex,
-        key: crypto
-          .createHash("sha256")
-          .update(`${requestIndex}:${Date.now()}`)
-          .digest("hex"),
-      });
-      this.requestsChain.push(requestBlock);
-      this.emit("message:request", requestBlock);
+    if (Wallet.current) {
+      if (index > this.headIndex) {
+        const requestIndex = this.headIndex + 1;
+        const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
+          index: requestIndex,
+          key: Wallet.current.signMessage(`${requestIndex}`),
+        });
+        this.emit("message:request", requestBlock);
+      }
     }
   }
 }

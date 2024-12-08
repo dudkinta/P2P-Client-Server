@@ -175,6 +175,14 @@ export class Wallet
     }
   }
 
+  public signMessage(message: string): string {
+    if (!this.privateKey) {
+      throw new Error("Wallet is not initialized. Call 'initialize()' first.");
+    }
+    const sign = crypto.createSign("SHA256");
+    sign.update(message).end();
+    return sign.sign(this.privateKey, "hex");
+  }
   public signTransaction(transaction: Transaction): void {
     if (!this.privateKey || !this.publicKey) {
       throw new Error("Wallet is not initialized. Call 'initialize()' first.");
