@@ -29,4 +29,19 @@ router.get("/block", async (req, res) => {
       .json({ error: "Failed to get from blockchain", details: error.message });
   }
 });
+router.get("/delegates", async (req, res) => {
+  try {
+    const blockchain = BlockChain.getInstance();
+    const delegator = blockchain.getDelegator();
+    if (delegator) {
+      res.json({ neighbors: delegator.getDelegates() });
+    } else {
+      res.status(404).json({ error: "Block not found" });
+    }
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ error: "Failed to get neighbors", details: error.message });
+  }
+});
 export default router;

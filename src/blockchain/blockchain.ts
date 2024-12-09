@@ -24,6 +24,7 @@ import { AllowedTypes } from "./db-context/models/common.js";
 const { debug } = pkg;
 
 const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
+const INVEST_PERCENT: number = 0.16; // Процент инвесторов (16%)
 const TOTAL_YEARS: number = 50; // Общее количество лет (50 лет)
 const BLOCK_INTERVAL: number = 60; // Интервал между блоками в секундах (5 секунд)
 const HALVINGS: number = 16; // Количество халвингов (16)
@@ -57,6 +58,9 @@ export class BlockChain extends EventEmitter {
     return BlockChain.instance;
   }
 
+  public getDelegator(): Delegator | undefined {
+    return this.delegator;
+  }
   public async startAsync(delegator: Delegator): Promise<void> {
     this.delegator = delegator;
     this.chain = await this.db.blockStorage.getAll();
@@ -181,10 +185,18 @@ export class BlockChain extends EventEmitter {
     // Количество блоков на один этап (до следующего халвинга)
     const blocksPerStage = totalBlocks / HALVINGS;
 
-    // Начальное вознаграждение
+    // Общая эмиссия после вычета 16% для нулевого блока
+    const remainingCoins = TOTAL_COINS * (1 - INVEST_PERCENT);
+
+    // Начальное вознаграждение для остальных блоков
     const initialReward =
-      TOTAL_COINS /
+      remainingCoins /
       ((blocksPerStage * (1 - Math.pow(0.5, HALVINGS))) / (1 - 0.5));
+
+    // Если это нулевой блок, то возвращаем 16% от всей эмиссии
+    if (blockNumber === 0) {
+      return TOTAL_COINS * INVEST_PERCENT;
+    }
 
     // Определяем текущий этап (номер халвинга)
     const currentStage = Math.floor(blockNumber / blocksPerStage);
@@ -310,7 +322,7 @@ export class BlockChain extends EventEmitter {
       neighbors
     );
     if (selectedDelegates.length != REQUIRE_DELEGATE_COUNT) {
-      this.log(LogLevel.Error, "Validators are not selected.");
+      this.log(LogLevel.Error, "Delegates are not selected.");
       return;
     }
     if (!Wallet.current) {

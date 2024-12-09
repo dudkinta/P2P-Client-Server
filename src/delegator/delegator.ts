@@ -40,6 +40,9 @@ export class Delegator {
       );
     }
   }
+  public getDelegates(): string[] {
+    return this.walletDelegates.map((delegate) => delegate.publicKey);
+  }
 }
 
 function calculateHMAC(hash: string, key: string): string {
