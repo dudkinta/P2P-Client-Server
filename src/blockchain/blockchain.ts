@@ -85,6 +85,10 @@ export class BlockChain extends EventEmitter {
     const maxIndex = Math.max(...this.chain.map((block) => block.index));
     this.emit("store:putHeadBlock", maxIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
+    if (this.chain.length === 0) {
+      //this.log(LogLevel.Info, "Genesis block not found.");
+      //await this.createBlock();
+    }
   }
 
   public getChain(): Block[] {
@@ -146,6 +150,10 @@ export class BlockChain extends EventEmitter {
         this.createBlock();
       }, BLOCK_INTERVAL * 1000);
     }
+    this.log(
+      LogLevel.Info,
+      `Block added: ${block.index} reward:${block.reward.amount}`
+    );
     await this.db.blockStorage.save(block);
     this.headIndex = block.index;
     this.emit("store:putHeadBlock", block.index);
@@ -293,7 +301,8 @@ export class BlockChain extends EventEmitter {
   private async createBlock(): Promise<void> {
     const lastBlock = await this.getLastBlock();
     if (!this.delegator) {
-      throw new Error("Delegator is not initialized.");
+      this.log(LogLevel.Error, "Delegator is not initialized.");
+      return;
     }
     const dtNow = Date.now();
     const neighbors = this.delegator.walletDelegates.map(
@@ -305,13 +314,16 @@ export class BlockChain extends EventEmitter {
       neighbors
     );
     if (selectedDelegates.length != REQUIRE_DELEGATE_COUNT) {
-      throw new Error("Validators are not selected.");
+      this.log(LogLevel.Error, "Validators are not selected.");
+      return;
     }
     if (!Wallet.current) {
-      throw new Error("Current wallet is null");
+      this.log(LogLevel.Error, "Current wallet is null");
+      return;
     }
     if (!Wallet.current.publicKey) {
-      throw new Error("Public key is null");
+      this.log(LogLevel.Error, "Public key is null");
+      return;
     }
     const rewardTransaction = new Transaction(
       Wallet.current.publicKey,

@@ -149,8 +149,11 @@ export class Wallet
   }
 
   public static use(wallet: Wallet): void {
-    this.current = wallet;
-    this.emitEvent("wallet:change", wallet);
+    const config = ConfigLoader.getInstance();
+    if (config.getConfig().nodeType == config.getConfig().roles.NODE) {
+      this.current = wallet;
+      this.emitEvent("wallet:change", wallet);
+    }
   }
 
   private static async isExist(path: string): Promise<boolean> {
@@ -183,6 +186,7 @@ export class Wallet
     sign.update(message).end();
     return sign.sign(this.privateKey, "hex");
   }
+
   public signTransaction(transaction: Transaction): void {
     if (!this.privateKey || !this.publicKey) {
       throw new Error("Wallet is not initialized. Call 'initialize()' first.");

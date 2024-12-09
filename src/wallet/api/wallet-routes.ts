@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { Wallet } from "./../wallet.js"; // Подключаем существующую реализацию кошельков
-import path from "path";
 
 const router = Router();
 
