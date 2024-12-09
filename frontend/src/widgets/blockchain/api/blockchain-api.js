@@ -11,6 +11,9 @@ class BlockchainApi extends ApiService {
     async getCurrentWallet(index) {
         return this.get(`/block?index=${index}`);
     }
+    async getDelegates() {
+        return this.get(`/delegates`);
+    }
 }
 
 export default BlockchainApi;

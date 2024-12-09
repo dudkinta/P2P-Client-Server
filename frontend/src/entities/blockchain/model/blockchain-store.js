@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 export const useBlockchainStore = defineStore('blockchain', {
     state: () => ({
         blocks: [],
+        delegates: [],
     }),
     actions: {
         addBlock(block) {
@@ -9,6 +10,12 @@ export const useBlockchainStore = defineStore('blockchain', {
                 return;
             }
             this.blocks.push(block);
+        },
+        addDelegate(delegate) {
+            if (this.delegates.find((d) => d.publicKey === delegate.publicKey)) {
+                return;
+            }
+            this.delegates.push(delegate);
         },
     },
 });

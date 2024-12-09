@@ -16,6 +16,7 @@ import {
   StoreItem,
 } from "./services/store/index.js";
 import { MessagesService, MessageChain } from "./services/messages/index.js";
+import { WalletPublicKey } from "../wallet/wallet.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -366,8 +367,9 @@ export class P2PClient extends EventEmitter {
         }
       );
       messageService.addEventListener("message:addValidator", (event: any) => {
-        this.log(LogLevel.Info, "add validator");
-        this.emit("message:addValidator", event.detail);
+        const detail = event.detail;
+        this.log(LogLevel.Info, `add validator ${JSON.stringify(detail)}`);
+        this.emit("message:addValidator", detail);
       });
       messageService.addEventListener(
         "message:removeValidator",

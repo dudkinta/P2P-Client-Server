@@ -51,8 +51,8 @@ export class SystemCoordinator {
     this.networkService.on("message:blockchainData", async (message) => {
       this.blockChain.addBlockchainData(message.value);
     });
-    this.networkService.on("message:addValidator", async (message) => {
-      this.delegator.addDelegate(message);
+    this.networkService.on("message:addValidator", async (event) => {
+      this.delegator.addDelegate(event);
     });
     this.networkService.on("message:removeValidator", async (message) => {
       this.delegator.removeDelegate(message);

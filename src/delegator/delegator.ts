@@ -1,6 +1,10 @@
-import { Wallet } from "../wallet/wallet.js";
+import { Wallet, WalletPublicKey } from "../wallet/wallet.js";
 import { MessageChain } from "../network/services/messages/index.js";
 import crypto from "crypto";
+import { LogLevel } from "../network/helpers/log-level.js";
+import { sendDebug } from "./../network/services/socket-service.js";
+import pkg from "debug";
+const { debug } = pkg;
 
 export const REQUIRE_DELEGATE_COUNT: number = 5;
 
@@ -9,6 +13,7 @@ class DelegateEntry {
   public publicKey: string;
   public dt: number;
   public lastValidation: number;
+
   constructor(sender: string, publicKey: string) {
     this.sender = sender;
     this.publicKey = publicKey;
@@ -19,10 +24,23 @@ class DelegateEntry {
 
 export class Delegator {
   public walletDelegates: DelegateEntry[] = [];
-
+  private log = (level: LogLevel, message: string) => {
+    const timestamp = new Date();
+    sendDebug("delegator", level, timestamp, message);
+    debug("delegator")(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
+  };
   constructor() {}
   public addDelegate(message: MessageChain): void {
-    const wallet = message.value as Wallet;
+    const wallet = message.value as WalletPublicKey;
+    this.log(
+      LogLevel.Info,
+      `Adding delegate message from: ${message.sender?.remotePeer.toString()}`
+    );
+    this.log(
+      LogLevel.Info,
+      `Adding delegate walletPK: ${JSON.stringify(wallet)}`
+    );
+
     if (wallet.publicKey && message.sender) {
       this.walletDelegates.push(
         new DelegateEntry(
@@ -34,6 +52,10 @@ export class Delegator {
   }
   public removeDelegate(message: MessageChain): void {
     if (message.sender) {
+      this.log(
+        LogLevel.Info,
+        `Removing delegate ${message.sender.remotePeer.toString()}`
+      );
       const sender = message.sender.remotePeer.toString();
       this.walletDelegates = this.walletDelegates.filter(
         (delegate) => delegate.sender !== sender

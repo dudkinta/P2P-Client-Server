@@ -137,7 +137,7 @@ export class NetworkService extends EventEmitter {
         this.log(LogLevel.Debug, `on chain message:receive`);
         this.emit("message:blockchainData", event);
       });
-      this.client.on("message:addValidator", async (event) => {
+      this.client.on("message:addValidator", async (event: MessageChain) => {
         this.log(LogLevel.Debug, `on add validator`);
         this.emit("message:addValidator", event);
       });

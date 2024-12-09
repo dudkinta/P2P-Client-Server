@@ -49,10 +49,10 @@ export enum MessageType {
 }
 
 export class MessageChain {
-  sender?: Connection;
-  type: MessageType;
-  dt: number;
-  value:
+  public sender?: Connection;
+  public type: MessageType;
+  public dt: number;
+  public value:
     | Block
     | Transaction
     | SmartContract
@@ -69,19 +69,22 @@ export class MessageChain {
       | ContractTransaction
       | WalletPublicKey
       | BlockChainMessage
-      | MessageRequest
+      | MessageRequest,
+    sender?: Connection
   ) {
     this.type = type;
     this.dt = Date.now();
     this.value = value;
+    this.sender = sender;
   }
-  toJSON(): string {
+
+  public toJSON(): string {
     return JSON.stringify({ type: this.type, value: this.value });
   }
-  getHash(): string {
+  public getHash(): string {
     return crypto.createHash("sha256").update(this.toJSON()).digest("hex");
   }
-  toProtobuf(root: protobuf.Root): any {
+  public toProtobuf(root: protobuf.Root): any {
     const ProtobufMessageChain = root.lookupType("MessageChain");
     const message: any = {
       type: this.type,
@@ -119,6 +122,58 @@ export class MessageChain {
     if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
 
     return ProtobufMessageChain.create(message);
+  }
+
+  public static fromProtobuf(
+    decodedMessage: any,
+    sender: Connection
+  ): MessageChain {
+    switch (decodedMessage.type) {
+      case MessageType.BLOCK:
+        return new MessageChain(
+          MessageType.BLOCK,
+          decodedMessage.block,
+          sender
+        );
+      case MessageType.TRANSACTION:
+        return new MessageChain(
+          MessageType.TRANSACTION,
+          decodedMessage.transaction,
+          sender
+        );
+      case MessageType.SMART_CONTRACT:
+        return new MessageChain(
+          MessageType.SMART_CONTRACT,
+          decodedMessage.smart_contract,
+          sender
+        );
+      case MessageType.CONTRACT_TRANSACTION:
+        return new MessageChain(
+          MessageType.CONTRACT_TRANSACTION,
+          decodedMessage.contract_transaction,
+          sender
+        );
+      case MessageType.WALLET:
+        return new MessageChain(
+          MessageType.WALLET,
+          decodedMessage.wallet,
+          sender
+        );
+      case MessageType.CHAIN:
+        return new MessageChain(
+          MessageType.CHAIN,
+          decodedMessage.chain,
+          sender
+        );
+      case MessageType.REQUEST_CHAIN:
+        return new MessageChain(
+          MessageType.REQUEST_CHAIN,
+          decodedMessage.request,
+          sender
+        );
+      default:
+        throw new Error(`Unsupported type: ${decodedMessage.type}`);
+    }
   }
 }
 

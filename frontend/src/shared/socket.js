@@ -7,10 +7,9 @@ export function initializeSocket() {
     const debugInfoStore = useDebugInfoStore();
     const nodeInfoStore = useNodeInfoStore();
     if (!socket) {
-        socket = io();
+        socket = io('http://localhost:3000', { transports: ['websocket'] });
 
         socket.on('connect', () => {
-
         });
 
         socket.on('logs', (data) => {

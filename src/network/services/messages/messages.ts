@@ -163,11 +163,14 @@ export class MessagesService
         throw new Error(`Failed to read message: ${err.message}`);
       });
 
-      const message = new MessageChain(decodedMessage.type, decodedMessage);
-      message.sender = connection;
+      const message = MessageChain.fromProtobuf(decodedMessage, connection);
       const hash = message.getHash();
       if (message.type == MessageType.WALLET) {
         this.messageHistory.set(hash, message);
+        this.log(
+          LogLevel.Info,
+          `Wallet message received: ${JSON.stringify(message)}`
+        );
         this.safeDispatchEvent<MessageChain>("message:addValidator", {
           detail: message,
         });
@@ -202,7 +205,7 @@ export class MessagesService
   ): Promise<void> {
     this.log(
       LogLevel.Info,
-      `Sending message to ${connection.remotePeer.toString()}: ${message}`
+      `Sending message to ${connection.remotePeer.toString()}: ${JSON.stringify(message)}`
     );
     if (this.proto_root == null) {
       this.log(LogLevel.Error, `Proto root is not loaded`);
