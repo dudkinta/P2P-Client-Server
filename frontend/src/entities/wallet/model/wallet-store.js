@@ -11,6 +11,9 @@ export const useWalletStore = defineStore('wallet', {
             }
         },
         addWallet(wallet) {
+            if (this.wallets.find((w) => w.publicKey === wallet.publicKey)) {
+                return;
+            }
             this.wallets.push(wallet);
         },
     }

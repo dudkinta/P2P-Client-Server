@@ -9,7 +9,6 @@ import {
   MessageType,
 } from "./network/services/messages/index.js";
 import { Delegator } from "./delegator/delegator.js";
-import { RequestStore } from "./network/services/store/index.js";
 
 export class SystemCoordinator {
   private config = ConfigLoader.getInstance().getConfig();
@@ -61,8 +60,12 @@ export class SystemCoordinator {
   }
 
   public async startAsync(): Promise<void> {
-    await this.networkService.startAsync();
-    await this.blockChain.initAsync(this.delegator);
+    await this.networkService.startAsync().catch((err) => {
+      console.log("Failed to start network service", err);
+    });
+    await this.blockChain.startAsync(this.delegator).catch((err) => {
+      console.log("Failed to start blockchain", err);
+    });
     console.log("Blockchain initialized");
   }
 

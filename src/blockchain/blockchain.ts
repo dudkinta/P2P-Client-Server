@@ -57,7 +57,7 @@ export class BlockChain extends EventEmitter {
     return BlockChain.instance;
   }
 
-  public async initAsync(delegator: Delegator): Promise<void> {
+  public async startAsync(delegator: Delegator): Promise<void> {
     this.delegator = delegator;
     this.chain = await this.db.blockStorage.getAll();
     this.chain.sort((a, b) => a.index - b.index);
@@ -85,10 +85,6 @@ export class BlockChain extends EventEmitter {
     const maxIndex = Math.max(...this.chain.map((block) => block.index));
     this.emit("store:putHeadBlock", maxIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
-    if (this.chain.length === 0) {
-      //this.log(LogLevel.Info, "Genesis block not found.");
-      //await this.createBlock();
-    }
   }
 
   public getChain(): Block[] {

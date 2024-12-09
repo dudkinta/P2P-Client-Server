@@ -11,12 +11,12 @@ export class TransactionStorage {
     await this.db.put(key, transaction);
   }
 
-  async get(hash: string): Promise<Transaction> {
+  async get(hash: string): Promise<Transaction | undefined> {
     try {
       const key = `transaction:${hash}`;
       return (await this.db.get(key)) as Transaction;
     } catch (err) {
-      throw err;
+      return undefined;
     }
   }
 

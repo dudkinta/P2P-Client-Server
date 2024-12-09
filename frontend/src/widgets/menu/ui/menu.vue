@@ -2,6 +2,7 @@
   <nav class="menu">
     <div class="menu-left">
       <router-link to="/wallet" class="menu-item">Кошелек</router-link>
+      <router-link to="/blockchain" class="menu-item">Блокчейн</router-link>
       <router-link to="/nodes" class="menu-item">Узлы</router-link>
     </div>
     <div class="menu-right">

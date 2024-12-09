@@ -11,12 +11,12 @@ export class BlockStorage {
     await this.db.put(key, block);
   }
 
-  async get(index: number): Promise<Block> {
+  async get(index: number): Promise<Block | undefined> {
     try {
       const key = `block:${index}`;
       return (await this.db.get(key)) as Block;
     } catch (err) {
-      throw err;
+      return undefined;
     }
   }
 

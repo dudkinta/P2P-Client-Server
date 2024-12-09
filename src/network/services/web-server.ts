@@ -5,12 +5,13 @@ import { setupSocketIO } from "./socket-service.js";
 import { NetworkService } from "./network-service.js";
 import ConfigLoader from "../../common/config-loader.js";
 import walletRoutes from "../../wallet/api/wallet-routes.js";
-
+import blockChainRoutes from "../../blockchain/api/blockchain-routes.js";
 const __dirname = path.resolve();
 
 export function createWebServer(ns: NetworkService): http.Server {
   const app = express();
   app.use("/api/wallet", walletRoutes);
+  app.use("/api/blockchain", blockChainRoutes);
 
   const config = ConfigLoader.getInstance().getConfig();
   const port = config.wsport ?? 3006;

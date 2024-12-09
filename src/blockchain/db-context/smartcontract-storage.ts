@@ -11,12 +11,12 @@ export class SmartContractStorage {
     await this.db.put(key, contract);
   }
 
-  async get(hash: string): Promise<SmartContract> {
+  async get(hash: string): Promise<SmartContract | undefined> {
     try {
       const key = `smartContract:${hash}`;
       return (await this.db.get(key)) as SmartContract;
     } catch (err) {
-      throw err;
+      return undefined;
     }
   }
 
