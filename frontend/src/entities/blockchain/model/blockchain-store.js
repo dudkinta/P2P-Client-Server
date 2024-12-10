@@ -15,5 +15,8 @@ export const useBlockchainStore = defineStore('blockchain', {
                 this.delegates.push(delegate);
             }
         },
+        replaceDelegates(delegates) {
+            this.delegates = delegates;
+        }
     },
 });

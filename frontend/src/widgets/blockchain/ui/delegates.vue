@@ -44,9 +44,7 @@ export default {
         if (!response.neighbors) {
           return;
         }
-        response.neighbors.forEach((element) => {
-          useBlockchainStore().addDelegate(element);
-        });
+        useBlockchainStore().replaceDelegates(response.neighbors);
         this.delegates = useBlockchainStore().delegates;
       } catch (error) {
         console.error(
