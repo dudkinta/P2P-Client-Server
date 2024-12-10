@@ -74,11 +74,33 @@ export class Block {
       this.timestamp,
       this.neighbors
     );
-    return (
-      JSON.stringify(checkDelegates) ===
-        JSON.stringify(this.selectedDelegates) &&
-      this.hash === this.calculateHash()
-    );
+    if (this.hash !== this.calculateHash()) {
+      return false;
+    }
+    if (!this.reward.isValid()) {
+      return false;
+    }
+    for (const tx of this.transactions) {
+      if (!tx.isValid()) {
+        return false;
+      }
+    }
+    for (const contract of this.smartContracts) {
+      if (!contract.isValid()) {
+        return false;
+      }
+    }
+    for (const contractTx of this.contractTransactions) {
+      if (!contractTx.isValid()) {
+        return false;
+      }
+    }
+    if (
+      JSON.stringify(checkDelegates) !== JSON.stringify(this.selectedDelegates)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   addTransaction(tx: Transaction): void {
