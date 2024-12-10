@@ -41,8 +41,11 @@ export default {
     async getDelegates() {
       try {
         const response = await this.blockchainApi.getDelegates();
-        response.neighbors.map((delegate) => {
-          useBlockchainStore().setDelegate(delegate);
+        if (!response.neighbors) {
+          return;
+        }
+        response.neighbors.forEach((element) => {
+          useBlockchainStore().addDelegate(element);
         });
         this.delegates = useBlockchainStore().delegates;
       } catch (error) {

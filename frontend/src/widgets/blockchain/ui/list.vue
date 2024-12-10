@@ -39,7 +39,9 @@ export default {
     async getChain() {
       try {
         const response = await this.blockchainApi.getChain();
-        console.log("Цепочка блоков:", response);
+        if (!response.chain) {
+          return;
+        }
         response.chain.map((block) => {
           useBlockchainStore().setBlock(block);
         });

@@ -69,8 +69,8 @@ export class Delegator {
       );
     }
   }
-  public getDelegates(): string[] {
-    return this.walletDelegates.map((delegate) => delegate.publicKey);
+  public getDelegates(): DelegateEntry[] {
+    return this.walletDelegates;
   }
 }
 
