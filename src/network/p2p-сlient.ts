@@ -308,6 +308,9 @@ export class P2PClient extends EventEmitter {
         );
         return;
       }
+      const resender = message.resender ?? [];
+      resender.push(this.node.peerId.toString());
+      message.resender = resender;
       await messageService.sendMessage(message.sender, message).catch((err) => {
         this.log(LogLevel.Error, `Error in sendMessage: ${err}`);
       });
@@ -374,7 +377,10 @@ export class P2PClient extends EventEmitter {
       messageService.addEventListener(
         "message:removeValidator",
         (event: any) => {
-          this.log(LogLevel.Info, "remove validator");
+          this.log(
+            LogLevel.Info,
+            `remove validator ${JSON.stringify(event.detail)}`
+          );
           this.emit("message:removeValidator", event.detail);
         }
       );

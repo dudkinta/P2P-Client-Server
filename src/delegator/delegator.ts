@@ -64,7 +64,7 @@ export class Delegator {
     if (message.sender) {
       this.log(
         LogLevel.Info,
-        `Removing delegate ${message.sender.remotePeer.toString()}`
+        `Removing delegate ${message.sender.remotePeer.toString()} ${JSON.stringify(message.value)}`
       );
       const sender = message.sender.remotePeer.toString();
       const dEntry = this.walletDelegates.find(
@@ -74,6 +74,10 @@ export class Delegator {
         (delegate) => delegate.sender !== sender
       );
       if (dEntry) {
+        this.log(
+          LogLevel.Info,
+          `Removing delegate ${dEntry.sender} ${dEntry.publicKey}`
+        );
         sendDelegate("remove", dEntry);
       }
     }

@@ -47,7 +47,6 @@ export class MessagesService
     sendDebug("libp2p:messages", level, timestamp, message);
     this.logger(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
-  private messageHistory: Map<string, MessageChain> = new Map();
   private proto_root?: protobuf.Root;
 
   constructor(
@@ -77,7 +76,9 @@ export class MessagesService
           if (Wallet.current) {
             await this.sendMessage(
               event.detail,
-              new MessageChain(MessageType.WALLET, Wallet.current)
+              new MessageChain(MessageType.WALLET, Wallet.current, undefined, [
+                this.components.peerId.toString(),
+              ])
             );
           }
         }
@@ -115,25 +116,6 @@ export class MessagesService
     );
     this.started = true;
     this.log(LogLevel.Info, "Started store service");
-    setTimeout(() => {
-      this.clearMessageHistory();
-    }, 1000);
-  }
-
-  private clearMessageHistory() {
-    for (const [key, message] of this.messageHistory) {
-      if (Date.now() - message.dt > MESSAGE_EXPIRATION_TIME) {
-        if (message.type == MessageType.WALLET) {
-          this.safeDispatchEvent<MessageChain>("message:removeValidator", {
-            detail: message,
-          });
-        }
-        this.messageHistory.delete(key);
-      }
-    }
-    setTimeout(() => {
-      this.clearMessageHistory();
-    }, 1000);
   }
 
   async stop(): Promise<void> {
@@ -162,11 +144,8 @@ export class MessagesService
       ).catch((err) => {
         throw new Error(`Failed to read message: ${err.message}`);
       });
-
       const message = MessageChain.fromProtobuf(decodedMessage, connection);
-      const hash = message.getHash();
       if (message.type == MessageType.WALLET) {
-        this.messageHistory.set(hash, message);
         this.log(
           LogLevel.Info,
           `Wallet message received: ${JSON.stringify(message)}`
@@ -176,17 +155,15 @@ export class MessagesService
         });
         return;
       }
-      if (this.messageHistory.has(hash)) {
-        this.log(LogLevel.Info, `Duplicate message ignored: ${hash}`);
-        return;
-      }
-      this.messageHistory.set(hash, message);
 
       this.safeDispatchEvent<MessageChain>("message:blockchainData", {
         detail: message,
       });
-
-      this.broadcastMessage(message);
+      if (
+        !message.resender?.some((r) => r === this.components.peerId.toString())
+      ) {
+        this.broadcastMessage(message);
+      }
     } catch (err: any) {
       this.log(
         LogLevel.Error,
@@ -235,7 +212,12 @@ export class MessagesService
       }
       try {
         if (connection !== message.sender) {
-          await this.sendMessage(connection, message);
+          const resender = message.resender ?? [];
+          resender.push(this.components.peerId.toString());
+          message.resender = resender;
+          await this.sendMessage(connection, message).catch((err) => {
+            this.log(LogLevel.Error, `Failed to sendMessage message: ${err}`);
+          });
         }
       } catch (err) {
         this.log(LogLevel.Error, `Failed to broadcast message: ${err}`);

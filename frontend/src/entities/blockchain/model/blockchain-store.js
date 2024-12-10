@@ -19,11 +19,12 @@ export const useBlockchainStore = defineStore('blockchain', {
             this.delegates = delegates;
         },
         updateDelegate(delegate) {
-
             if (delegate.command == 'add') {
+                console.log('add delegate:', delegate);
                 this.addDelegate(delegate.delegate);
             }
             if (delegate.command == 'remove') {
+                console.log('remove delegate:', delegate);
                 this.delegates = this.delegates.filter((d) => d.publicKey !== delegate.publicKey);
             }
         }
