@@ -41,13 +41,20 @@ export class Delegator {
       `Adding delegate walletPK: ${JSON.stringify(wallet)}`
     );
 
-    if (wallet.publicKey && message.sender) {
-      this.walletDelegates.push(
-        new DelegateEntry(
-          message.sender.remotePeer.toString(),
-          wallet.publicKey
+    if (wallet.publicKey && message.sender?.remotePeer) {
+      if (
+        !this.walletDelegates.some(
+          (delegate) =>
+            delegate.sender === message.sender?.remotePeer.toString()
         )
-      );
+      ) {
+        this.walletDelegates.push(
+          new DelegateEntry(
+            message.sender.remotePeer.toString(),
+            wallet.publicKey
+          )
+        );
+      }
     }
   }
   public removeDelegate(message: MessageChain): void {

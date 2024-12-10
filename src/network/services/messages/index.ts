@@ -79,11 +79,18 @@ export class MessageChain {
   }
 
   public toJSON(): string {
-    return JSON.stringify({ type: this.type, value: this.value });
+    return JSON.stringify({
+      type: this.type,
+      value: this.value,
+      dt: this.dt,
+      sender: this.sender,
+    });
   }
+
   public getHash(): string {
     return crypto.createHash("sha256").update(this.toJSON()).digest("hex");
   }
+
   public toProtobuf(root: protobuf.Root): any {
     const ProtobufMessageChain = root.lookupType("MessageChain");
     const message: any = {
