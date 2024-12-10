@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import * as tinySecp256k1 from "tiny-secp256k1";
 import { AllowedValue } from "./common.js";
 
 export class SmartContract {
@@ -24,21 +25,32 @@ export class SmartContract {
   }
   isValid(): boolean {
     if (!this.owner || !this.code || !this.initialState || !this.signature) {
-      console.error("Smartcontract is missing required fields.");
+      console.error("SmartContract is missing required fields.");
       return false;
     }
 
-    const verify = crypto.createVerify("SHA256");
-    verify.update(this.getContractData()).end();
+    const contractData = this.getContractData();
+    const hash = crypto.createHash("sha256").update(contractData).digest();
 
-    const isSignatureValid = verify.verify(this.owner, this.signature, "hex");
+    const ownerBuffer = Buffer.from(this.owner, "hex");
+    if (!tinySecp256k1.isPoint(ownerBuffer)) {
+      console.error("Invalid owner public key.");
+      return false;
+    }
+    const signatureBuffer = Buffer.from(this.signature, "hex");
+    const isSignatureValid = tinySecp256k1.verify(
+      hash,
+      ownerBuffer,
+      signatureBuffer
+    );
     if (!isSignatureValid) {
-      console.error("Invalid transaction signature.");
+      console.error("Invalid smart contract signature.");
       return false;
     }
 
     return true;
   }
+
   calculateHash() {
     return crypto
       .createHash("sha256")

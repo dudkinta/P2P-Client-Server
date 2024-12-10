@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import * as tinySecp256k1 from "tiny-secp256k1";
 import { AllowedTypes } from "./common.js";
 
 export class Transaction {
@@ -42,15 +43,26 @@ export class Transaction {
       return false;
     }
 
-    const verify = crypto.createVerify("SHA256");
-    verify.update(this.getTransactionData()).end();
+    const senderBuffer = Buffer.from(this.sender, "hex");
+    if (!tinySecp256k1.isPoint(senderBuffer)) {
+      console.error("Invalid sender public key.");
+      return false;
+    }
 
-    const isSignatureValid = verify.verify(this.sender, this.signature, "hex");
+    const signatureBuffer = Buffer.from(this.signature, "hex");
+    const hash = crypto
+      .createHash("sha256")
+      .update(this.getTransactionData())
+      .digest();
+    const isSignatureValid = tinySecp256k1.verify(
+      hash,
+      senderBuffer,
+      signatureBuffer
+    );
     if (!isSignatureValid) {
       console.error("Invalid transaction signature.");
       return false;
     }
-
     return true;
   }
 

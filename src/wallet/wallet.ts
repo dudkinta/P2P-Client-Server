@@ -10,6 +10,11 @@ import { SmartContract } from "../blockchain/db-context/models/smart-contract.js
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 import EventEmitter from "events";
 
+function toHex(buffer: Uint8Array): string {
+  return Array.from(buffer)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 export interface WalletPublicKey {
   publicKey: string | null;
 }
@@ -197,10 +202,17 @@ export class Wallet
     }
 
     const transactionData = transaction.getTransactionData();
-    const sign = crypto.createSign("SHA256");
-    sign.update(transactionData).end();
+    const hash = crypto.createHash("sha256").update(transactionData).digest();
+    const privateKeyBuffer = Buffer.from(this.privateKey, "hex");
+    if (!tinySecp256k1.isPrivate(privateKeyBuffer)) {
+      throw new Error("Invalid private key!");
+    }
+    const signature = tinySecp256k1.sign(hash, privateKeyBuffer);
 
-    transaction.signature = sign.sign(this.privateKey, "hex");
+    if (!signature) {
+      throw new Error("Failed to sign the transaction!");
+    }
+    transaction.signature = toHex(signature);
   }
 
   public signSmartContract(contract: SmartContract): void {
@@ -209,14 +221,24 @@ export class Wallet
     }
 
     if (contract.owner !== this.publicKey) {
-      throw new Error("Cannot sign transactions for other wallets!");
+      throw new Error("Cannot sign contracts for other wallets!");
     }
 
     const contractData = contract.getContractData();
-    const sign = crypto.createSign("SHA256");
-    sign.update(contractData).end();
+    const hash = crypto.createHash("sha256").update(contractData).digest();
+    const privateKeyBuffer = Buffer.from(this.privateKey, "hex");
 
-    contract.signature = sign.sign(this.privateKey, "hex");
+    if (!tinySecp256k1.isPrivate(privateKeyBuffer)) {
+      throw new Error("Invalid private key!");
+    }
+
+    const signature = tinySecp256k1.sign(hash, privateKeyBuffer);
+
+    if (!signature) {
+      throw new Error("Failed to sign the smart contract!");
+    }
+
+    contract.signature = toHex(signature);
   }
 
   public signContractTransaction(transaction: ContractTransaction): void {
@@ -229,10 +251,20 @@ export class Wallet
     }
 
     const transactionData = transaction.getContractTransactionData();
-    const sign = crypto.createSign("SHA256");
-    sign.update(transactionData).end();
+    const hash = crypto.createHash("sha256").update(transactionData).digest();
+    const privateKeyBuffer = Buffer.from(this.privateKey, "hex");
 
-    transaction.signature = sign.sign(this.privateKey, "hex");
+    if (!tinySecp256k1.isPrivate(privateKeyBuffer)) {
+      throw new Error("Invalid private key!");
+    }
+
+    const signature = tinySecp256k1.sign(hash, privateKeyBuffer);
+
+    if (!signature) {
+      throw new Error("Failed to sign the contract transaction!");
+    }
+
+    transaction.signature = toHex(signature);
   }
 
   public toWalletPublicKey(): WalletPublicKey {

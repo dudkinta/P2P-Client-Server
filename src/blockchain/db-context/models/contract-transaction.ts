@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import * as tinySecp256k1 from "tiny-secp256k1";
 import { AllowedValue } from "./common.js";
 export enum TransactionStatus {
   Pending = "pending",
@@ -54,10 +55,20 @@ export class ContractTransaction {
       return false;
     }
 
-    const verify = crypto.createVerify("SHA256");
-    verify.update(this.getContractTransactionData()).end();
+    const transactionData = this.getContractTransactionData();
+    const hash = crypto.createHash("sha256").update(transactionData).digest();
 
-    const isSignatureValid = verify.verify(this.sender, this.signature, "hex");
+    const senderBuffer = Buffer.from(this.sender, "hex");
+    if (!tinySecp256k1.isPoint(senderBuffer)) {
+      console.error("Invalid sender public key.");
+      return false;
+    }
+    const signatureBuffer = Buffer.from(this.signature, "hex");
+    const isSignatureValid = tinySecp256k1.verify(
+      hash,
+      senderBuffer,
+      signatureBuffer
+    );
     if (!isSignatureValid) {
       console.error("Invalid transaction signature.");
       return false;
