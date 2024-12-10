@@ -2,13 +2,16 @@ import { Wallet, WalletPublicKey } from "../wallet/wallet.js";
 import { MessageChain } from "../network/services/messages/index.js";
 import crypto from "crypto";
 import { LogLevel } from "../network/helpers/log-level.js";
-import { sendDebug } from "./../network/services/socket-service.js";
+import {
+  sendDebug,
+  sendDelegate,
+} from "./../network/services/socket-service.js";
 import pkg from "debug";
 const { debug } = pkg;
 
 export const REQUIRE_DELEGATE_COUNT: number = 5;
 
-class DelegateEntry {
+export class DelegateEntry {
   public sender: string;
   public publicKey: string;
   public dt: number;
@@ -48,12 +51,12 @@ export class Delegator {
             delegate.sender === message.sender?.remotePeer.toString()
         )
       ) {
-        this.walletDelegates.push(
-          new DelegateEntry(
-            message.sender.remotePeer.toString(),
-            wallet.publicKey
-          )
+        const dEntry = new DelegateEntry(
+          message.sender.remotePeer.toString(),
+          wallet.publicKey
         );
+        this.walletDelegates.push(dEntry);
+        sendDelegate("add", dEntry);
       }
     }
   }
@@ -64,9 +67,15 @@ export class Delegator {
         `Removing delegate ${message.sender.remotePeer.toString()}`
       );
       const sender = message.sender.remotePeer.toString();
+      const dEntry = this.walletDelegates.find(
+        (delegate) => delegate.sender === sender
+      );
       this.walletDelegates = this.walletDelegates.filter(
         (delegate) => delegate.sender !== sender
       );
+      if (dEntry) {
+        sendDelegate("remove", dEntry);
+      }
     }
   }
   public getDelegates(): DelegateEntry[] {

@@ -17,6 +17,15 @@ export const useBlockchainStore = defineStore('blockchain', {
         },
         replaceDelegates(delegates) {
             this.delegates = delegates;
+        },
+        updateDelegate(delegate) {
+
+            if (delegate.command == 'add') {
+                this.addDelegate(delegate.delegate);
+            }
+            if (delegate.command == 'remove') {
+                this.delegates = this.delegates.filter((d) => d.publicKey !== delegate.publicKey);
+            }
         }
     },
 });

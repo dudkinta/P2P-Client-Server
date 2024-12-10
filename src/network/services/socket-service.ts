@@ -2,7 +2,7 @@ import { Node } from "../models/node.js";
 import { Server, Socket } from "socket.io";
 import { LogLevel } from "../helpers/log-level.js";
 import { NetworkService } from "./network-service.js";
-
+import { DelegateEntry } from "./../../delegator/delegator.js";
 let io: Server;
 let networkService: NetworkService;
 export function setupSocketIO(server: any, ns: NetworkService) {
@@ -38,6 +38,18 @@ export function sendDebug(
       service: service,
       level: level,
       message: logMessage,
+    });
+  }
+}
+
+export function sendDelegate(
+  command: "add" | "remove",
+  delegate: DelegateEntry
+) {
+  if (io) {
+    io.emit("delegate", {
+      command: command,
+      delegate: delegate,
     });
   }
 }
