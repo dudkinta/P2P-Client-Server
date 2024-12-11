@@ -76,9 +76,12 @@ export class MessagesService
           if (Wallet.current) {
             await this.sendMessage(
               event.detail,
-              new MessageChain(MessageType.WALLET, Wallet.current, undefined, [
-                this.components.peerId.toString(),
-              ])
+              new MessageChain(
+                MessageType.WALLET,
+                { publicKey: Wallet.current.publicKey },
+                undefined,
+                [this.components.peerId.toString()]
+              )
             );
           }
         }

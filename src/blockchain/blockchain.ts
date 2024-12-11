@@ -86,7 +86,10 @@ export class BlockChain extends EventEmitter {
         await this.db.blockStorage.delete(errorIndex);
       }
     }
-    const maxIndex = Math.max(...this.chain.map((block) => block.index));
+    let maxIndex =
+      this.chain.length == 0
+        ? -1
+        : Math.max(...this.chain.map((block) => block.index));
     this.emit("store:putHeadBlock", maxIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
   }
@@ -306,7 +309,7 @@ export class BlockChain extends EventEmitter {
     }
   }
 
-  private async createBlock(): Promise<void> {
+  public async createBlock(): Promise<void> {
     const lastBlock = await this.getLastBlock();
     if (!this.delegator) {
       this.log(LogLevel.Error, "Delegator is not initialized.");
@@ -353,7 +356,12 @@ export class BlockChain extends EventEmitter {
         neighbors,
         selectedDelegates
       );
+      //console.log("block", genesisBlock);
       await this.addBlock(genesisBlock, false);
+      this.emit(
+        "message:newBlock",
+        new MessageChain(MessageType.BLOCK, genesisBlock)
+      );
     } else {
       const block = new Block(
         lastBlock.index + 1,
@@ -369,6 +377,7 @@ export class BlockChain extends EventEmitter {
       this.pendingTransactions = [];
       this.pendingSmartContracts = [];
       this.pendingContractTransactions = [];
+      //console.log("block", block);
       await this.addBlock(block, false);
       this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block));
     }
