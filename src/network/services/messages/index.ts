@@ -89,6 +89,7 @@ export class MessageChain {
     return JSON.stringify({
       type: this.type,
       value: this.value,
+      resenders: this.resender
     });
   }
 

@@ -170,7 +170,7 @@ export class MessagesService
         detail: message,
       });
       if (
-        !message.resender?.some((r) => r === this.components.peerId.toString())
+        !message.resender?.find((r) => r === this.components.peerId.toString())
       ) {
         this.broadcastMessage(message);
       }
