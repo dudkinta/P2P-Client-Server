@@ -164,7 +164,13 @@ export class MessagesService
         });
         return;
       }
-
+      if (message.type == MessageType.HEAD_BLOCK_INDEX){
+        const blockchain = BlockChain.getInstance();
+        if (message.value as number <= blockchain.getHeadIndex())
+        {
+          return;
+        }
+      }
       this.safeDispatchEvent<MessageChain>("message:blockchainData", {
         detail: message,
       });
