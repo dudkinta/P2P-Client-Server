@@ -47,7 +47,7 @@ export enum MessageType {
   WALLET = 4,
   CHAIN = 5,
   REQUEST_CHAIN = 6,
-  HEAD_BLOCK_INDEX=7
+  HEAD_BLOCK_INDEX= 7,
 }
 
 export class MessageChain {
@@ -129,7 +129,7 @@ export class MessageChain {
       case MessageType.HEAD_BLOCK_INDEX:
         message.headIndex = this.value;
       default:
-        throw new Error(`Unsupported type: ${this.type}`);
+        throw new Error(`Unsupported type (toProtobuf): ${this.type}`);
     }
 
     // Проверяем сообщение перед сериализацией
@@ -201,7 +201,7 @@ export class MessageChain {
           decodedMessage.resender
         );
       default:
-        throw new Error(`Unsupported type: ${decodedMessage.type}`);
+        throw new Error(`Unsupported type (fromProtobuf): ${decodedMessage.type}`);
     }
   }
 }
