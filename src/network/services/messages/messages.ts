@@ -80,7 +80,6 @@ export class MessagesService
               new MessageChain(
                 MessageType.WALLET,
                 { publicKey: Wallet.current.publicKey },
-                undefined,
                 [this.components.peerId.toString()]
               )
             );
@@ -88,7 +87,7 @@ export class MessagesService
           const blockchain = BlockChain.getInstance();
           if (blockchain){
             await this.sendMessage(event.detail,
-              new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex())
+              new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex(), [])
             )
           }
         }
@@ -102,7 +101,7 @@ export class MessagesService
           );
           const removeMessage = new MessageChain(
             MessageType.WALLET,
-            new Wallet()
+            new Wallet(), []
           );
           removeMessage.sender = event.detail;
           this.safeDispatchEvent<MessageChain>("message:removeValidator", {
@@ -169,9 +168,8 @@ export class MessagesService
       this.safeDispatchEvent<MessageChain>("message:blockchainData", {
         detail: message,
       });
-      const iResender = message.resender?.find((r) => r == this.components.peerId.toString());
       if (
-        !iResender
+        !message.resender.includes(this.components.peerId.toString())
       ) {
         this.log(LogLevel.Trace, `message resenders: ${message.resender} myPeerId: ${this.components.peerId.toString()}`);
         this.broadcastMessage(message);
@@ -214,26 +212,36 @@ export class MessagesService
 
   async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
+    
     const connections = this.components.connectionManager.getConnections();
     if (connections.length === 0) {
       this.log(LogLevel.Warning, "No connections to broadcast message to");
+      return; // Завершаем выполнение, если нет соединений
     }
+  
+    // Обновляем список ресендеров текущим пировым ID, если он отсутствует
+    if (!message.resender.includes(this.components.peerId.toString())) {
+      message.resender.push(this.components.peerId.toString());
+    }
+  
     for (const connection of connections) {
-      if (connection.limits) {
-        continue;
-      }
       try {
-        if (connection !== message.sender) {
-          const resender = message.resender ?? [];
-          resender.push(this.components.peerId.toString());
-          message.resender = resender;
-          const isResender = message.resender?.find((r) => r == connection.remotePeer.toString());
-          if (!isResender){
-           await this.sendMessage(connection, message).catch((err) => {
-             this.log(LogLevel.Error, `Failed to sendMessage message: ${err}`);
-           });
-          }
+        // Пропускаем, если соединение с лимитами
+        if (connection.limits) continue;
+  
+        // Пропускаем, если соединение принадлежит отправителю или уже есть в списке ресендеров
+        const remotePeerId = connection.remotePeer.toString();
+        if (
+          connection === message.sender || 
+          message.resender.includes(remotePeerId)
+        ) {
+          continue;
         }
+  
+        // Отправляем сообщение
+        await this.sendMessage(connection, message).catch((err) => {
+          this.log(LogLevel.Error, `Failed to sendMessage: ${err}`);
+        });
       } catch (err) {
         this.log(LogLevel.Error, `Failed to broadcast message: ${err}`);
       }

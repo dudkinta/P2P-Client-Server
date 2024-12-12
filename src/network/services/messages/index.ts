@@ -52,7 +52,7 @@ export enum MessageType {
 
 export class MessageChain {
   public sender?: Connection;
-  public resender?: string[];
+  public resender: string[];
   public type: MessageType;
   public dt: number;
   public value:
@@ -75,8 +75,8 @@ export class MessageChain {
       | BlockChainMessage
       | MessageRequest
       | number,
+    resender: string[],
     sender?: Connection,
-    resender?: string[]
   ) {
     this.type = type;
     this.dt = Date.now();
@@ -150,57 +150,57 @@ export class MessageChain {
         return new MessageChain(
           MessageType.BLOCK,
           decodedMessage.block,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.TRANSACTION:
         return new MessageChain(
           MessageType.TRANSACTION,
           decodedMessage.transaction,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.SMART_CONTRACT:
         return new MessageChain(
           MessageType.SMART_CONTRACT,
           decodedMessage.smart_contract,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.CONTRACT_TRANSACTION:
         return new MessageChain(
           MessageType.CONTRACT_TRANSACTION,
           decodedMessage.contract_transaction,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.WALLET:
         return new MessageChain(
           MessageType.WALLET,
           decodedMessage.wallet,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.CHAIN:
         return new MessageChain(
           MessageType.CHAIN,
           decodedMessage.chain,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.REQUEST_CHAIN:
         return new MessageChain(
           MessageType.REQUEST_CHAIN,
           decodedMessage.request,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       case MessageType.HEAD_BLOCK_INDEX:
         return new MessageChain(
           MessageType.HEAD_BLOCK_INDEX,
           decodedMessage.headIndex,
-          sender,
-          decodedMessage.resender
+          decodedMessage.resender,
+          sender
         );
       default:
         throw new Error(`Unsupported type (fromProtobuf): ${decodedMessage.type}`);

@@ -28,7 +28,7 @@ export class SystemCoordinator {
     Wallet.onEvent("wallet:change", async (wallet: Wallet) => {
       const message = new MessageChain(
         MessageType.WALLET,
-        wallet.toWalletPublicKey()
+        wallet.toWalletPublicKey(), []
       );
       await this.networkService.broadcastMessage(message);
     });

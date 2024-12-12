@@ -263,8 +263,7 @@ export class BlockChain extends EventEmitter {
           key: key,
           maxIndex: this.chain.length - 1,
           block: block,
-        });
-        messageChain.sender = message.sender;
+        }, [], message.sender);
         this.emit("message:chain", messageChain);
       }
     }
@@ -364,7 +363,7 @@ export class BlockChain extends EventEmitter {
       await this.addBlock(genesisBlock, false);
       this.emit(
         "message:newBlock",
-        new MessageChain(MessageType.BLOCK, genesisBlock)
+        new MessageChain(MessageType.BLOCK, genesisBlock, [])
       );
     } else {
       const block = new Block(
@@ -383,7 +382,7 @@ export class BlockChain extends EventEmitter {
       this.pendingContractTransactions = [];
       //console.log("block", block);
       await this.addBlock(block, false);
-      this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block));
+      this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block, []));
     }
   }
 
