@@ -169,9 +169,11 @@ export class MessagesService
       this.safeDispatchEvent<MessageChain>("message:blockchainData", {
         detail: message,
       });
+      const iResender = message.resender?.find((r) => r == this.components.peerId.toString());
       if (
-        !message.resender?.find((r) => r === this.components.peerId.toString())
+        !iResender
       ) {
+        this.log(LogLevel.Trace, `message resenders: ${message.resender} myPeerId: ${this.components.peerId.toString()}`);
         this.broadcastMessage(message);
       }
     } catch (err: any) {
