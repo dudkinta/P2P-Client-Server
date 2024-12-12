@@ -211,6 +211,7 @@ export class BlockChain extends EventEmitter {
   }
 
   public async addBlockchainData(message: MessageChain): Promise<void> {
+    this.log(LogLevel.Info, `Receive blockchaindata: ${message}`);
     if (message.type === MessageType.BLOCK) {
       const block = message.value as Block;
       if (block.isValid()) {
