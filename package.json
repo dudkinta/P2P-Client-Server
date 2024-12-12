@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "cd frontend && npm run build && cd .. && npx tsc && npm run copy-proto",
+    "build": "cd frontend && npm run build && cd .. && npx tsc",
     "dev": "npm run build && concurrently \"npm run start\" \"npm run vite\"",
-    "copy-proto": "npx copyfiles -u 1 ./src/**/*.proto ./dist",
+    "postbuild": "npx copyfiles -u 1 \"./src/**/*.proto\" ./dist",
     "vite": "cd frontend && npm run dev",
     "start": "node dist/index.js"
   },

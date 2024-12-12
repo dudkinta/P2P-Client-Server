@@ -86,11 +86,10 @@ export class BlockChain extends EventEmitter {
         await this.db.blockStorage.delete(errorIndex);
       }
     }
-    let maxIndex =
+    this.headIndex =
       this.chain.length == 0
         ? -1
         : Math.max(...this.chain.map((block) => block.index));
-    this.emit("store:putHeadBlock", maxIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
   }
 
@@ -158,8 +157,9 @@ export class BlockChain extends EventEmitter {
       `Block added: ${block.index} reward:${block.reward.amount}`
     );
     await this.db.blockStorage.save(block);
-    this.headIndex = block.index;
-    this.emit("store:putHeadBlock", block.index);
+    if (this.headIndex < block.index) {
+      this.headIndex = block.index;
+    };
   }
 
   public async getLastBlock(): Promise<Block | undefined> {
@@ -302,10 +302,13 @@ export class BlockChain extends EventEmitter {
         const lastBlock = await this.getBlock(index - 1);
         if (lastBlock && lastBlock.hash === block.previousHash) {
           await this.addBlock(block, true);
-          if (index < maxIndex) {
-            this.setHeadIndex(index + 1);
-          }
         }
+      }
+    }
+    if (message.type == MessageType.HEAD_BLOCK_INDEX){
+      const receiveHeadIndex = message.value as number;
+      if (receiveHeadIndex > this.headIndex){
+        this.headIndex = receiveHeadIndex;
       }
     }
   }
@@ -403,16 +406,7 @@ export class BlockChain extends EventEmitter {
     await this.addBlock(newBlock, isFillChain);
   }
 
-  public setHeadIndex(index: number): void {
-    if (Wallet.current) {
-      if (index > this.headIndex) {
-        const requestIndex = this.headIndex + 1;
-        const requestBlock = new MessageChain(MessageType.REQUEST_CHAIN, {
-          index: requestIndex,
-          key: Wallet.current.signMessage(`${requestIndex}`),
-        });
-        this.emit("message:request", requestBlock);
-      }
-    }
+  public getHeadIndex(): number {
+    return this.headIndex;
   }
 }

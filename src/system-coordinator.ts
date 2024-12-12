@@ -21,9 +21,6 @@ export class SystemCoordinator {
     this.networkService = new NetworkService(
       new P2PClient(listenAddrs, port, this.config.nodeType)
     );
-    setTimeout(() => {
-      this.updateBlockHead();
-    }, 20 * 1000);
     this.blockChain = BlockChain.getInstance();
     this.delegator = new Delegator();
     createWebServer(this.networkService);
@@ -38,9 +35,6 @@ export class SystemCoordinator {
 
     this.blockChain.on("message:newBlock", async (message) => {
       await this.networkService.broadcastMessage(message);
-    });
-    this.blockChain.on("store:putHeadBlock", async (index) => {
-      await this.networkService.putStoreHeadBlock(index);
     });
     this.blockChain.on("message:request", async (message) => {
       await this.networkService.broadcastMessage(message);
@@ -67,18 +61,5 @@ export class SystemCoordinator {
       console.log("Failed to start blockchain", err);
     });
     console.log("Blockchain initialized");
-  }
-
-  private updateBlockHead() {
-    const indexBlocks = this.networkService.RequestStoreData({
-      key: "HeadBlock",
-      peerId: undefined,
-      dt: undefined,
-    });
-    if (indexBlocks.length > 0) {
-      const maxIndex = Math.max(...indexBlocks.map((x) => x.value));
-      this.blockChain.setHeadIndex(maxIndex);
-    }
-    setTimeout(() => this.updateBlockHead(), 20 * 1000);
   }
 }

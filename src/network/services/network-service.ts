@@ -390,10 +390,6 @@ export class NetworkService extends EventEmitter {
     return this.client.getStore(request);
   }
 
-  public async putStoreHeadBlock(index: number): Promise<void> {
-    await this.client.putStoreHeadBlock(index);
-  }
-
   public getRoot(): { root: Node; connections: Connection[] } | undefined {
     return this.storage?.getRoot();
   }

@@ -47,6 +47,7 @@ export enum MessageType {
   WALLET = 4,
   CHAIN = 5,
   REQUEST_CHAIN = 6,
+  HEAD_BLOCK_INDEX=7
 }
 
 export class MessageChain {
@@ -61,7 +62,8 @@ export class MessageChain {
     | ContractTransaction
     | WalletPublicKey
     | BlockChainMessage
-    | MessageRequest;
+    | MessageRequest
+    | number;
   constructor(
     type: MessageType,
     value:
@@ -71,7 +73,8 @@ export class MessageChain {
       | ContractTransaction
       | WalletPublicKey
       | BlockChainMessage
-      | MessageRequest,
+      | MessageRequest
+      | number,
     sender?: Connection,
     resender?: string[]
   ) {
@@ -123,6 +126,8 @@ export class MessageChain {
       case MessageType.REQUEST_CHAIN:
         message.request = this.value;
         break;
+      case MessageType.HEAD_BLOCK_INDEX:
+        message.headIndex = this.value;
       default:
         throw new Error(`Unsupported type: ${this.type}`);
     }
@@ -185,6 +190,13 @@ export class MessageChain {
         return new MessageChain(
           MessageType.REQUEST_CHAIN,
           decodedMessage.request,
+          sender,
+          decodedMessage.resender
+        );
+      case MessageType.HEAD_BLOCK_INDEX:
+        return new MessageChain(
+          MessageType.HEAD_BLOCK_INDEX,
+          decodedMessage.headIndex,
           sender,
           decodedMessage.resender
         );

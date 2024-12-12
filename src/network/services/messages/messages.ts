@@ -27,6 +27,7 @@ import type {
 import type { Logger, Startable, Connection } from "@libp2p/interface";
 import path from "path";
 import { fileURLToPath } from "url";
+import { BlockChain } from "../../../blockchain/blockchain.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -83,6 +84,12 @@ export class MessagesService
                 [this.components.peerId.toString()]
               )
             );
+          }
+          const blockchain = BlockChain.getInstance();
+          if (blockchain){
+            await this.sendMessage(event.detail,
+              new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex())
+            )
           }
         }
       );

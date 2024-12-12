@@ -256,22 +256,6 @@ export class P2PClient extends EventEmitter {
     }, 60000 * 30);
   }
 
-  public async putStoreHeadBlock(index: number): Promise<void> {
-    if (this.node) {
-      const storeService = this.node.services.store as StoreService;
-      if (storeService) {
-        storeService.putStore({
-          peerId: this.node.peerId.toString(),
-          key: "HeadBlock",
-          value: index,
-          ttl: 60000 * 60,
-          dt: Date.now(),
-          recieved: Date.now(),
-        });
-      }
-    }
-  }
-
   public async broadcastMessage(message: MessageChain): Promise<void> {
     if (!this.node) {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");

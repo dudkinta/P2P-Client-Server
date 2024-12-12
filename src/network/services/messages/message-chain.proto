@@ -40,5 +40,6 @@ message MessageChain {
         blockchain.wallet.WalletPublicKey wallet = 7;
         BlockChainMessage chain = 8;
         MessageRequest request = 9;
+        int32 headIndex = 10;
     }
 }
