@@ -47,7 +47,7 @@ export enum MessageType {
   WALLET = 4,
   CHAIN = 5,
   REQUEST_CHAIN = 6,
-  HEAD_BLOCK_INDEX= 7,
+  HEAD_BLOCK_INDEX = 7,
 }
 
 export class MessageChain {
@@ -128,6 +128,7 @@ export class MessageChain {
         break;
       case MessageType.HEAD_BLOCK_INDEX:
         message.headIndex = this.value;
+        break;
       default:
         throw new Error(`Unsupported type (toProtobuf): ${this.type}`);
     }
