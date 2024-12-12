@@ -227,9 +227,12 @@ export class MessagesService
           const resender = message.resender ?? [];
           resender.push(this.components.peerId.toString());
           message.resender = resender;
-          await this.sendMessage(connection, message).catch((err) => {
-            this.log(LogLevel.Error, `Failed to sendMessage message: ${err}`);
-          });
+          const isResender = message.resender?.find((r) => r == connection.remotePeer.toString());
+          if (!isResender){
+           await this.sendMessage(connection, message).catch((err) => {
+             this.log(LogLevel.Error, `Failed to sendMessage message: ${err}`);
+           });
+          }
         }
       } catch (err) {
         this.log(LogLevel.Error, `Failed to broadcast message: ${err}`);
