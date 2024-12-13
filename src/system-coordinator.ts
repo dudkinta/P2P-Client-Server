@@ -43,13 +43,13 @@ export class SystemCoordinator {
       await this.networkService.sendMessageToConnection(message.sender, message); //возврат сообщения запрашиваемому пиру
     });
     this.networkService.on("message:blockchainData", async (message) => {
-      this.blockChain.addBlockchainData(message);
+      await this.blockChain.addBlockchainData(message);
     });
-    this.networkService.on("message:addValidator", async (event) => {
-      this.delegator.addDelegate(event);
+    this.networkService.on("message:addValidator", (event) => {
+      this.delegator.addDelegate(event.detail);
     });
-    this.networkService.on("message:removeValidator", async (message) => {
-      this.delegator.removeDelegate(message);
+    this.networkService.on("message:removeValidator", async (event) => {
+      this.delegator.removeDelegate(event);
     });
   }
 

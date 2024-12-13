@@ -346,23 +346,23 @@ export class P2PClient extends EventEmitter {
         messageService.startListeners();
 
         messageService.addEventListener("message:addValidator", (event: any) => {
-          this.emit("message:addValidator", event.detail);
+          this.emit("message:addValidator", event);
         });
         messageService.addEventListener("message:removeValidator", (event: any) => {
-          this.emit("message:removeValidator", event.detail);
+          this.emit("message:removeValidator", event);
         });
         messageService.addEventListener("message:headIndex", (event: any) => {
-          this.emit("message:headIndex", event.detail);
+          this.emit("message:headIndex", event);
         });
         messageService.addEventListener("message:requestchain", (event: any) => {
-          this.emit("message:requestchain", event.detail);
+          this.emit("message:requestchain", event);
         });
         messageService.addEventListener("message:blockchainData", (event: any) => {
-          this.emit("message:blockchainData", event.detail);
+          this.emit("message:blockchainData", event);
         });
         messageService.addEventListener("message:unknown", (event: any) => {
           this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
-          this.emit("message:unknown", event.detail);
+          this.emit("message:unknown", event);
         });
       }
 

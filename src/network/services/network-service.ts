@@ -134,23 +134,23 @@ export class NetworkService extends EventEmitter {
         }
       });
       this.client.on("message:addValidator", (event: any) => {
-        this.emit("message:addValidator", event.detail);
+        this.emit("message:addValidator", event);
       });
       this.client.on("message:removeValidator", (event: any) => {
-        this.emit("message:removeValidator", event.detail);
+        this.emit("message:removeValidator", event);
       });
       this.client.on("message:headIndex", (event: any) => {
-        this.emit("message:headIndex", event.detail);
+        this.emit("message:headIndex", event);
       });
       this.client.on("message:requestchain", (event: any) => {
-        this.emit("message:requestchain", event.detail);
+        this.emit("message:requestchain", event);
       });
       this.client.on("message:blockchainData", (event: any) => {
-        this.emit("message:blockchainData", event.detail);
+        this.emit("message:blockchainData", event);
       });
       this.client.on("message:unknown", (event: any) => {
         this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
-        this.emit("message:unknown", event.detail);
+        this.emit("message:unknown", event);
       });
       await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(
