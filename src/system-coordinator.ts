@@ -42,14 +42,14 @@ export class SystemCoordinator {
     this.blockChain.on("message:chain", async (message) => {
       await this.networkService.sendMessageToConnection(message.sender, message); //возврат сообщения запрашиваемому пиру
     });
-    this.networkService.on("message:blockchainData", async (message) => {
-      await this.blockChain.addBlockchainData(message);
+    this.networkService.on("message:blockchainData", async (event) => {
+      await this.blockChain.addBlockchainData(event.detail);
     });
     this.networkService.on("message:addValidator", (event) => {
       this.delegator.addDelegate(event.detail);
     });
     this.networkService.on("message:removeValidator", async (event) => {
-      this.delegator.removeDelegate(event);
+      this.delegator.removeDelegate(event.detail);
     });
   }
 
