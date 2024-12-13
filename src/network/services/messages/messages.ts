@@ -92,7 +92,7 @@ export class MessagesService
     }
   }
 
-  async start(): Promise<void> {
+  public async start(): Promise<void> {
     this.log(LogLevel.Info, "Starting store service");
     if (this.components.pubsub) {
       this.components.pubsub.addEventListener('message', this.messageHandler);
@@ -108,11 +108,11 @@ export class MessagesService
     this.log(LogLevel.Info, "Started messages service");
   }
 
-  async stop(): Promise<void> {
+  public async stop(): Promise<void> {
     this.started = false;
   }
 
-  isStarted(): boolean {
+  public isStarted(): boolean {
     return this.started;
   }
 
@@ -159,7 +159,7 @@ export class MessagesService
     }
   }
 
-  async broadcastMessage(message: MessageChain): Promise<void> {
+  public async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     try {
       if (this.proto_root) {

@@ -60,28 +60,27 @@ export class Delegator {
       }
     }
   }
-  public removeDelegate(message: MessageChain): void {
-    if (message.sender) {
+
+  public removeDelegate(sender: string): void {
+    this.log(
+      LogLevel.Info,
+      `Removing delegate ${sender}`
+    );
+    const dEntry = this.walletDelegates.find(
+      (delegate) => delegate.sender === sender
+    );
+    this.walletDelegates = this.walletDelegates.filter(
+      (delegate) => delegate.sender !== sender
+    );
+    if (dEntry) {
       this.log(
         LogLevel.Info,
-        `Removing delegate ${JSON.stringify(message.value)}`
+        `Removing delegate ${dEntry.sender} ${dEntry.publicKey}`
       );
-      const sender = message.sender;
-      const dEntry = this.walletDelegates.find(
-        (delegate) => delegate.sender === sender
-      );
-      this.walletDelegates = this.walletDelegates.filter(
-        (delegate) => delegate.sender !== sender
-      );
-      if (dEntry) {
-        this.log(
-          LogLevel.Info,
-          `Removing delegate ${dEntry.sender} ${dEntry.publicKey}`
-        );
-        sendDelegate("remove", dEntry);
-      }
+      sendDelegate("remove", dEntry);
     }
   }
+
   public getDelegates(): DelegateEntry[] {
     return this.walletDelegates;
   }
