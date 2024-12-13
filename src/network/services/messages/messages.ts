@@ -161,11 +161,15 @@ export class MessagesService
 
   async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
-    if (this.proto_root) {
-      const protoType = this.proto_root.lookupType('MessageChain');
-      const msg = message.toProtobuf(this.proto_root);
-      const data = protoType.encode(msg).finish();
-      await this.components.pubsub.publish(MessageType[message.type], data);
+    try {
+      if (this.proto_root) {
+        const protoType = this.proto_root.lookupType('MessageChain');
+        const msg = message.toProtobuf(this.proto_root);
+        const data = protoType.encode(msg).finish();
+        await this.components.pubsub.publish(MessageType[message.type], data);
+      }
+    } catch (err) {
+      this.log(LogLevel.Error, `Broadcast message (${JSON.stringify(message)}) error: ${JSON.stringify(err)}`);
     }
   }
 
