@@ -32,7 +32,7 @@ enum MessageType {
 
 message MessageChain {
     MessageType type = 1;
-    repeated string resender=2;
+    string sender=2;
     oneof value {
         blockchain.block.Block block = 3;
         blockchain.transaction.Transaction transaction = 4;

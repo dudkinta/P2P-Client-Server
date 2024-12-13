@@ -32,27 +32,27 @@ export class Delegator {
     sendDebug("delegator", level, timestamp, message);
     debug("delegator")(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
-  constructor() {}
+  constructor() { }
   public addDelegate(message: MessageChain): void {
     const wallet = message.value as WalletPublicKey;
     this.log(
       LogLevel.Info,
-      `Adding delegate message from: ${message.sender?.remotePeer.toString()}`
+      `Adding delegate message`
     );
     this.log(
       LogLevel.Info,
       `Adding delegate walletPK: ${JSON.stringify(wallet)}`
     );
 
-    if (wallet.publicKey && message.sender?.remotePeer) {
+    if (wallet.publicKey && message.sender) {
       if (
         !this.walletDelegates.some(
           (delegate) =>
-            delegate.sender === message.sender?.remotePeer.toString()
+            delegate.sender === message.sender
         )
       ) {
         const dEntry = new DelegateEntry(
-          message.sender.remotePeer.toString(),
+          message.sender,
           wallet.publicKey
         );
         this.walletDelegates.push(dEntry);
@@ -64,9 +64,9 @@ export class Delegator {
     if (message.sender) {
       this.log(
         LogLevel.Info,
-        `Removing delegate ${message.sender.remotePeer.toString()} ${JSON.stringify(message.value)}`
+        `Removing delegate ${JSON.stringify(message.value)}`
       );
-      const sender = message.sender.remotePeer.toString();
+      const sender = message.sender;
       const dEntry = this.walletDelegates.find(
         (delegate) => delegate.sender === sender
       );

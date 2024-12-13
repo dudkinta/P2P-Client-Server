@@ -133,17 +133,24 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
-      this.client.on("message:blockchainData", async (event) => {
-        this.log(LogLevel.Debug, `on chain message:receive`);
-        this.emit("message:blockchainData", event);
+      this.client.on("message:addValidator", (event: any) => {
+        this.emit("message:addValidator", event.detail);
       });
-      this.client.on("message:addValidator", async (event: MessageChain) => {
-        this.log(LogLevel.Debug, `on add validator`);
-        this.emit("message:addValidator", event);
+      this.client.on("message:removeValidator", (event: any) => {
+        this.emit("message:removeValidator", event.detail);
       });
-      this.client.on("message:removeValidator", async (event) => {
-        this.log(LogLevel.Debug, `on remove validator`);
-        this.emit("message:removeValidator", event);
+      this.client.on("message:headIndex", (event: any) => {
+        this.emit("message:headIndex", event.detail);
+      });
+      this.client.on("message:requestchain", (event: any) => {
+        this.emit("message:requestchain", event.detail);
+      });
+      this.client.on("message:blockchainData", (event: any) => {
+        this.emit("message:blockchainData", event.detail);
+      });
+      this.client.on("message:unknown", (event: any) => {
+        this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
+        this.emit("message:unknown", event.detail);
       });
       await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(
@@ -397,7 +404,7 @@ export class NetworkService extends EventEmitter {
   public async broadcastMessage(message: MessageChain): Promise<void> {
     await this.client.broadcastMessage(message);
   }
-  public async sendMessageToConnection(message: MessageChain) {
-    await this.client.sendMessageToConnection(message);
+  public async sendMessageToConnection(peerId: string, message: MessageChain) {
+    await this.client.sendMessageToConnection(peerId, message);
   }
 }

@@ -2,6 +2,7 @@ import { createLibp2p, Libp2p } from "libp2p";
 import { loadOrCreatePeerId } from "./peer-helper.js";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
+import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import { tcp } from "@libp2p/tcp";
 import {
   circuitRelayTransport,
@@ -58,6 +59,10 @@ export async function getRelayClient(
             defaultDurationLimit: 600000,
             defaultDataLimit: BigInt(1 << 24),
           },
+        }),
+        pubsub: gossipsub({
+          emitSelf:false,
+          gossipFactor: 0.3,
         }),
         identify: identify(),
         identifyPush: identifyPush(),
@@ -126,6 +131,10 @@ export async function getNodeClient(
             defaultDurationLimit: 600000,
             defaultDataLimit: BigInt(1 << 24),
           },
+        }),
+        pubsub: gossipsub({
+          emitSelf:false,
+          gossipFactor: 0.3,
         }),
         identify: identify(),
         identifyPush: identifyPush(),

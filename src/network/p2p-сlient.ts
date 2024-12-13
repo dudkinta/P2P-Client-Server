@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
-import { TimeoutError, Connection, PeerId } from "@libp2p/interface";
+import { TimeoutError, Connection, PeerId, Message } from "@libp2p/interface";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
@@ -16,7 +16,6 @@ import {
   StoreItem,
 } from "./services/store/index.js";
 import { MessagesService, MessageChain } from "./services/messages/index.js";
-import { WalletPublicKey } from "../wallet/wallet.js";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -267,6 +266,7 @@ export class P2PClient extends EventEmitter {
       return;
     }
     try {
+      message.sender = this.node.peerId.toString();
       await messageService.broadcastMessage(message).catch((err) => {
         this.log(LogLevel.Error, `Error in broadcastMessage: ${err}`);
       });
@@ -274,7 +274,8 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Error, `Error in broadcastMessage: ${error}`);
     }
   }
-  public async sendMessageToConnection(message: MessageChain): Promise<void> {
+
+  public async sendMessageToConnection(peerId: string, message: MessageChain): Promise<void> {
     if (!this.node) {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
       return;
@@ -285,17 +286,8 @@ export class P2PClient extends EventEmitter {
       return;
     }
     try {
-      if (!message.sender) {
-        this.log(
-          LogLevel.Error,
-          "Sender is not initialized for sendMessageToConnection"
-        );
-        return;
-      }
-      const resender = message.resender ?? [];
-      resender.push(this.node.peerId.toString());
-      message.resender = resender;
-      await messageService.sendMessage(message.sender, message).catch((err) => {
+      message.sender = this.node.peerId.toString();
+      await messageService.sendMessage(peerId, message).catch((err) => {
         this.log(LogLevel.Error, `Error in sendMessage: ${err}`);
       });
     } catch (error) {
@@ -345,30 +337,34 @@ export class P2PClient extends EventEmitter {
       this.node.addEventListener("start", (event: any) => {
         this.log(LogLevel.Info, "Libp2p node started");
       });
-      const messageService = this.node.services.messages as MessagesService;
-      messageService.addEventListener(
-        "message:blockchainData",
-        (event: any) => {
-          this.log(LogLevel.Info, "message receive");
-          this.emit("message:blockchainData", event.detail);
-        }
-      );
-      messageService.addEventListener("message:addValidator", (event: any) => {
-        const detail = event.detail;
-        this.log(LogLevel.Info, `add validator ${JSON.stringify(detail)}`);
-        this.emit("message:addValidator", detail);
-      });
-      messageService.addEventListener(
-        "message:removeValidator",
-        (event: any) => {
-          this.log(
-            LogLevel.Info,
-            `remove validator ${JSON.stringify(event.detail)}`
-          );
-          this.emit("message:removeValidator", event.detail);
-        }
-      );
+
+
       await this.node.start();
+
+      const messageService = this.node.services.messages as MessagesService;
+      if (messageService) {
+        messageService.startListeners();
+
+        messageService.addEventListener("message:addValidator", (event: any) => {
+          this.emit("message:addValidator", event.detail);
+        });
+        messageService.addEventListener("message:removeValidator", (event: any) => {
+          this.emit("message:removeValidator", event.detail);
+        });
+        messageService.addEventListener("message:headIndex", (event: any) => {
+          this.emit("message:headIndex", event.detail);
+        });
+        messageService.addEventListener("message:requestchain", (event: any) => {
+          this.emit("message:requestchain", event.detail);
+        });
+        messageService.addEventListener("message:blockchainData", (event: any) => {
+          this.emit("message:blockchainData", event.detail);
+        });
+        messageService.addEventListener("message:unknown", (event: any) => {
+          this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
+          this.emit("message:unknown", event.detail);
+        });
+      }
 
       this.log(LogLevel.Info, `Libp2p listening on:`);
       this.localPeerId = this.node.peerId;

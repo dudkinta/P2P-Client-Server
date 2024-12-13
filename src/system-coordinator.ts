@@ -28,7 +28,7 @@ export class SystemCoordinator {
     Wallet.onEvent("wallet:change", async (wallet: Wallet) => {
       const message = new MessageChain(
         MessageType.WALLET,
-        wallet.toWalletPublicKey(), []
+        wallet.toWalletPublicKey(), ''
       );
       await this.networkService.broadcastMessage(message);
     });
@@ -40,10 +40,10 @@ export class SystemCoordinator {
       await this.networkService.broadcastMessage(message);
     });
     this.blockChain.on("message:chain", async (message) => {
-      await this.networkService.sendMessageToConnection(message);
+      await this.networkService.sendMessageToConnection(message.sender, message); //возврат сообщения запрашиваемому пиру
     });
     this.networkService.on("message:blockchainData", async (message) => {
-      this.blockChain.addBlockchainData(message.value);
+      this.blockChain.addBlockchainData(message);
     });
     this.networkService.on("message:addValidator", async (event) => {
       this.delegator.addDelegate(event);

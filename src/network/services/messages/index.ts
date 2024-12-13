@@ -6,8 +6,8 @@ import type {
   PeerStore,
   TypedEventTarget,
   Libp2pEvents,
-  Connection,
   PeerId,
+  PubSub
 } from "@libp2p/interface";
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 import { Block } from "../../../blockchain/db-context/models/block.js";
@@ -15,19 +15,25 @@ import { Transaction } from "../../../blockchain/db-context/models/transaction.j
 import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
 import { WalletPublicKey } from "../../../wallet/wallet.js";
+import { GossipsubEvents } from "@chainsafe/libp2p-gossipsub";
 
 export interface MessageServiceEvents {
-  "message:blockchainData": CustomEvent<MessageChain>;
   "message:addValidator": CustomEvent<MessageChain>;
-  "message:removeValidator": CustomEvent<MessageChain>;
+  "message:removeValidator": CustomEvent<string>;
+  "message:headIndex": CustomEvent<number>;
   "message:requestchain": CustomEvent<MessageChain>;
+
+  "message:blockchainData": CustomEvent<MessageChain>;
+  "message:unknown": CustomEvent<MessageChain>;
+
   "message:error": CustomEvent<Error>;
 }
 
 export interface MessagesService
   extends TypedEventEmitter<MessageServiceEvents> {
+  startListeners(): void;
   broadcastMessage(message: MessageChain): Promise<void>;
-  sendMessage(connection: Connection, message: MessageChain): Promise<void>;
+  sendMessage(connection: string, message: MessageChain): Promise<void>;
 }
 
 export interface MessageRequest {
@@ -51,9 +57,8 @@ export enum MessageType {
 }
 
 export class MessageChain {
-  public sender?: Connection;
-  public resender: string[];
   public type: MessageType;
+  public sender: string;
   public dt: number;
   public value:
     | Block
@@ -75,21 +80,18 @@ export class MessageChain {
       | BlockChainMessage
       | MessageRequest
       | number,
-    resender: string[],
-    sender?: Connection,
+    sender: string
   ) {
     this.type = type;
     this.dt = Date.now();
     this.value = value;
     this.sender = sender;
-    this.resender = resender;
   }
 
   public toJSON(): string {
     return JSON.stringify({
       type: this.type,
-      value: this.value,
-      resenders: this.resender
+      value: this.value
     });
   }
 
@@ -101,7 +103,7 @@ export class MessageChain {
     const ProtobufMessageChain = root.lookupType("MessageChain");
     const message: any = {
       type: this.type,
-      resender: this.resender,
+      sender: this.sender
     };
 
     // Динамически добавляем соответствующее значение в зависимости от типа
@@ -142,65 +144,48 @@ export class MessageChain {
   }
 
   public static fromProtobuf(
-    decodedMessage: any,
-    sender: Connection
+    decodedMessage: any
   ): MessageChain {
     switch (decodedMessage.type) {
       case MessageType.BLOCK:
         return new MessageChain(
           MessageType.BLOCK,
-          decodedMessage.block,
-          decodedMessage.resender,
-          sender
+          decodedMessage.block, decodedMessage.sender
         );
       case MessageType.TRANSACTION:
         return new MessageChain(
           MessageType.TRANSACTION,
-          decodedMessage.transaction,
-          decodedMessage.resender,
-          sender
+          decodedMessage.transaction, decodedMessage.sender
         );
       case MessageType.SMART_CONTRACT:
         return new MessageChain(
           MessageType.SMART_CONTRACT,
-          decodedMessage.smart_contract,
-          decodedMessage.resender,
-          sender
+          decodedMessage.smart_contract, decodedMessage.sender
         );
       case MessageType.CONTRACT_TRANSACTION:
         return new MessageChain(
           MessageType.CONTRACT_TRANSACTION,
-          decodedMessage.contract_transaction,
-          decodedMessage.resender,
-          sender
+          decodedMessage.contract_transaction, decodedMessage.sender
         );
       case MessageType.WALLET:
         return new MessageChain(
           MessageType.WALLET,
-          decodedMessage.wallet,
-          decodedMessage.resender,
-          sender
+          decodedMessage.wallet, decodedMessage.sender
         );
       case MessageType.CHAIN:
         return new MessageChain(
           MessageType.CHAIN,
-          decodedMessage.chain,
-          decodedMessage.resender,
-          sender
+          decodedMessage.chain, decodedMessage.sender
         );
       case MessageType.REQUEST_CHAIN:
         return new MessageChain(
           MessageType.REQUEST_CHAIN,
-          decodedMessage.request,
-          decodedMessage.resender,
-          sender
+          decodedMessage.request, decodedMessage.sender
         );
       case MessageType.HEAD_BLOCK_INDEX:
         return new MessageChain(
           MessageType.HEAD_BLOCK_INDEX,
-          decodedMessage.headIndex,
-          decodedMessage.resender,
-          sender
+          decodedMessage.headIndex, decodedMessage.sender
         );
       default:
         throw new Error(`Unsupported type (fromProtobuf): ${decodedMessage.type}`);
@@ -223,6 +208,7 @@ export interface MessagesServiceComponents {
   peerStore: PeerStore;
   logger: ComponentLogger;
   peerId: PeerId;
+  pubsub: PubSub<GossipsubEvents>;
   events: TypedEventTarget<Libp2pEvents>;
 }
 
