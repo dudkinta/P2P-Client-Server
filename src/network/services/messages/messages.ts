@@ -95,7 +95,7 @@ export class MessagesService
   public async start(): Promise<void> {
     this.log(LogLevel.Info, "Starting store service");
     if (this.components.pubsub) {
-      this.components.pubsub.addEventListener('message', this.messageHandler);
+      this.components.pubsub.addEventListener('message', this.messageHandler.bind(this));
     }
     else {
       this.log(LogLevel.Critical, `PubSub not present`);
@@ -126,7 +126,6 @@ export class MessagesService
         console.log(err);
       }
     });
-    this.components.pubsub.subscribe('TEST');
   }
 
   private async messageHandler(evt: CustomEvent<Message>): Promise<void> {
@@ -158,6 +157,8 @@ export class MessagesService
             this.safeDispatchEvent('message:unknown', { detail: message });
           }
         }
+      } else {
+        this.log(LogLevel.Error, `Proto_ROOT not found`);
       }
     }
     catch (err: any) {
@@ -176,7 +177,6 @@ export class MessagesService
         const msg = message.toProtobuf(this.proto_root);
         const data = protoType.encode(msg).finish();
         await this.components.pubsub.publish(MessageType[message.type], data);
-        await this.components.pubsub.publish('TEST', Buffer.from('Test message'));
       }
     } catch (err) {
       this.log(LogLevel.Error, `Broadcast message (${JSON.stringify(message)}) error: ${JSON.stringify(err)}`);
