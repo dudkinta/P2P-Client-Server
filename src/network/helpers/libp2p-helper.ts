@@ -60,10 +60,7 @@ export async function getRelayClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
-        pubsub: gossipsub({
-          emitSelf:false,
-          gossipFactor: 0.3,
-        }),
+        pubsub: gossipsub(),
         identify: identify(),
         identifyPush: identifyPush(),
         store: store(),
@@ -132,10 +129,7 @@ export async function getNodeClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
-        pubsub: gossipsub({
-          emitSelf:false,
-          gossipFactor: 0.3,
-        }),
+        pubsub: gossipsub(),
         identify: identify(),
         identifyPush: identifyPush(),
         store: store(),

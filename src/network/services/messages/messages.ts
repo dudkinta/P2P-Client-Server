@@ -126,50 +126,57 @@ export class MessagesService
         console.log(err);
       }
     });
+    this.components.pubsub.subscribe('TEST');
   }
 
   private async messageHandler(evt: CustomEvent<Message>): Promise<void> {
     const msg = evt.detail;
-    if (this.proto_root) {
-      const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
-      const bufferMessage = ProtobufMessageChain.decode(msg.data);
-      const message = MessageChain.fromProtobuf(bufferMessage);
-      this.log(LogLevel.Debug, `Receive message: ${JSON.stringify(message)}`);
-      switch (message.type) {
-        case MessageType.HEAD_BLOCK_INDEX: {
-          this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
-          break;
-        }
-        case MessageType.WALLET: {
-          this.safeDispatchEvent('message:addValidator', { detail: message });
-          break;
-        }
-        case MessageType.REQUEST_CHAIN: {
-          this.safeDispatchEvent('message:requestchain', { detail: message });
-          break;
-        }
-        case MessageType.BLOCK, MessageType.CHAIN, MessageType.TRANSACTION, MessageType.SMART_CONTRACT, MessageType.CONTRACT_TRANSACTION: {
-          this.safeDispatchEvent('message:blockchainData', { detail: message });
-          break;
-        }
-        default: {
-          this.safeDispatchEvent('message:unknown', { detail: message });
+    try {
+      if (this.proto_root) {
+        const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
+        const bufferMessage = ProtobufMessageChain.decode(msg.data);
+        const message = MessageChain.fromProtobuf(bufferMessage);
+        this.log(LogLevel.Debug, `Receive message: ${JSON.stringify(message)}`);
+        switch (message.type) {
+          case MessageType.HEAD_BLOCK_INDEX: {
+            this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
+            break;
+          }
+          case MessageType.WALLET: {
+            this.safeDispatchEvent('message:addValidator', { detail: message });
+            break;
+          }
+          case MessageType.REQUEST_CHAIN: {
+            this.safeDispatchEvent('message:requestchain', { detail: message });
+            break;
+          }
+          case MessageType.BLOCK, MessageType.CHAIN, MessageType.TRANSACTION, MessageType.SMART_CONTRACT, MessageType.CONTRACT_TRANSACTION: {
+            this.safeDispatchEvent('message:blockchainData', { detail: message });
+            break;
+          }
+          default: {
+            this.safeDispatchEvent('message:unknown', { detail: message });
+          }
         }
       }
+    }
+    catch (err: any) {
+      this.log(LogLevel.Error, `Error in messageHandler`);
     }
   }
 
   public async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     try {
-      //const peers = (await this.components.peerStore.all()).map((peerId) => peerId.id.toString());
-      //this.log(LogLevel.Debug, `PeerStore.All() = ${JSON.stringify(peers)}`);
+
+      this.log(LogLevel.Debug, `Current subcribes: ${JSON.stringify(this.components.pubsub.getTopics())}`);
       if (this.proto_root) {
         this.log(LogLevel.Debug, `Send message type: ${MessageType[message.type]} data: ${JSON.stringify(message)}`);
         const protoType = this.proto_root.lookupType('MessageChain');
         const msg = message.toProtobuf(this.proto_root);
         const data = protoType.encode(msg).finish();
         await this.components.pubsub.publish(MessageType[message.type], data);
+        await this.components.pubsub.publish('TEST', Buffer.from('Test message'));
       }
     } catch (err) {
       this.log(LogLevel.Error, `Broadcast message (${JSON.stringify(message)}) error: ${JSON.stringify(err)}`);
