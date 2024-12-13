@@ -119,7 +119,7 @@ export class MessagesService
   public startListeners() {
     Object.keys(MessageType).filter(key => isNaN(Number(key))).map((typeName) => {
       try {
-        this.log(LogLevel.Info, `Subscribe to ${typeName}`);
+        console.log(LogLevel.Info, `Subscribe to ${typeName}`);
         this.components.pubsub.subscribe(typeName);
       }
       catch (err) {
@@ -134,6 +134,7 @@ export class MessagesService
       const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
       const bufferMessage = ProtobufMessageChain.decode(msg.data);
       const message = MessageChain.fromProtobuf(bufferMessage);
+      this.log(LogLevel.Debug, `Receive message: ${JSON.stringify(message)}`);
       switch (message.type) {
         case MessageType.HEAD_BLOCK_INDEX: {
           this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
@@ -155,14 +156,16 @@ export class MessagesService
           this.safeDispatchEvent('message:unknown', { detail: message });
         }
       }
-
     }
   }
 
   public async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     try {
+      //const peers = (await this.components.peerStore.all()).map((peerId) => peerId.id.toString());
+      //this.log(LogLevel.Debug, `PeerStore.All() = ${JSON.stringify(peers)}`);
       if (this.proto_root) {
+        this.log(LogLevel.Debug, `Send message type: ${MessageType[message.type]} data: ${JSON.stringify(message)}`);
         const protoType = this.proto_root.lookupType('MessageChain');
         const msg = message.toProtobuf(this.proto_root);
         const data = protoType.encode(msg).finish();
