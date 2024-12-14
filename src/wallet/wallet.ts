@@ -141,6 +141,7 @@ export class Wallet
         this.emitEvent("wallet:remove", this.current.publicKey);
       }
       if (this.current != wallet) {
+        this.current = wallet;
         this.emitEvent("wallet:change", wallet);
       }
     }
