@@ -194,8 +194,6 @@ export class MessagesService
   public async broadcastMessage(message: MessageChain): Promise<void> {
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     try {
-
-      this.log(LogLevel.Debug, `Current subcribes: ${JSON.stringify(this.components.pubsub.getTopics())}`);
       if (this.proto_root) {
         this.log(LogLevel.Debug, `Send message type: ${MessageType[message.type]} data: ${JSON.stringify(message)}`);
         const protoType = this.proto_root.lookupType('MessageChain');
@@ -203,8 +201,18 @@ export class MessagesService
         const data = protoType.encode(msg).finish();
         await this.components.pubsub.publish(MessageType[message.type], data);
       }
-    } catch (err) {
-      this.log(LogLevel.Error, `Broadcast message (${JSON.stringify(message)}) error: ${JSON.stringify(err)}`);
+    } catch (err: any) {
+      if (err instanceof Error) {
+        this.log(
+          LogLevel.Error,
+          `Broadcast message (${JSON.stringify(message)}) error: ${err.message}`
+        );
+      } else {
+        this.log(
+          LogLevel.Error,
+          `Broadcast message (${JSON.stringify(message)}) error: ${JSON.stringify(err)}`
+        );
+      }
     }
   }
 

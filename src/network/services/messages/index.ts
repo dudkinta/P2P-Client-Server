@@ -122,7 +122,10 @@ export class MessageChain {
       case MessageType.CONTRACT_TRANSACTION:
         message.contract_transaction = this.value;
         break;
-      case MessageType.WALLET, MessageType.WALLET_REMOVE:
+      case MessageType.WALLET:
+        message.wallet = this.value;
+        break;
+      case MessageType.WALLET_REMOVE:
         message.wallet = this.value;
         break;
       case MessageType.CHAIN:
