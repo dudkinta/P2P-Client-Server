@@ -290,7 +290,23 @@ export class MessagesService
         this.safeDispatchEvent('message:requestchain', { detail: message });
         break;
       }
-      case MessageType.BLOCK, MessageType.CHAIN, MessageType.TRANSACTION, MessageType.SMART_CONTRACT, MessageType.CONTRACT_TRANSACTION: {
+      case MessageType.BLOCK: {
+        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        break;
+      }
+      case MessageType.CHAIN: {
+        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        break;
+      }
+      case MessageType.TRANSACTION: {
+        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        break;
+      }
+      case MessageType.SMART_CONTRACT: {
+        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        break;
+      }
+      case MessageType.CONTRACT_TRANSACTION: {
         this.safeDispatchEvent('message:blockchainData', { detail: message });
         break;
       }
