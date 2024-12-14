@@ -4,6 +4,7 @@ import { Block } from "./db-context/models/block.js";
 import { SmartContract } from "./db-context/models/smart-contract.js";
 import { Transaction } from "./db-context/models/transaction.js";
 import { ContractTransaction } from "./db-context/models/contract-transaction.js";
+import * as tinySecp256k1 from "tiny-secp256k1";
 import { EventEmitter } from "events";
 import {
   MessageChain,
@@ -263,7 +264,7 @@ export class BlockChain extends EventEmitter {
           key: key,
           maxIndex: this.chain.length - 1,
           block: block,
-        }, '');
+        }, message.sender);
         this.emit("message:chain", messageChain);
       }
     }
@@ -280,12 +281,20 @@ export class BlockChain extends EventEmitter {
         this.log(LogLevel.Error, "Publick key is null");
         return;
       }
-      const verify = crypto.createVerify("SHA256");
-      verify.update(`${block.index}`).end();
-      const isSignatureValid = verify.verify(
-        Wallet.current.publicKey,
-        key,
-        "hex"
+      const publicKeyBuffer = Buffer.from(Wallet.current.publicKey, "hex");
+      if (!tinySecp256k1.isPoint(publicKeyBuffer)) {
+        console.error("Invalid sender public key.");
+        return;
+      }
+      const signatureBuffer = Buffer.from(key, "hex");
+      const hash = crypto
+        .createHash("sha256")
+        .update(block.index.toString())
+        .digest();
+      const isSignatureValid = tinySecp256k1.verify(
+        hash,
+        publicKeyBuffer,
+        signatureBuffer
       );
       if (!isSignatureValid) {
         this.log(LogLevel.Error, "Invalid signature for chain message.");
@@ -301,6 +310,9 @@ export class BlockChain extends EventEmitter {
         const lastBlock = await this.getBlock(index - 1);
         if (lastBlock && lastBlock.hash === block.previousHash) {
           await this.addBlock(block, true);
+          if (lastBlock.index < maxIndex || lastBlock.index < this.getHeadIndex()) {
+            await this.prepareChainRequest();
+          }
         }
       }
     }
@@ -308,7 +320,22 @@ export class BlockChain extends EventEmitter {
       const receiveHeadIndex = message.value as number;
       if (receiveHeadIndex > this.headIndex) {
         this.headIndex = receiveHeadIndex;
+        await this.prepareChainRequest();
       }
+    }
+  }
+
+  private async prepareChainRequest() {
+    const lastBlock = await this.getLastBlock();
+    const lastIndex = lastBlock?.index ?? 0;
+    if (Wallet.current) {
+      const key = Wallet.current?.signMessage(lastIndex.toString());
+      this.emit("message:requestchain", new MessageChain(MessageType.REQUEST_CHAIN,
+        {
+          key: key,
+          index: lastIndex
+        },
+        ''));
     }
   }
 

@@ -27,8 +27,7 @@ export interface WalletEvents {
 
 export class Wallet
   extends EventEmitter<WalletEvents>
-  implements WalletPublicKey
-{
+  implements WalletPublicKey {
   private static eventEmitter: EventEmitter = new EventEmitter();
   public static instances: Wallet[] = [];
   public static current: Wallet | null = null;
@@ -187,9 +186,18 @@ export class Wallet
     if (!this.privateKey) {
       throw new Error("Wallet is not initialized. Call 'initialize()' first.");
     }
-    const sign = crypto.createSign("SHA256");
-    sign.update(message).end();
-    return sign.sign(this.privateKey, "hex");
+
+    const hash = crypto.createHash("sha256").update(message).digest();
+    const privateKeyBuffer = Buffer.from(this.privateKey, "hex");
+    if (!tinySecp256k1.isPrivate(privateKeyBuffer)) {
+      throw new Error("Invalid private key!");
+    }
+    const signature = tinySecp256k1.sign(hash, privateKeyBuffer);
+
+    if (!signature) {
+      throw new Error("Failed to sign the transaction!");
+    }
+    return toHex(signature);
   }
 
   public signTransaction(transaction: Transaction): void {
