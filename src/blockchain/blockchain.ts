@@ -330,7 +330,7 @@ export class BlockChain extends EventEmitter {
     const lastIndex = lastBlock?.index ?? 0;
     if (Wallet.current) {
       const key = Wallet.current?.signMessage(lastIndex.toString());
-      this.emit("message:requestchain", new MessageChain(MessageType.REQUEST_CHAIN,
+      this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN,
         {
           key: key,
           index: lastIndex
