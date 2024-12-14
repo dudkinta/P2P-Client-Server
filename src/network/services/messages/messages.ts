@@ -1,4 +1,4 @@
-import { TypedEventEmitter } from "@libp2p/interface";
+import { Connection, TypedEventEmitter } from "@libp2p/interface";
 import { sendDebug } from "../socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
 import protobuf from "protobufjs";
@@ -77,8 +77,10 @@ export class MessagesService
             await this.broadcastMessage(new MessageChain(MessageType.WALLET, { publicKey: Wallet.current.publicKey }, this.components.peerId.toString()));
           }
           const blockchain = BlockChain.getInstance();
+          const connection = event.detail as Connection;
+          connection.remotePeer.toString()
           if (blockchain) {
-            await this.broadcastMessage(new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex(), this.components.peerId.toString()));
+            await this.sendMessage(connection.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex(), this.components.peerId.toString()));
           }
         }
       );
