@@ -31,6 +31,7 @@ export class SystemCoordinator {
         wallet.toWalletPublicKey(), ''
       );
       await this.networkService.broadcastMessage(message);
+      await this.networkService.broadcastMessage(new MessageChain(MessageType.HEAD_BLOCK_INDEX, this.blockChain.getHeadIndex(), ''));
     });
 
     this.blockChain.on("message:newBlock", async (message) => {
