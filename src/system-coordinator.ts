@@ -48,8 +48,14 @@ export class SystemCoordinator {
     this.networkService.on("message:addValidator", (event) => {
       this.delegator.addDelegate(event.detail);
     });
-    this.networkService.on("message:removeValidator", async (event) => {
-      this.delegator.removeDelegate(event.detail);
+    this.networkService.on("message:removeValidator", (event) => {
+      this.delegator.removeValidator(event.detail);
+    });
+    this.networkService.on("message:disconnect", async (event) => {
+      this.delegator.disconnectDelegate(event.detail);
+    });
+    this.delegator.on("message:removeDelegator", async (message) => {
+      await this.networkService.broadcastMessage(message);
     });
   }
 

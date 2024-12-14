@@ -351,6 +351,9 @@ export class P2PClient extends EventEmitter {
         messageService.addEventListener("message:removeValidator", (event: any) => {
           this.emit("message:removeValidator", event);
         });
+        messageService.addEventListener("message:disconnect", (event: any) => {
+          this.emit("message:disconnect", event);
+        });
         messageService.addEventListener("message:headIndex", (event: any) => {
           this.emit("message:headIndex", event);
         });

@@ -28,6 +28,7 @@ enum MessageType {
     CHAIN = 5;
     REQUEST_CHAIN = 6;
     HEAD_BLOCK_INDEX = 7;
+    WALLET_REMOVE = 8;
 }
 
 message MessageChain {

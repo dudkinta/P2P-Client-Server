@@ -23,7 +23,7 @@ import type {
   MessagesService as MessagesServiceInterface,
   MessageServiceEvents,
 } from "./index.js";
-import type { Logger, Startable, Message } from "@libp2p/interface";
+import { Logger, Startable, Message, TopicValidatorResult } from "@libp2p/interface";
 import path from "path";
 import { fileURLToPath } from "url";
 import { BlockChain } from "../../../blockchain/blockchain.js";
@@ -86,7 +86,7 @@ export class MessagesService
             LogLevel.Info,
             `Connection close to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
           );
-          this.safeDispatchEvent("message:removeValidator", { detail: event.detail.remotePeer.toString() });
+          this.safeDispatchEvent("message:disconnect", { detail: event.detail.remotePeer.toString() });
         }
       );
     }
@@ -126,6 +126,27 @@ export class MessagesService
         console.log(err);
       }
     });
+    this.components.pubsub.topicValidators.set(MessageType[MessageType.HEAD_BLOCK_INDEX], this.filterMessages.bind(this));
+  }
+
+  private async filterMessages(msg: any): Promise<TopicValidatorResult> {
+    if (!this.proto_root) {
+      return TopicValidatorResult.Ignore;
+    }
+    const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
+    const bufferMessage = ProtobufMessageChain.decode(msg.data);
+    const message = MessageChain.fromProtobuf(bufferMessage);
+    if (message.type == MessageType.HEAD_BLOCK_INDEX) {
+      const blockchain = BlockChain.getInstance();
+      if (blockchain) {
+        const msgHeadIndex = message.value as number;
+        if (msgHeadIndex <= blockchain.getHeadIndex()) {
+          return TopicValidatorResult.Ignore;
+        }
+      }
+    }
+    return TopicValidatorResult.Accept;
+
   }
 
   private async messageHandler(evt: CustomEvent<Message>): Promise<void> {
@@ -143,6 +164,10 @@ export class MessagesService
           }
           case MessageType.WALLET: {
             this.safeDispatchEvent('message:addValidator', { detail: message });
+            break;
+          }
+          case MessageType.WALLET_REMOVE: {
+            this.safeDispatchEvent('message:removeValidator', { detail: message });
             break;
           }
           case MessageType.REQUEST_CHAIN: {

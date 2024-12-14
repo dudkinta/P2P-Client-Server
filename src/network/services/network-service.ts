@@ -139,6 +139,9 @@ export class NetworkService extends EventEmitter {
       this.client.on("message:removeValidator", (event: any) => {
         this.emit("message:removeValidator", event);
       });
+      this.client.on("message:disconnect", (event: any) => {
+        this.emit("message:disconnect", event);
+      });
       this.client.on("message:headIndex", (event: any) => {
         this.emit("message:headIndex", event);
       });

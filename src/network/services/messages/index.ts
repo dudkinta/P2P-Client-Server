@@ -19,7 +19,8 @@ import { GossipsubEvents } from "@chainsafe/libp2p-gossipsub";
 
 export interface MessageServiceEvents {
   "message:addValidator": CustomEvent<MessageChain>;
-  "message:removeValidator": CustomEvent<string>;
+  "message:disconnect": CustomEvent<string>;
+  "message:removeValidator": CustomEvent<MessageChain>;
   "message:headIndex": CustomEvent<number>;
   "message:requestchain": CustomEvent<MessageChain>;
 
@@ -54,6 +55,7 @@ export enum MessageType {
   CHAIN = 5,
   REQUEST_CHAIN = 6,
   HEAD_BLOCK_INDEX = 7,
+  WALLET_REMOVE = 8,
 }
 
 export class MessageChain {
@@ -120,7 +122,7 @@ export class MessageChain {
       case MessageType.CONTRACT_TRANSACTION:
         message.contract_transaction = this.value;
         break;
-      case MessageType.WALLET:
+      case MessageType.WALLET, MessageType.WALLET_REMOVE:
         message.wallet = this.value;
         break;
       case MessageType.CHAIN:
@@ -172,6 +174,11 @@ export class MessageChain {
           MessageType.WALLET,
           decodedMessage.wallet, decodedMessage.sender
         );
+      case MessageType.WALLET_REMOVE:
+        return new MessageChain(
+          MessageType.WALLET_REMOVE,
+          decodedMessage.wallet, decodedMessage.sender
+        )
       case MessageType.CHAIN:
         return new MessageChain(
           MessageType.CHAIN,

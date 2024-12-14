@@ -1,5 +1,6 @@
-import { Wallet, WalletPublicKey } from "../wallet/wallet.js";
-import { MessageChain } from "../network/services/messages/index.js";
+import { WalletPublicKey } from "../wallet/wallet.js";
+import { EventEmitter } from "events";
+import { MessageChain, MessageType } from "../network/services/messages/index.js";
 import crypto from "crypto";
 import { LogLevel } from "../network/helpers/log-level.js";
 import {
@@ -25,14 +26,16 @@ export class DelegateEntry {
   }
 }
 
-export class Delegator {
+export class Delegator extends EventEmitter {
   public walletDelegates: DelegateEntry[] = [];
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("delegator", level, timestamp, message);
     debug("delegator")(`[${timestamp.toISOString().slice(11, 23)}] ${message}`);
   };
-  constructor() { }
+  constructor() {
+    super();
+  }
   public addDelegate(message: MessageChain): void {
     const wallet = message.value as WalletPublicKey;
     this.log(
@@ -61,23 +64,50 @@ export class Delegator {
     }
   }
 
-  public removeDelegate(sender: string): void {
+  public removeValidator(message: MessageChain): void {
+    this.log(
+      LogLevel.Info,
+      `Removing delegate ${JSON.stringify(message)}`
+    );
+    const wallet = message.value as WalletPublicKey;
+    try {
+      const dEntry = this.walletDelegates.find(
+        (delegate) => delegate.publicKey === wallet.publicKey
+      );
+      if (dEntry) {
+        sendDelegate("remove", dEntry);
+        this.walletDelegates = this.walletDelegates.filter(
+          (delegate) => delegate.publicKey !== wallet.publicKey
+        );
+      }
+    } catch {
+      this.log(LogLevel.Error, `Error in removeValidator. Message: ${JSON.stringify(message)}`)
+    }
+  }
+
+  public disconnectDelegate(sender: string): void {
     this.log(
       LogLevel.Info,
       `Removing delegate ${sender}`
     );
-    const dEntry = this.walletDelegates.find(
-      (delegate) => delegate.sender === sender
-    );
-    this.walletDelegates = this.walletDelegates.filter(
-      (delegate) => delegate.sender !== sender
-    );
-    if (dEntry) {
-      this.log(
-        LogLevel.Info,
-        `Removing delegate ${dEntry.sender} ${dEntry.publicKey}`
+    try {
+      const dEntry = this.walletDelegates.find(
+        (delegate) => delegate.sender === sender
       );
-      sendDelegate("remove", dEntry);
+      if (dEntry) {
+        this.log(
+          LogLevel.Info,
+          `Removing delegate ${dEntry.sender} ${dEntry.publicKey}`
+        );
+        this.walletDelegates = this.walletDelegates.filter(
+          (delegate) => delegate.sender !== sender
+        );
+        this.emit("message:removeDelegator", new MessageChain(MessageType.WALLET_REMOVE, { publicKey: dEntry.publicKey }, ""));
+        sendDelegate("remove", dEntry);
+      }
+    }
+    catch {
+      this.log(LogLevel.Error, `Error in disconnectValidator. Sender: ${JSON.stringify(sender)}`)
     }
   }
 
