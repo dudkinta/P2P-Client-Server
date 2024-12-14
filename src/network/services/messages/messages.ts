@@ -138,8 +138,8 @@ export class MessagesService
         console.log(err);
       }
     });
-    this.components.pubsub.topicValidators.set(MessageType[MessageType.HEAD_BLOCK_INDEX], this.filterMessages.bind(this));
-    this.components.pubsub.topicValidators.set(MessageType[MessageType.REQUEST_CHAIN], this.filterMessages.bind(this));
+    //this.components.pubsub.topicValidators.set(MessageType[MessageType.HEAD_BLOCK_INDEX], this.filterMessages.bind(this));
+    //this.components.pubsub.topicValidators.set(MessageType[MessageType.REQUEST_CHAIN], this.filterMessages.bind(this));
   }
 
   private async filterMessages(msg: any): Promise<TopicValidatorResult> {
