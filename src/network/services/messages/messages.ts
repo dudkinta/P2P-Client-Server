@@ -64,6 +64,7 @@ export class MessagesService
     this.maxOutboundStreams = init.maxOutboundStreams ?? MAX_OUTBOUND_STREAMS;
     this.runOnLimitedConnection = init.runOnLimitedConnection ?? true;
     this.handleDirectMessage = this.handleDirectMessage.bind(this);
+    this.handleEventer = this.handleEventer.bind(this);
     if (init.runOnPeerConnect ?? true) {
       this.components.events.addEventListener(
         "connection:open",
@@ -141,6 +142,7 @@ export class MessagesService
 
   private async filterMessages(msg: any): Promise<TopicValidatorResult> {
     if (!this.proto_root) {
+      this.log(LogLevel.Error, 'Error filter message. PROTO_ROOT not found');
       return TopicValidatorResult.Ignore;
     }
     const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');

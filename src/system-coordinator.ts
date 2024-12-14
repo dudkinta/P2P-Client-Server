@@ -48,6 +48,9 @@ export class SystemCoordinator {
     this.networkService.on("message:requestchain", async (event) => {
       await this.blockChain.addBlockchainData(event.detail);
     });
+    this.networkService.on("message:headIndex", async (event) => {
+      await this.blockChain.addBlockchainData(event.detail);
+    });
     this.networkService.on("message:addValidator", (event) => {
       this.delegator.addDelegate(event.detail);
     });
