@@ -22,6 +22,7 @@ import type {
   MessagesServiceInit,
   MessagesService as MessagesServiceInterface,
   MessageServiceEvents,
+  MessageRequest,
 } from "./index.js";
 import { Logger, Startable, Message, TopicValidatorResult } from "@libp2p/interface";
 import path from "path";
@@ -135,6 +136,7 @@ export class MessagesService
       }
     });
     this.components.pubsub.topicValidators.set(MessageType[MessageType.HEAD_BLOCK_INDEX], this.filterMessages.bind(this));
+    this.components.pubsub.topicValidators.set(MessageType[MessageType.REQUEST_CHAIN], this.filterMessages.bind(this));
   }
 
   private async filterMessages(msg: any): Promise<TopicValidatorResult> {
@@ -144,11 +146,20 @@ export class MessagesService
     const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
     const bufferMessage = ProtobufMessageChain.decode(msg.data);
     const message = MessageChain.fromProtobuf(bufferMessage);
-    if (message.type == MessageType.HEAD_BLOCK_INDEX) {
-      const blockchain = BlockChain.getInstance();
-      if (blockchain) {
+    const blockchain = BlockChain.getInstance();
+    if (blockchain) {
+      if (message.type == MessageType.HEAD_BLOCK_INDEX) {
         const msgHeadIndex = message.value as number;
         if (msgHeadIndex <= blockchain.getHeadIndex()) {
+          this.log(LogLevel.Info, 'Ignore message: HEAD_BLOCK_INDEX');
+          return TopicValidatorResult.Ignore;
+        }
+
+      }
+      if (message.type == MessageType.REQUEST_CHAIN) {
+        const requestChainMessage = message.value as MessageRequest;
+        if (requestChainMessage && requestChainMessage.index < blockchain.getHeadIndex()) {
+          this.log(LogLevel.Info, 'Ignore message: REQUEST_CHAIN');
           return TopicValidatorResult.Ignore;
         }
       }
