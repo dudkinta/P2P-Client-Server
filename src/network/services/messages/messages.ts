@@ -73,14 +73,23 @@ export class MessagesService
             LogLevel.Info,
             `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
           );
-          if (Wallet.current) {
-            await this.broadcastMessage(new MessageChain(MessageType.WALLET, { publicKey: Wallet.current.publicKey }, this.components.peerId.toString()));
+          const peer = await this.components.peerStore.get(this.components.peerId);
+          if (!peer) {
+            this.log(LogLevel.Error, 'selfPeer in peerStore notFound');
           }
-          const blockchain = BlockChain.getInstance();
-          const connection = event.detail as Connection;
-          connection.remotePeer.toString()
-          if (blockchain) {
-            await this.sendMessage(connection.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, blockchain.getHeadIndex(), this.components.peerId.toString()));
+          const buffHeadIndex = peer?.metadata?.get('headIndex');
+          if (buffHeadIndex) {
+            const headIndex = JSON.parse(new TextDecoder().decode(buffHeadIndex));
+            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, headIndex, this.components.peerId.toString()));
+          } else {
+            this.log(LogLevel.Error, 'headIndex notFound');
+          }
+          const buffPublicKey = peer?.metadata?.get('publicKey');
+          if (buffPublicKey) {
+            const publicKey = JSON.parse(new TextDecoder().decode(buffPublicKey));
+            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.WALLET, publicKey, this.components.peerId.toString()));
+          } else {
+            this.log(LogLevel.Error, 'publicKey notFound')
           }
         }
       );
@@ -276,10 +285,18 @@ export class MessagesService
     }
   }
 
-  private handleEventer(message: MessageChain) {
+  private async handleEventer(message: MessageChain): Promise<void> {
     switch (message.type) {
       case MessageType.HEAD_BLOCK_INDEX: {
         this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
+        const peerId = (await this.components.peerStore.all()).find(p => p.id.toString() == message.sender);
+        if (peerId) {
+          await this.components.peerStore.merge(peerId.id, {
+            metadata: {
+              'headIndex': new TextEncoder().encode(JSON.stringify(message.value)),
+            },
+          });
+        }
         break;
       }
       case MessageType.WALLET: {

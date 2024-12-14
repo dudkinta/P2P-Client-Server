@@ -38,7 +38,7 @@ export class BlockChain extends EventEmitter {
   private pendingTransactions: Transaction[] = [];
   private pendingSmartContracts: SmartContract[] = [];
   private pendingContractTransactions: ContractTransaction[] = [];
-  private headIndex: number = 0;
+  private headIndex: number = -1;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("blockchain", level, timestamp, message);
@@ -87,10 +87,11 @@ export class BlockChain extends EventEmitter {
         await this.db.blockStorage.delete(errorIndex);
       }
     }
-    this.headIndex =
+    const headIndex =
       this.chain.length == 0
         ? -1
         : Math.max(...this.chain.map((block) => block.index));
+    this.setHeadIndex(headIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
   }
 
@@ -158,9 +159,9 @@ export class BlockChain extends EventEmitter {
       `Block added: ${block.index} reward:${block.reward.amount}`
     );
     await this.db.blockStorage.save(block);
-    if (this.headIndex < block.index) {
-      this.headIndex = block.index;
-    };
+    if (this.getHeadIndex() < block.index) {
+      this.setHeadIndex(block.index);
+    }
   }
 
   public async getLastBlock(): Promise<Block | undefined> {
@@ -318,8 +319,7 @@ export class BlockChain extends EventEmitter {
     }
     if (message.type == MessageType.HEAD_BLOCK_INDEX) {
       const receiveHeadIndex = message.value as number;
-      if (receiveHeadIndex > this.headIndex) {
-        this.headIndex = receiveHeadIndex;
+      if (receiveHeadIndex > this.getHeadIndex()) {
         await this.prepareChainRequest();
       }
     }
@@ -434,5 +434,10 @@ export class BlockChain extends EventEmitter {
 
   public getHeadIndex(): number {
     return this.headIndex;
+  }
+
+  public setHeadIndex(index: number) {
+    this.headIndex = index;
+    this.emit('setHeadIndex', this.headIndex);
   }
 }

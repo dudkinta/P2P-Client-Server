@@ -295,6 +295,25 @@ export class P2PClient extends EventEmitter {
     }
   }
 
+  public async saveMetadata(key: string, data: any): Promise<void> {
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
+      return;
+    }
+    const newMetadata = new Map();
+
+    if (data == undefined) {
+      newMetadata.set(key, undefined);
+    } else {
+      newMetadata.set(key, new TextEncoder().encode(JSON.stringify(data)))
+    }
+
+    await this.node.peerStore.patch(this.node.peerId, {
+      metadata: newMetadata
+    });
+    console.log('Store metadata', (await this.node.peerStore.get(this.node.peerId)).metadata);
+  }
+
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();

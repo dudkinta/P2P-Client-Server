@@ -21,6 +21,7 @@ export interface WalletPublicKey {
 
 export interface WalletEvents {
   "wallet:change": [Wallet];
+  "wallet:remove": [string];
   "wallet:error": [Error];
   "wallet:connected": [{ peerId: string; publicKey: string }];
 }
@@ -77,25 +78,6 @@ export class Wallet
         this.instances.push(wallet);
       }
     }
-
-    setTimeout(
-      () => {
-        this.reUseWallet();
-      },
-      30 * 60 * 1000
-    );
-  }
-
-  private static reUseWallet() {
-    if (Wallet.current) {
-      this.emitEvent("wallet:change", Wallet.current);
-    }
-    setTimeout(
-      () => {
-        this.reUseWallet();
-      },
-      30 * 60 * 1000
-    );
   }
 
   public static async create(name: string): Promise<Wallet> {
@@ -155,8 +137,12 @@ export class Wallet
   public static use(wallet: Wallet): void {
     const config = ConfigLoader.getInstance();
     if (config.getConfig().nodeType == config.getConfig().roles.NODE) {
-      this.current = wallet;
-      this.emitEvent("wallet:change", wallet);
+      if (this.current && this.current != wallet && this.current.publicKey) {
+        this.emitEvent("wallet:remove", this.current.publicKey);
+      }
+      if (this.current != wallet) {
+        this.emitEvent("wallet:change", wallet);
+      }
     }
   }
 

@@ -31,9 +31,12 @@ export class SystemCoordinator {
         wallet.toWalletPublicKey(), ''
       );
       await this.networkService.broadcastMessage(message);
-      await this.networkService.broadcastMessage(new MessageChain(MessageType.HEAD_BLOCK_INDEX, this.blockChain.getHeadIndex(), ''));
+      await this.networkService.saveMetadata('publicKey', wallet.toWalletPublicKey());
     });
-
+    Wallet.onEvent("wallet:remove", async (publicKey: string) => {
+      await this.networkService.saveMetadata('publicKay', undefined);
+      await this.networkService.broadcastMessage(new MessageChain(MessageType.WALLET_REMOVE, { publicKey: publicKey }, ''));
+    });
     this.blockChain.on("message:newBlock", async (message) => {
       await this.networkService.broadcastMessage(message);
     });
@@ -42,6 +45,9 @@ export class SystemCoordinator {
     });
     this.blockChain.on("message:chain", async (message) => {
       await this.networkService.sendMessageToConnection(message.sender, message); //возврат сообщения запрашиваемому пиру
+    });
+    this.blockChain.on("setHeadIndex", async () => {
+      await this.networkService.saveMetadata('headIndex', this.blockChain.getHeadIndex());
     });
     this.networkService.on("message:blockchainData", async (event) => {
       await this.blockChain.addBlockchainData(event.detail);

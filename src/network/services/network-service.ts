@@ -410,4 +410,8 @@ export class NetworkService extends EventEmitter {
   public async sendMessageToConnection(peerId: string, message: MessageChain) {
     await this.client.sendMessageToConnection(peerId, message);
   }
+
+  public async saveMetadata(key: string, data: any): Promise<void> {
+    await this.client.saveMetadata(key, data);
+  }
 }
