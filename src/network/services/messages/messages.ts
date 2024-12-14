@@ -6,7 +6,7 @@ import {
   writeToConnection,
   readFromConnection,
 } from "../../helpers/proto-helper.js";
-
+import type { IncomingStreamData } from "@libp2p/interface-internal";
 import { Wallet } from "./../../../wallet/wallet.js";
 import {
   PROTOCOL_PREFIX,
@@ -62,6 +62,7 @@ export class MessagesService
     this.maxInboundStreams = init.maxInboundStreams ?? MAX_INBOUND_STREAMS;
     this.maxOutboundStreams = init.maxOutboundStreams ?? MAX_OUTBOUND_STREAMS;
     this.runOnLimitedConnection = init.runOnLimitedConnection ?? true;
+    this.handleDirectMessage = this.handleDirectMessage.bind(this);
     if (init.runOnPeerConnect ?? true) {
       this.components.events.addEventListener(
         "connection:open",
@@ -93,6 +94,12 @@ export class MessagesService
   }
 
   public async start(): Promise<void> {
+    await this.components.registrar.handle(this.protocol, this.handleDirectMessage, {
+      maxInboundStreams: this.maxInboundStreams,
+      maxOutboundStreams: this.maxOutboundStreams,
+      runOnLimitedConnection: this.runOnLimitedConnection,
+    });
+
     this.log(LogLevel.Info, "Starting store service");
     if (this.components.pubsub) {
       this.components.pubsub.addEventListener('message', this.messageHandler.bind(this));
@@ -109,6 +116,7 @@ export class MessagesService
   }
 
   public async stop(): Promise<void> {
+    await this.components.registrar.unhandle(this.protocol);
     this.started = false;
   }
 
@@ -157,31 +165,7 @@ export class MessagesService
         const bufferMessage = ProtobufMessageChain.decode(msg.data);
         const message = MessageChain.fromProtobuf(bufferMessage);
         this.log(LogLevel.Debug, `Receive message: ${JSON.stringify(message)}`);
-        switch (message.type) {
-          case MessageType.HEAD_BLOCK_INDEX: {
-            this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
-            break;
-          }
-          case MessageType.WALLET: {
-            this.safeDispatchEvent('message:addValidator', { detail: message });
-            break;
-          }
-          case MessageType.WALLET_REMOVE: {
-            this.safeDispatchEvent('message:removeValidator', { detail: message });
-            break;
-          }
-          case MessageType.REQUEST_CHAIN: {
-            this.safeDispatchEvent('message:requestchain', { detail: message });
-            break;
-          }
-          case MessageType.BLOCK, MessageType.CHAIN, MessageType.TRANSACTION, MessageType.SMART_CONTRACT, MessageType.CONTRACT_TRANSACTION: {
-            this.safeDispatchEvent('message:blockchainData', { detail: message });
-            break;
-          }
-          default: {
-            this.safeDispatchEvent('message:unknown', { detail: message });
-          }
-        }
+        this.handleEventer(message);
       } else {
         this.log(LogLevel.Error, `Proto_ROOT not found`);
       }
@@ -243,4 +227,65 @@ export class MessagesService
     }
   }
 
+  private async handleDirectMessage(data: IncomingStreamData): Promise<void> {
+    const { stream, connection } = data;
+    this.log(LogLevel.Info, `Incoming message from ${connection.remotePeer}`);
+
+    try {
+      if (!this.proto_root) {
+        throw new Error("Proto root is not loaded");
+      }
+      const decodedMessage = await readFromConnection(
+        stream,
+        this.proto_root,
+        this.timeout,
+        "MessageChain"
+      ).catch((err) => {
+        throw new Error(`Failed to read message: ${err.message}`);
+      });
+      const message = MessageChain.fromProtobuf(decodedMessage);
+      this.handleEventer(message);
+    }
+    catch (err: any) {
+      if (err instanceof Error) {
+        this.log(
+          LogLevel.Error,
+          `Direct message error: ${err.message}`
+        );
+      } else {
+        this.log(
+          LogLevel.Error,
+          `Direct message error: ${JSON.stringify(err)}`
+        );
+      }
+    }
+  }
+
+  private handleEventer(message: MessageChain) {
+    switch (message.type) {
+      case MessageType.HEAD_BLOCK_INDEX: {
+        this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
+        break;
+      }
+      case MessageType.WALLET: {
+        this.safeDispatchEvent('message:addValidator', { detail: message });
+        break;
+      }
+      case MessageType.WALLET_REMOVE: {
+        this.safeDispatchEvent('message:removeValidator', { detail: message });
+        break;
+      }
+      case MessageType.REQUEST_CHAIN: {
+        this.safeDispatchEvent('message:requestchain', { detail: message });
+        break;
+      }
+      case MessageType.BLOCK, MessageType.CHAIN, MessageType.TRANSACTION, MessageType.SMART_CONTRACT, MessageType.CONTRACT_TRANSACTION: {
+        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        break;
+      }
+      default: {
+        this.safeDispatchEvent('message:unknown', { detail: message });
+      }
+    }
+  }
 }
