@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import ConfigLoader from "../../common/config-loader.js";
 import { P2PClient } from "../p2p-сlient.js";
 import { multiaddr } from "@multiformats/multiaddr";
-import { Connection, PeerId } from "@libp2p/interface";
+import { Connection, PeerId, PeerStore } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
 import { RelayStrategy } from "./relay-strategy.js";
@@ -78,7 +78,7 @@ export class NetworkService extends EventEmitter {
       this.client.on("connection:open", (event: any) => {
         try {
           const conn = event;
-          const peerId = event.remotePeer;
+          const peerId = conn.remotePeer;
           if (!peerId) return;
           if (peerId.toString() === this.localPeer) return;
           if (conn.status !== "open") return;
@@ -91,14 +91,13 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
-
-      this.client.on("updateProtocols", (event) => {
+      this.client.on("updatePeer", (event) => {
         try {
-          const { protocols, peerId } = event;
+          const { protocols, peerId, store } = event;
           if (!peerId) return;
           if (peerId.toString() === this.localPeer) return;
 
-          const node = this.getNode(peerId.toString(), peerId, undefined);
+          const node = this.getNode(peerId.toString(), peerId, undefined, store);
           if (protocols && node) {
             protocols.forEach((protocol: string) => {
               if (!node.protocols.has(protocol)) {
@@ -169,7 +168,8 @@ export class NetworkService extends EventEmitter {
   private getNode(
     peer: string,
     peerId: PeerId | undefined,
-    connection: Connection | undefined
+    connection: Connection | undefined,
+    store?: Map<string, string>
   ): Node | undefined {
     try {
       let node = this.storage.get(peer);
@@ -182,6 +182,9 @@ export class NetworkService extends EventEmitter {
         }
         if (connection) {
           node.connections.add(connection);
+        }
+        if (store) {
+          node.setStore(store);
         }
       }
       return node;
@@ -411,7 +414,7 @@ export class NetworkService extends EventEmitter {
     await this.client.sendMessageToConnection(peerId, message);
   }
 
-  public async saveMetadata(key: string, data: any): Promise<void> {
+  public async saveMetadata(key: string, data: string): Promise<void> {
     await this.client.saveMetadata(key, data);
   }
 }

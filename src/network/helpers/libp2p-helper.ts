@@ -3,6 +3,7 @@ import { loadOrCreatePeerId } from "./peer-helper.js";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
+import { kadDHT } from "@libp2p/kad-dht";
 import { tcp } from "@libp2p/tcp";
 import {
   circuitRelayTransport,
@@ -60,6 +61,7 @@ export async function getRelayClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
+        kadDHT: kadDHT(),
         pubsub: gossipsub(),
         identify: identify(),
         identifyPush: identifyPush(),
@@ -129,6 +131,7 @@ export async function getNodeClient(
             defaultDataLimit: BigInt(1 << 24),
           },
         }),
+        kadDHT: kadDHT(),
         pubsub: gossipsub(),
         identify: identify(),
         identifyPush: identifyPush(),

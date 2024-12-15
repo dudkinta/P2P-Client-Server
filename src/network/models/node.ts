@@ -2,6 +2,7 @@ import type { Connection, PeerId } from "@libp2p/interface";
 export class Node {
   peerId: PeerId | undefined;
   connections: Set<Connection>;
+  store: Map<string, string>;
   addresses: Set<string>;
   protocols: Set<string>;
   roles: Set<string>;
@@ -12,6 +13,7 @@ export class Node {
     if (connection) {
       this.connections.add(connection);
     }
+    this.store = new Map();
     this.addresses = new Set();
     this.protocols = new Set();
     this.roles = new Set();
@@ -52,10 +54,17 @@ export class Node {
     return allConnections;
   }
 
+  setStore(store: Map<string, string>) {
+    [...store].forEach(([key, value]) => {
+      this.store.set(key, value);
+    });
+  }
+
   toJSON(): string {
     return JSON.stringify({
-      peerId: this.peerId,
+      peerId: this.peerId?.toString(),
       connections: Array.from(this.connections),
+      store: this.store,
       addresses: Array.from(this.addresses),
       protocols: Array.from(this.protocols),
       roles: Array.from(this.roles),

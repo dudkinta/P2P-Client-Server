@@ -7,7 +7,7 @@ import {
   readFromConnection,
 } from "../../helpers/proto-helper.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { Wallet } from "./../../../wallet/wallet.js";
+import { WalletPublicKey } from "./../../../wallet/wallet.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -79,15 +79,15 @@ export class MessagesService
           }
           const buffHeadIndex = peer?.metadata?.get('headIndex');
           if (buffHeadIndex) {
-            const headIndex = JSON.parse(new TextDecoder().decode(buffHeadIndex));
+            const headIndex = Number.parseInt(new TextDecoder().decode(buffHeadIndex));
             await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, headIndex, this.components.peerId.toString()));
           } else {
             this.log(LogLevel.Error, 'headIndex notFound');
           }
           const buffPublicKey = peer?.metadata?.get('publicKey');
           if (buffPublicKey) {
-            const publicKey = JSON.parse(new TextDecoder().decode(buffPublicKey));
-            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.WALLET, publicKey, this.components.peerId.toString()));
+            const publicKey = new TextDecoder().decode(buffPublicKey);
+            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.WALLET, { publicKey: publicKey }, this.components.peerId.toString()));
           } else {
             this.log(LogLevel.Error, 'publicKey notFound')
           }
@@ -291,9 +291,9 @@ export class MessagesService
         this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
         const peerId = (await this.components.peerStore.all()).find(p => p.id.toString() == message.sender);
         if (peerId) {
-          await this.components.peerStore.merge(peerId.id, {
+          await this.components.peerStore.patch(peerId.id, {
             metadata: {
-              'headIndex': new TextEncoder().encode(JSON.stringify(message.value)),
+              'headIndex': new TextEncoder().encode((message.value as number).toString()),
             },
           });
         }
@@ -301,6 +301,15 @@ export class MessagesService
       }
       case MessageType.WALLET: {
         this.safeDispatchEvent('message:addValidator', { detail: message });
+        const peerId = (await this.components.peerStore.all()).find(p => p.id.toString() == message.sender);
+        if (peerId) {
+          const publicKey = (message.value as WalletPublicKey).publicKey ?? '';
+          await this.components.peerStore.patch(peerId.id, {
+            metadata: {
+              'publicKey': new TextEncoder().encode(publicKey),
+            },
+          });
+        }
         break;
       }
       case MessageType.WALLET_REMOVE: {

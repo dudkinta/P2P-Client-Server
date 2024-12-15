@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
-import { TimeoutError, Connection, PeerId, Message } from "@libp2p/interface";
+import { TimeoutError, Connection, PeerId, Message, Peer } from "@libp2p/interface";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
@@ -16,6 +16,7 @@ import {
   StoreItem,
 } from "./services/store/index.js";
 import { MessagesService, MessageChain } from "./services/messages/index.js";
+import { KadDHT } from "@libp2p/kad-dht";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -295,23 +296,41 @@ export class P2PClient extends EventEmitter {
     }
   }
 
-  public async saveMetadata(key: string, data: any): Promise<void> {
+  public async saveMetadata(key: string, data: string): Promise<void> {
     if (!this.node) {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
       return;
     }
+    const dhtKey = new TextEncoder().encode(key);
+    const dhtValue = new TextEncoder().encode(data);
     const newMetadata = new Map();
-
-    if (data == undefined) {
-      newMetadata.set(key, undefined);
-    } else {
-      newMetadata.set(key, new TextEncoder().encode(JSON.stringify(data)))
-    }
-
+    newMetadata.set(key, dhtValue)
     await this.node.peerStore.patch(this.node.peerId, {
       metadata: newMetadata
     });
-    console.log('Store metadata', (await this.node.peerStore.get(this.node.peerId)).metadata);
+    const dht = this.node.services.kadDHT as KadDHT;
+    if (dht) {
+      try {
+        await dht.put(dhtKey, dhtValue);
+        this.log(LogLevel.Info, `Metadata saved to DHT: key=${key}`);
+      } catch (error: any) {
+        this.log(LogLevel.Error, `Failed to save metadata to DHT: ${error.message}`);
+      }
+    } else {
+      this.log(LogLevel.Error, `DHT is not enabled for this node`);
+    }
+  }
+
+  private async emitUpdateMetadata(peerName: string): Promise<void> {
+    const peer = (await this.node?.peerStore.all())?.find(p => p.id.toString() == peerName);
+    if (peer) {
+      const peerId: PeerId = peer.id;
+      const store = new Map();
+      [...peer.metadata].forEach(([key, value]) => {
+        store.set(key, new TextDecoder().decode(value));
+      });
+      this.emit("updatePeer", { peerId, undefined, store })
+    }
   }
 
   async startNode(): Promise<void> {
@@ -335,22 +354,17 @@ export class P2PClient extends EventEmitter {
         this.emit("connection:close", { peerId, conn });
       });
       this.node.addEventListener("peer:connect", (event: any) => {
-        const peerId = event.detail;
-        if (peerId) {
-          this.emit("peer:connect", peerId);
-        }
+        this.emit("peer:connect", event);
       });
       this.node.addEventListener("peer:disconnect", (event: any) => {
-        const peerId = event.detail;
-        if (peerId) {
-          this.emit("peer:disconnect", peerId);
-        }
+        this.emit("peer:disconnect", event);
       });
       this.node.addEventListener("peer:update", (event: any) => {
         const protocols = event.detail.peer.protocols;
         const peerId: PeerId = event.detail.peer.id;
-        if (protocols && peerId) {
-          this.emit("updateProtocols", { peerId, protocols });
+        const store = event.detail.metadata;
+        if (peerId) {
+          this.emit("updatePeer", { peerId, protocols, store });
         }
       });
       this.node.addEventListener("start", (event: any) => {
@@ -364,8 +378,9 @@ export class P2PClient extends EventEmitter {
       if (messageService) {
         messageService.startListeners();
 
-        messageService.addEventListener("message:addValidator", (event: any) => {
+        messageService.addEventListener("message:addValidator", async (event: any) => {
           this.emit("message:addValidator", event);
+          await this.emitUpdateMetadata(event.detail.sender);
         });
         messageService.addEventListener("message:removeValidator", (event: any) => {
           this.emit("message:removeValidator", event);
@@ -373,8 +388,9 @@ export class P2PClient extends EventEmitter {
         messageService.addEventListener("message:disconnect", (event: any) => {
           this.emit("message:disconnect", event);
         });
-        messageService.addEventListener("message:headIndex", (event: any) => {
+        messageService.addEventListener("message:headIndex", async (event: any) => {
           this.emit("message:headIndex", event);
+          await this.emitUpdateMetadata(event.detail.sender);
         });
         messageService.addEventListener("message:requestchain", (event: any) => {
           this.emit("message:requestchain", event);
