@@ -17,6 +17,7 @@ import {
 } from "./services/store/index.js";
 import { MessagesService, MessageChain } from "./services/messages/index.js";
 import { KadDHT } from "@libp2p/kad-dht";
+import { randomInt } from "crypto";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
@@ -355,7 +356,7 @@ export class P2PClient extends EventEmitter {
             // Получаем значение (Uint8Array)
             const value = (event as any).value;// as Uint8Array | Uint8ArrayList;
             const decoded = new TextDecoder().decode(value.subarray ? value.subarray() : value);
-            return JSON.parse(decoded);
+            console.log(`receive data: ${JSON.parse(decoded)} for key:${key}`);
           }
         }
         console.log('end for', key);
@@ -453,8 +454,12 @@ export class P2PClient extends EventEmitter {
       this.localPeerId = this.node.peerId;
       await this.updateSelfMultiaddress();
       P2PClient.instance = this;
+      setInterval(async () => {
+        await this.saveMetadata('test', randomInt(1000).toString());
+      }, 1000);
       setTimeout(async () => await this.getFromDHT('publicKey'), 0);
       setTimeout(async () => await this.getFromDHT('headIndex'), 0);
+      setTimeout(async () => await this.getFromDHT('test'), 0);
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
       console.error(err);
