@@ -301,7 +301,7 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
       return;
     }
-    const dhtKey = new TextEncoder().encode(key);
+    const dhtKey = new TextEncoder().encode(`${key}:${this.node.peerId.toString()}`);
     const dhtValue = new TextEncoder().encode(data);
     const newMetadata = new Map();
     newMetadata.set(key, dhtValue)
