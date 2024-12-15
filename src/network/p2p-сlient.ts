@@ -24,6 +24,7 @@ export interface ConnectionOpenEvent {
 }
 
 export class P2PClient extends EventEmitter {
+  private static instance: P2PClient;
   private config = ConfigLoader.getInstance().getConfig();
   private node: Libp2p | undefined;
   private log = (level: LogLevel, message: string) => {
@@ -44,6 +45,9 @@ export class P2PClient extends EventEmitter {
     this.mainRole = role;
   }
 
+  public static getInstance(): P2PClient {
+    return P2PClient.instance;
+  }
   private async createNode(): Promise<Libp2p | undefined> {
     try {
       if (this.mainRole === this.config.roles.NODE) {
@@ -301,7 +305,7 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
       return;
     }
-    const dhtKey = new TextEncoder().encode(`${key}:${this.node.peerId.toString()}`);
+    const dhtKey = new TextEncoder().encode(`globalData:${key}`);
     const dhtValue = new TextEncoder().encode(data);
     const newMetadata = new Map();
     newMetadata.set(key, dhtValue)
@@ -311,7 +315,16 @@ export class P2PClient extends EventEmitter {
     const dht = this.node.services.kadDHT as KadDHT;
     if (dht) {
       try {
-        await dht.put(dhtKey, dhtValue);
+        const currentData: string[] = []//await this.getFromDHT(key);
+
+        // Добавить свой ключ в список (если его нет)
+        if (!currentData.includes(data)) {
+          currentData.push(data);
+        }
+
+        // Сохранить обновленный список
+        const updatedData = new TextEncoder().encode(JSON.stringify(currentData));
+        await dht.put(dhtKey, updatedData);
         this.log(LogLevel.Info, `Metadata saved to DHT: key=${key}`);
       } catch (error: any) {
         this.log(LogLevel.Error, `Failed to save metadata to DHT: ${error.message}`);
@@ -319,6 +332,38 @@ export class P2PClient extends EventEmitter {
     } else {
       this.log(LogLevel.Error, `DHT is not enabled for this node`);
     }
+  }
+
+  private async getFromDHT(key: string): Promise<string[]> {
+    if (!this.node) {
+      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
+      return [];
+    }
+    const globalKey = new TextEncoder().encode(`global:${key}`);
+    const dht = this.node.services.kadDHT as KadDHT;
+    try {
+      if (dht) {
+        // Запускаем запрос
+        console.log('start getting', key);
+        const query = dht.get(globalKey);
+
+        // Обрабатываем все события QueryEvent
+        console.log('start for', key);
+        for await (const event of query) {
+          console.log("Event:", key, event.name, event);
+          if (event.name === 'PEER_RESPONSE') {
+            // Получаем значение (Uint8Array)
+            const value = (event as any).value;// as Uint8Array | Uint8ArrayList;
+            const decoded = new TextDecoder().decode(value.subarray ? value.subarray() : value);
+            return JSON.parse(decoded);
+          }
+        }
+        console.log('end for', key);
+      }
+    } catch (error: any) {
+      this.log(LogLevel.Error, `Failed to fetch global public keys: ${error.message}`);
+    }
+    return [];
   }
 
   private async emitUpdateMetadata(peerName: string): Promise<void> {
@@ -407,6 +452,9 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Info, `Libp2p listening on:`);
       this.localPeerId = this.node.peerId;
       await this.updateSelfMultiaddress();
+      P2PClient.instance = this;
+      setTimeout(async () => await this.getFromDHT('publicKey'), 0);
+      setTimeout(async () => await this.getFromDHT('headIndex'), 0);
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
       console.error(err);

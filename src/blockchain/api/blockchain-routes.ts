@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { BlockChain } from "../blockchain.js";
+import { P2PClient } from "../../network/p2p-сlient.js";
 const router = Router();
 
 router.get("/", async (req, res) => {
@@ -31,10 +32,10 @@ router.get("/block", async (req, res) => {
 });
 router.get("/delegates", async (req, res) => {
   try {
-    const blockchain = BlockChain.getInstance();
-    const delegator = blockchain.getDelegator();
-    if (delegator) {
-      res.json({ neighbors: delegator.getDelegates() });
+    const p2pClient = P2PClient.getInstance();
+    if (p2pClient) {
+      //const keys = await p2pClient.getFromDHT('publicKey');
+      res.json({ neighbors: [] });
     } else {
       res.status(404).json({ error: "Block not found" });
     }
