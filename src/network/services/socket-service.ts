@@ -5,6 +5,7 @@ import { NetworkService } from "./network-service.js";
 import { DelegateEntry } from "./../../delegator/delegator.js";
 let io: Server;
 let networkService: NetworkService;
+
 export function setupSocketIO(server: any, ns: NetworkService) {
   networkService = ns;
   io = new Server(server, {

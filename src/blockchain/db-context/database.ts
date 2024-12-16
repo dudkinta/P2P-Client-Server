@@ -1,11 +1,13 @@
 import { Level } from "level";
 import path from "path";
-import ConfigLoader from "../../common/config-loader.js";
+import { ConfigLoader } from "../../common/config-loader.js";
 import { BlockStorage } from "./block-storage.js";
 import { TransactionStorage } from "./transaction-storage.js";
 import { SmartContractStorage } from "./smartcontract-storage.js";
 import { ContractTransactionStorage } from "./contracttransactions-storage.js";
+import { injectable } from "inversify";
 
+@injectable()
 export class dbContext {
   private config = ConfigLoader.getInstance().getConfig();
   public blockStorage: BlockStorage;

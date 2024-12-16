@@ -1,5 +1,5 @@
 import { Node } from "..//models/node.js";
-import ConfigLoader from "../../common/config-loader.js";
+import { ConfigLoader } from "../../common/config-loader.js";
 import { isLocalAddress, isDirect, isRelay } from "../helpers/check-ip.js";
 import { Connection, PeerId } from "@libp2p/interface";
 import pkg from "debug";
@@ -8,7 +8,7 @@ import {
   sendDebug as SendLogToSocket,
   sendNodes as SendNodesToSocket,
 } from "./socket-service.js";
-import { RequestStore, StoreItem } from "./../services/store/index.js";
+import { RequestStore } from "./../services/store/index.js";
 import { getRandomElement } from "../helpers/array-helper.js";
 import { LogLevel } from "../helpers/log-level.js";
 import {

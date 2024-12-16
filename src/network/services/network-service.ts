@@ -1,8 +1,10 @@
+import { inject } from "inversify";
+import { TYPES } from "../../types.js";
 import { EventEmitter } from "events";
-import ConfigLoader from "../../common/config-loader.js";
+import { ConfigLoader } from "../../common/config-loader.js";
 import { P2PClient } from "../p2p-сlient.js";
 import { multiaddr } from "@multiformats/multiaddr";
-import { Connection, PeerId, PeerStore } from "@libp2p/interface";
+import { Connection, PeerId } from "@libp2p/interface";
 import { Node } from "../models/node.js";
 import { NodeStrategy } from "./node-strategy.js";
 import { RelayStrategy } from "./relay-strategy.js";
@@ -31,7 +33,6 @@ export type RequestConnectedPeers = (
 export type RequestStoreData = (request: RequestStore) => StoreItem[];
 
 export class NetworkService extends EventEmitter {
-  private client: P2PClient;
   private storage: IStrategy;
   private localPeer: PeerId | undefined;
   private config = ConfigLoader.getInstance().getConfig();
@@ -42,9 +43,8 @@ export class NetworkService extends EventEmitter {
       `[${timestamp.toISOString().slice(11, 23)}] ${message}`
     );
   };
-  constructor(p2pClient: P2PClient) {
+  constructor(@inject(TYPES.P2PClient) private client: P2PClient) {
     super();
-    this.client = p2pClient;
     if (this.config.nodeType == this.config.roles.NODE) {
       this.storage = new NodeStrategy(
         this.RequestConnect.bind(this),
@@ -132,15 +132,7 @@ export class NetworkService extends EventEmitter {
           );
         }
       });
-      this.client.on("message:addValidator", (event: any) => {
-        this.emit("message:addValidator", event);
-      });
-      this.client.on("message:removeValidator", (event: any) => {
-        this.emit("message:removeValidator", event);
-      });
-      this.client.on("message:disconnect", (event: any) => {
-        this.emit("message:disconnect", event);
-      });
+
       this.client.on("message:headIndex", (event: any) => {
         this.emit("message:headIndex", event);
       });

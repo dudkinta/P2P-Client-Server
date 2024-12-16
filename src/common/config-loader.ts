@@ -30,7 +30,7 @@ export interface Config {
   MAX_NODES: number;
 }
 
-class ConfigLoader {
+export class ConfigLoader {
   static instance: ConfigLoader;
   private config: Config;
   private knowsRelay: string[];
@@ -83,5 +83,3 @@ class ConfigLoader {
     return relayIds.includes(peer);
   }
 }
-
-export default ConfigLoader;

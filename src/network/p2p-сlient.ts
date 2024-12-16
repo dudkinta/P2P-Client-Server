@@ -1,32 +1,34 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from './../types.js';
 import { EventEmitter } from "events";
 import { Libp2p } from "libp2p";
-import { TimeoutError, Connection, PeerId, Message, Peer } from "@libp2p/interface";
+import { TimeoutError, Connection, PeerId } from "@libp2p/interface";
 import { RolesService } from "./services/roles/index.js";
 import { PeerListService } from "./services/peer-list/index.js";
 import { MultiaddressService } from "./services/multiadress/index.js";
 import { Multiaddr } from "@multiformats/multiaddr";
-import ConfigLoader from "../common/config-loader.js";
+import { Config, ConfigLoader } from "../common/config-loader.js";
 import { sendDebug } from "./services/socket-service.js";
 import { LogLevel } from "./helpers/log-level.js";
 import pkg from "debug";
-import { getNodeClient, getRelayClient } from "./helpers/libp2p-helper.js";
+import { p2pClientHelper } from "./helpers/libp2p-helper.js";
 import {
   StoreService,
   RequestStore,
   StoreItem,
 } from "./services/store/index.js";
 import { MessagesService, MessageChain } from "./services/messages/index.js";
-import { KadDHT } from "@libp2p/kad-dht";
-import { randomInt } from "crypto";
 const { debug } = pkg;
 export interface ConnectionOpenEvent {
   peerId: PeerId;
   conn: Connection;
 }
-
+@injectable()
 export class P2PClient extends EventEmitter {
-  private static instance: P2PClient;
-  private config = ConfigLoader.getInstance().getConfig();
+  private config: Config;
+  private port: number;
+  private listenAddrs: string[];
+  private mainRole: string;
   private node: Libp2p | undefined;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
@@ -36,29 +38,27 @@ export class P2PClient extends EventEmitter {
     );
   };
   localPeerId: PeerId | undefined;
-  private port: number;
-  private listenAddrs: string[];
-  private mainRole: string;
-  constructor(listenAddrs: string[], port: number, role: string) {
+
+  constructor(@inject(TYPES.ConfigLoader) configLoader: ConfigLoader,
+    @inject(TYPES.p2pClientHelper) private p2pClientHelper: p2pClientHelper) {
     super();
-    this.port = port;
-    this.listenAddrs = listenAddrs;
-    this.mainRole = role;
+    const config = configLoader.getConfig();
+    this.config = config;
+    this.port = config.port ?? 6006;
+    this.listenAddrs = config.listen ?? ["/ip4/0.0.0.0/tcp/"];
+    this.mainRole = config.nodeType;
   }
 
-  public static getInstance(): P2PClient {
-    return P2PClient.instance;
-  }
   private async createNode(): Promise<Libp2p | undefined> {
     try {
       if (this.mainRole === this.config.roles.NODE) {
-        return await getNodeClient(this.listenAddrs, this.port).catch((err) => {
+        return await this.p2pClientHelper.getNodeClient(this.listenAddrs, this.port).catch((err) => {
           this.log(LogLevel.Error, `Error in getNodeClient: ${err}`);
           return undefined;
         });
       }
       if (this.mainRole === this.config.roles.RELAY) {
-        return await getRelayClient(this.listenAddrs, this.port).catch(
+        return await this.p2pClientHelper.getRelayClient(this.listenAddrs, this.port).catch(
           (err) => {
             this.log(LogLevel.Error, `Error in getRelayClient: ${err}`);
             return undefined;
@@ -313,58 +313,6 @@ export class P2PClient extends EventEmitter {
     await this.node.peerStore.patch(this.node.peerId, {
       metadata: newMetadata
     });
-    const dht = this.node.services.kadDHT as KadDHT;
-    if (dht) {
-      try {
-        const currentData: string[] = []//await this.getFromDHT(key);
-
-        // Добавить свой ключ в список (если его нет)
-        if (!currentData.includes(data)) {
-          currentData.push(data);
-        }
-
-        // Сохранить обновленный список
-        const updatedData = new TextEncoder().encode(JSON.stringify(currentData));
-        await dht.put(dhtKey, updatedData);
-        this.log(LogLevel.Info, `Metadata saved to DHT: key=${key}`);
-      } catch (error: any) {
-        this.log(LogLevel.Error, `Failed to save metadata to DHT: ${error.message}`);
-      }
-    } else {
-      this.log(LogLevel.Error, `DHT is not enabled for this node`);
-    }
-  }
-
-  private async getFromDHT(key: string): Promise<string[]> {
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
-      return [];
-    }
-    const globalKey = new TextEncoder().encode(`global:${key}`);
-    const dht = this.node.services.kadDHT as KadDHT;
-    try {
-      if (dht) {
-        // Запускаем запрос
-        console.log('start getting', key);
-        const query = dht.get(globalKey);
-
-        // Обрабатываем все события QueryEvent
-        console.log('start for', key);
-        for await (const event of query) {
-          console.log("Event:", key, event.name, event);
-          if (event.name === 'PEER_RESPONSE') {
-            // Получаем значение (Uint8Array)
-            const value = (event as any).value;// as Uint8Array | Uint8ArrayList;
-            const decoded = new TextDecoder().decode(value.subarray ? value.subarray() : value);
-            console.log(`receive data: ${JSON.parse(decoded)} for key:${key}`);
-          }
-        }
-        console.log('end for', key);
-      }
-    } catch (error: any) {
-      this.log(LogLevel.Error, `Failed to fetch global public keys: ${error.message}`);
-    }
-    return [];
   }
 
   private async emitUpdateMetadata(peerName: string): Promise<void> {
@@ -424,16 +372,6 @@ export class P2PClient extends EventEmitter {
       if (messageService) {
         messageService.startListeners();
 
-        messageService.addEventListener("message:addValidator", async (event: any) => {
-          this.emit("message:addValidator", event);
-          await this.emitUpdateMetadata(event.detail.sender);
-        });
-        messageService.addEventListener("message:removeValidator", (event: any) => {
-          this.emit("message:removeValidator", event);
-        });
-        messageService.addEventListener("message:disconnect", (event: any) => {
-          this.emit("message:disconnect", event);
-        });
         messageService.addEventListener("message:headIndex", async (event: any) => {
           this.emit("message:headIndex", event);
           await this.emitUpdateMetadata(event.detail.sender);
@@ -453,13 +391,6 @@ export class P2PClient extends EventEmitter {
       this.log(LogLevel.Info, `Libp2p listening on:`);
       this.localPeerId = this.node.peerId;
       await this.updateSelfMultiaddress();
-      P2PClient.instance = this;
-      setInterval(async () => {
-        await this.saveMetadata('test', randomInt(1000).toString());
-      }, 1000);
-      setTimeout(async () => await this.getFromDHT('publicKey'), 0);
-      setTimeout(async () => await this.getFromDHT('headIndex'), 0);
-      setTimeout(async () => await this.getFromDHT('test'), 0);
     } catch (err: any) {
       this.log(LogLevel.Error, `Error on start client node - ${err}`);
       console.error(err);

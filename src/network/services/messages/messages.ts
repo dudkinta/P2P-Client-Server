@@ -21,13 +21,14 @@ import type {
   MessagesServiceComponents,
   MessagesServiceInit,
   MessagesService as MessagesServiceInterface,
-  MessageServiceEvents,
-  MessageRequest,
+  MessageServiceEvents
 } from "./index.js";
 import { Logger, Startable, Message, TopicValidatorResult } from "@libp2p/interface";
 import path from "path";
 import { fileURLToPath } from "url";
-import { BlockChain } from "../../../blockchain/blockchain.js";
+import { inject } from "inversify";
+import { TYPES } from "../../../types.js";
+import { Delegator } from "../../../delegator/delegator.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -51,6 +52,7 @@ export class MessagesService
 
   constructor(
     components: MessagesServiceComponents,
+    @inject(TYPES.Delegator) private delegator: Delegator,
     init: MessagesServiceInit = {}
   ) {
     super();
@@ -100,7 +102,10 @@ export class MessagesService
             LogLevel.Info,
             `Connection close to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
           );
-          this.safeDispatchEvent("message:disconnect", { detail: event.detail.remotePeer.toString() });
+          const publicKey = this.delegator.disconnectDelegate(event.detail.remotePeer.toString());
+          if (publicKey) {
+            await this.broadcastMessage(new MessageChain(MessageType.WALLET_REMOVE, { publicKey: publicKey }, this.components.peerId.toString()));
+          }
         }
       );
     }
@@ -140,7 +145,6 @@ export class MessagesService
   public startListeners() {
     Object.keys(MessageType).filter(key => isNaN(Number(key))).map((typeName) => {
       try {
-        console.log(LogLevel.Info, `Subscribe to ${typeName}`);
         this.components.pubsub.subscribe(typeName);
       }
       catch (err) {
@@ -160,7 +164,7 @@ export class MessagesService
     const bufferMessage = ProtobufMessageChain.decode(msg.data);
     const message = MessageChain.fromProtobuf(bufferMessage);
     if (message.sender != this.components.peerId.toString()) {
-      const blockchain = BlockChain.getInstance();
+      /*const blockchain = BlockChain.getInstance();
       if (blockchain) {
         if (message.type == MessageType.HEAD_BLOCK_INDEX) {
           const msgHeadIndex = message.value as number;
@@ -176,7 +180,7 @@ export class MessagesService
             return TopicValidatorResult.Ignore;
           }
         }
-      }
+      }*/
     }
     return TopicValidatorResult.Accept;
   }
@@ -300,20 +304,11 @@ export class MessagesService
         break;
       }
       case MessageType.WALLET: {
-        this.safeDispatchEvent('message:addValidator', { detail: message });
-        const peerId = (await this.components.peerStore.all()).find(p => p.id.toString() == message.sender);
-        if (peerId) {
-          const publicKey = (message.value as WalletPublicKey).publicKey ?? '';
-          await this.components.peerStore.patch(peerId.id, {
-            metadata: {
-              'publicKey': new TextEncoder().encode(publicKey),
-            },
-          });
-        }
+        this.delegator.addDelegate(message);
         break;
       }
       case MessageType.WALLET_REMOVE: {
-        this.safeDispatchEvent('message:removeValidator', { detail: message });
+        this.delegator.removeValidator(message);
         break;
       }
       case MessageType.REQUEST_CHAIN: {

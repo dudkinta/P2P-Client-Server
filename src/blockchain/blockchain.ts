@@ -1,3 +1,5 @@
+import { injectable, inject } from "inversify";
+import { TYPES } from "../types.js";
 import crypto from "crypto";
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
@@ -22,6 +24,7 @@ import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
 import { AllowedTypes } from "./db-context/models/common.js";
+
 const { debug } = pkg;
 
 const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
@@ -30,10 +33,8 @@ const TOTAL_YEARS: number = 50; // Общее количество лет (50 л
 const BLOCK_INTERVAL: number = 60; // Интервал между блоками в секундах (5 секунд)
 const HALVINGS: number = 16; // Количество халвингов (16)
 
+@injectable()
 export class BlockChain extends EventEmitter {
-  private static instance: BlockChain;
-  private delegator?: Delegator;
-  private db: dbContext;
   private chain: Block[] = [];
   private pendingTransactions: Transaction[] = [];
   private pendingSmartContracts: SmartContract[] = [];
@@ -47,23 +48,12 @@ export class BlockChain extends EventEmitter {
     );
   };
 
-  private constructor() {
+  constructor(@inject(TYPES.DbContext) private db: dbContext,
+    @inject(TYPES.Delegator) private delegator: Delegator) {
     super();
-    this.db = new dbContext();
   }
 
-  public static getInstance(): BlockChain {
-    if (!BlockChain.instance) {
-      BlockChain.instance = new BlockChain();
-    }
-    return BlockChain.instance;
-  }
-
-  public getDelegator(): Delegator | undefined {
-    return this.delegator;
-  }
-  public async startAsync(delegator: Delegator): Promise<void> {
-    this.delegator = delegator;
+  public async startAsync(): Promise<void> {
     this.chain = await this.db.blockStorage.getAll();
     this.chain.sort((a, b) => a.index - b.index);
     let lastBlock: Block;
@@ -341,10 +331,6 @@ export class BlockChain extends EventEmitter {
 
   public async createBlock(): Promise<void> {
     const lastBlock = await this.getLastBlock();
-    if (!this.delegator) {
-      this.log(LogLevel.Error, "Delegator is not initialized.");
-      return;
-    }
     const dtNow = Date.now();
     const neighbors = this.delegator.walletDelegates.map(
       (delegate) => delegate.publicKey

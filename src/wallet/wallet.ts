@@ -5,7 +5,7 @@ const bip32 = BIP32Factory(tinySecp256k1);
 import crypto from "crypto";
 import { Transaction } from "../blockchain/db-context/models/transaction.js";
 import { promises as fs } from "fs";
-import ConfigLoader from "../common/config-loader.js";
+import { ConfigLoader } from "../common/config-loader.js";
 import { SmartContract } from "../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../blockchain/db-context/models/contract-transaction.js";
 import EventEmitter from "events";

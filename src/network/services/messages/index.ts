@@ -1,3 +1,4 @@
+import { Container } from "inversify";
 import { MessagesService as MessagesServiceClass } from "./messages.js";
 import crypto from "crypto";
 import type {
@@ -18,12 +19,8 @@ import { WalletPublicKey } from "../../../wallet/wallet.js";
 import { GossipsubEvents } from "@chainsafe/libp2p-gossipsub";
 
 export interface MessageServiceEvents {
-  "message:addValidator": CustomEvent<MessageChain>;
-  "message:disconnect": CustomEvent<string>;
-  "message:removeValidator": CustomEvent<MessageChain>;
   "message:headIndex": CustomEvent<number>;
   "message:requestchain": CustomEvent<MessageChain>;
-
   "message:blockchainData": CustomEvent<MessageChain>;
   "message:unknown": CustomEvent<MessageChain>;
 
@@ -220,10 +217,4 @@ export interface MessagesServiceComponents {
   peerId: PeerId;
   pubsub: PubSub<GossipsubEvents>;
   events: TypedEventTarget<Libp2pEvents>;
-}
-
-export function messages(
-  init: MessagesServiceInit = {}
-): (components: MessagesServiceComponents) => MessagesService {
-  return (components) => new MessagesServiceClass(components, init);
 }

@@ -1,3 +1,5 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from './../types.js'
 import { WalletPublicKey } from "../wallet/wallet.js";
 import { EventEmitter } from "events";
 import { MessageChain, MessageType } from "../network/services/messages/index.js";
@@ -11,6 +13,7 @@ import pkg from "debug";
 const { debug } = pkg;
 
 export const REQUIRE_DELEGATE_COUNT: number = 5;
+
 
 export class DelegateEntry {
   public sender: string;
@@ -26,6 +29,7 @@ export class DelegateEntry {
   }
 }
 
+@injectable()
 export class Delegator extends EventEmitter {
   public walletDelegates: DelegateEntry[] = [];
   private log = (level: LogLevel, message: string) => {
@@ -40,11 +44,7 @@ export class Delegator extends EventEmitter {
     const wallet = message.value as WalletPublicKey;
     this.log(
       LogLevel.Info,
-      `Adding delegate message`
-    );
-    this.log(
-      LogLevel.Info,
-      `Adding delegate walletPK: ${JSON.stringify(wallet)}`
+      `Add delegate walletPK: ${JSON.stringify(wallet)}`
     );
 
     if (wallet.publicKey && message.sender) {
@@ -85,7 +85,7 @@ export class Delegator extends EventEmitter {
     }
   }
 
-  public disconnectDelegate(sender: string): void {
+  public disconnectDelegate(sender: string): string | undefined {
     this.log(
       LogLevel.Info,
       `Removing delegate ${sender}`
@@ -105,6 +105,7 @@ export class Delegator extends EventEmitter {
         this.emit("message:removeDelegator", new MessageChain(MessageType.WALLET_REMOVE, { publicKey: dEntry.publicKey }, ""));
         sendDelegate("remove", dEntry);
       }
+      return dEntry?.publicKey;
     }
     catch {
       this.log(LogLevel.Error, `Error in disconnectValidator. Sender: ${JSON.stringify(sender)}`)
