@@ -1,4 +1,3 @@
-import { Connection, TypedEventEmitter } from "@libp2p/interface";
 import { sendDebug } from "../socket-service.js";
 import { LogLevel } from "../../helpers/log-level.js";
 import protobuf from "protobufjs";
@@ -7,7 +6,6 @@ import {
   readFromConnection,
 } from "../../helpers/proto-helper.js";
 import type { IncomingStreamData } from "@libp2p/interface-internal";
-import { WalletPublicKey } from "./../../../wallet/wallet.js";
 import {
   PROTOCOL_PREFIX,
   PROTOCOL_NAME,
@@ -21,19 +19,17 @@ import type {
   MessagesServiceComponents,
   MessagesServiceInit,
   MessagesService as MessagesServiceInterface,
-  MessageServiceEvents
 } from "./index.js";
 import { Logger, Startable, Message, TopicValidatorResult } from "@libp2p/interface";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inject } from "inversify";
 import { TYPES } from "../../../types.js";
-import { Delegator } from "../../../delegator/delegator.js";
+import { BlockChain } from "../../../blockchain/blockchain.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class MessagesService
-  extends TypedEventEmitter<MessageServiceEvents>
   implements Startable, MessagesServiceInterface {
   public readonly protocol: string;
   private readonly components: MessagesServiceComponents;
@@ -52,10 +48,10 @@ export class MessagesService
 
   constructor(
     components: MessagesServiceComponents,
-    @inject(TYPES.Delegator) private delegator: Delegator,
+    @inject(TYPES.BlockChain) private blockchain: BlockChain,
+
     init: MessagesServiceInit = {}
   ) {
-    super();
     this.components = components;
     this.logger = components.logger.forComponent("@libp2p/messages");
     this.started = false;
@@ -75,37 +71,8 @@ export class MessagesService
             LogLevel.Info,
             `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
           );
-          const peer = await this.components.peerStore.get(this.components.peerId);
-          if (!peer) {
-            this.log(LogLevel.Error, 'selfPeer in peerStore notFound');
-          }
-          const buffHeadIndex = peer?.metadata?.get('headIndex');
-          if (buffHeadIndex) {
-            const headIndex = Number.parseInt(new TextDecoder().decode(buffHeadIndex));
-            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, headIndex, this.components.peerId.toString()));
-          } else {
-            this.log(LogLevel.Error, 'headIndex notFound');
-          }
-          const buffPublicKey = peer?.metadata?.get('publicKey');
-          if (buffPublicKey) {
-            const publicKey = new TextDecoder().decode(buffPublicKey);
-            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.WALLET, { publicKey: publicKey }, this.components.peerId.toString()));
-          } else {
-            this.log(LogLevel.Error, 'publicKey notFound')
-          }
-        }
-      );
-      this.components.events.addEventListener(
-        "connection:close",
-        async (event: any) => {
-          this.log(
-            LogLevel.Info,
-            `Connection close to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
-          );
-          const publicKey = this.delegator.disconnectDelegate(event.detail.remotePeer.toString());
-          if (publicKey) {
-            await this.broadcastMessage(new MessageChain(MessageType.WALLET_REMOVE, { publicKey: publicKey }, this.components.peerId.toString()));
-          }
+          const headIndex = this.blockchain.getHeadIndex();
+          await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, headIndex, this.components.peerId.toString()));
         }
       );
     }
@@ -129,6 +96,17 @@ export class MessagesService
     this.proto_root = await protobuf.load(
       path.resolve(__dirname, "./message-chain.proto")
     );
+
+    this.blockchain.on("message:newBlock", async (message) => {
+      await this.broadcastMessage(message);
+    });
+    this.blockchain.on("message:request", async (message) => {
+      await this.broadcastMessage(message);
+    });
+    this.blockchain.on("message:chain", async (message) => {
+      await this.sendMessage(message.sender, message); //возврат сообщения запрашиваемому пиру
+    });
+
     this.started = true;
     this.log(LogLevel.Info, "Started messages service");
   }
@@ -253,6 +231,9 @@ export class MessagesService
         this.log(LogLevel.Error, `Failed to write message: ${err.message}`);
       });
     }
+    else {
+      this.log(LogLevel.Error, `PeerId: ${peer} not found`);
+    }
   }
 
   private async handleDirectMessage(data: IncomingStreamData): Promise<void> {
@@ -292,51 +273,40 @@ export class MessagesService
   private async handleEventer(message: MessageChain): Promise<void> {
     switch (message.type) {
       case MessageType.HEAD_BLOCK_INDEX: {
-        this.safeDispatchEvent("message:headIndex", { detail: message.value as number });
-        const peerId = (await this.components.peerStore.all()).find(p => p.id.toString() == message.sender);
-        if (peerId) {
-          await this.components.peerStore.patch(peerId.id, {
-            metadata: {
-              'headIndex': new TextEncoder().encode((message.value as number).toString()),
-            },
-          });
+        const headIndex = message.value as number;
+        const myHeadIndex = this.blockchain.getHeadIndex();
+        if (myHeadIndex < headIndex) {
+          const requestMessage = new MessageChain(MessageType.REQUEST_CHAIN, { index: myHeadIndex + 1 }, message.sender);
+          await this.sendMessage(message.sender, requestMessage);
         }
         break;
       }
-      case MessageType.WALLET: {
-        this.delegator.addDelegate(message);
-        break;
-      }
-      case MessageType.WALLET_REMOVE: {
-        this.delegator.removeValidator(message);
-        break;
-      }
       case MessageType.REQUEST_CHAIN: {
-        this.safeDispatchEvent('message:requestchain', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.BLOCK: {
-        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.CHAIN: {
-        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.TRANSACTION: {
-        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.SMART_CONTRACT: {
-        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.CONTRACT_TRANSACTION: {
-        this.safeDispatchEvent('message:blockchainData', { detail: message });
+        this.blockchain.addBlockchainData(message);
         break;
       }
       default: {
-        this.safeDispatchEvent('message:unknown', { detail: message });
+        this.log(LogLevel.Warning, `Incoming unknown message type`);
       }
     }
   }

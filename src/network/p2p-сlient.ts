@@ -261,72 +261,6 @@ export class P2PClient extends EventEmitter {
     }, 60000 * 30);
   }
 
-  public async broadcastMessage(message: MessageChain): Promise<void> {
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
-      return;
-    }
-    const messageService = this.node.services.messages as MessagesService;
-    if (!messageService) {
-      this.log(LogLevel.Error, "Message service is not initialized");
-      return;
-    }
-    try {
-      message.sender = this.node.peerId.toString();
-      await messageService.broadcastMessage(message).catch((err) => {
-        this.log(LogLevel.Error, `Error in broadcastMessage: ${err}`);
-      });
-    } catch (error) {
-      this.log(LogLevel.Error, `Error in broadcastMessage: ${error}`);
-    }
-  }
-
-  public async sendMessageToConnection(peerId: string, message: MessageChain): Promise<void> {
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
-      return;
-    }
-    const messageService = this.node.services.messages as MessagesService;
-    if (!messageService) {
-      this.log(LogLevel.Error, "Message service is not initialized");
-      return;
-    }
-    try {
-      message.sender = this.node.peerId.toString();
-      await messageService.sendMessage(peerId, message).catch((err) => {
-        this.log(LogLevel.Error, `Error in sendMessage: ${err}`);
-      });
-    } catch (error) {
-      this.log(LogLevel.Error, `Error in sendMessage: ${error}`);
-    }
-  }
-
-  public async saveMetadata(key: string, data: string): Promise<void> {
-    if (!this.node) {
-      this.log(LogLevel.Error, "Node is not initialized for broadcastMessage");
-      return;
-    }
-    const dhtKey = new TextEncoder().encode(`globalData:${key}`);
-    const dhtValue = new TextEncoder().encode(data);
-    const newMetadata = new Map();
-    newMetadata.set(key, dhtValue)
-    await this.node.peerStore.patch(this.node.peerId, {
-      metadata: newMetadata
-    });
-  }
-
-  private async emitUpdateMetadata(peerName: string): Promise<void> {
-    const peer = (await this.node?.peerStore.all())?.find(p => p.id.toString() == peerName);
-    if (peer) {
-      const peerId: PeerId = peer.id;
-      const store = new Map();
-      [...peer.metadata].forEach(([key, value]) => {
-        store.set(key, new TextDecoder().decode(value));
-      });
-      this.emit("updatePeer", { peerId, undefined, store })
-    }
-  }
-
   async startNode(): Promise<void> {
     try {
       this.node = await this.createNode();
@@ -371,21 +305,6 @@ export class P2PClient extends EventEmitter {
       const messageService = this.node.services.messages as MessagesService;
       if (messageService) {
         messageService.startListeners();
-
-        messageService.addEventListener("message:headIndex", async (event: any) => {
-          this.emit("message:headIndex", event);
-          await this.emitUpdateMetadata(event.detail.sender);
-        });
-        messageService.addEventListener("message:requestchain", (event: any) => {
-          this.emit("message:requestchain", event);
-        });
-        messageService.addEventListener("message:blockchainData", (event: any) => {
-          this.emit("message:blockchainData", event);
-        });
-        messageService.addEventListener("message:unknown", (event: any) => {
-          this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
-          this.emit("message:unknown", event);
-        });
       }
 
       this.log(LogLevel.Info, `Libp2p listening on:`);

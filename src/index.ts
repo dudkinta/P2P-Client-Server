@@ -2,10 +2,8 @@ import 'reflect-metadata';
 import { Container, injectable, inject } from 'inversify';
 import { TYPES } from './types.js';
 import { ConfigLoader } from "./common/config-loader.js";
-import { SystemCoordinator } from "./system-coordinator.js";
 import { P2PClient } from './network/p2p-сlient.js';
 import { NetworkService } from './network/services/network-service.js';
-import { Delegator } from './delegator/delegator.js';
 import { WebServer } from './network/services/web-server.js';
 import { dbContext } from './blockchain/db-context/database.js';
 import { BlockChain } from './blockchain/blockchain.js';
@@ -18,11 +16,20 @@ import { p2pClientHelper } from './network/helpers/libp2p-helper.js';
 @injectable()
 class App {
   constructor(
-    @inject(TYPES.SystemCoordinator) private sytemCoordinator: SystemCoordinator,
+    @inject(TYPES.NetworkService) private networkService: NetworkService,
+    @inject(TYPES.WebServer) private webServer: WebServer,
+    @inject(TYPES.BlockChain) private blockChain: BlockChain
   ) { }
 
   async start() {
-    await this.sytemCoordinator.startAsync();
+    await this.networkService.startAsync().catch((err) => {
+      console.log("Failed to start network service", err);
+    });
+    await this.blockChain.startAsync().catch((err) => {
+      console.log("Failed to start blockchain", err);
+    });
+    await this.webServer.startAsync();
+    console.log("Blockchain initialized");
   }
 }
 
@@ -33,18 +40,16 @@ class App {
   container.bind<ConfigLoader>(TYPES.ConfigLoader).toDynamicValue(() => {
     return ConfigLoader.getInstance();
   });
-  container.bind<Delegator>(TYPES.Delegator).to(Delegator).inSingletonScope();
   container.bind<NetworkService>(TYPES.NetworkService).to(NetworkService).inSingletonScope();
   container.bind<(components: MessagesServiceComponents) => MessagesService>(
     TYPES.MessagesServiceFactory
   ).toFactory((context) => {
     return (components: MessagesServiceComponents, init: MessagesServiceInit = {}) => {
-      const delegator = context.container.get<Delegator>(TYPES.Delegator);
-      return new MessagesService(components, delegator, init);
+      const blockChain = context.container.get<BlockChain>(TYPES.BlockChain);
+      return new MessagesService(components, blockChain, init);
     };
   });
   container.bind<P2PClient>(TYPES.P2PClient).to(P2PClient).inSingletonScope();
-  container.bind<SystemCoordinator>(TYPES.SystemCoordinator).to(SystemCoordinator).inSingletonScope();
   container.bind<WebServer>(TYPES.WebServer).to(WebServer).inSingletonScope();
   container.bind<dbContext>(TYPES.DbContext).to(dbContext).inSingletonScope();
   container.bind<BlockChain>(TYPES.BlockChain).to(BlockChain).inSingletonScope();

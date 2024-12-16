@@ -133,19 +133,6 @@ export class NetworkService extends EventEmitter {
         }
       });
 
-      this.client.on("message:headIndex", (event: any) => {
-        this.emit("message:headIndex", event);
-      });
-      this.client.on("message:requestchain", (event: any) => {
-        this.emit("message:requestchain", event);
-      });
-      this.client.on("message:blockchainData", (event: any) => {
-        this.emit("message:blockchainData", event);
-      });
-      this.client.on("message:unknown", (event: any) => {
-        this.log(LogLevel.Error, `Unknown message: ${event.detail}`);
-        this.emit("message:unknown", event);
-      });
       await this.storage.startStrategy(this.localPeer).catch((error) => {
         this.log(
           LogLevel.Error,
@@ -397,16 +384,5 @@ export class NetworkService extends EventEmitter {
 
   public getRoot(): { root: Node; connections: Connection[] } | undefined {
     return this.storage?.getRoot();
-  }
-
-  public async broadcastMessage(message: MessageChain): Promise<void> {
-    await this.client.broadcastMessage(message);
-  }
-  public async sendMessageToConnection(peerId: string, message: MessageChain) {
-    await this.client.sendMessageToConnection(peerId, message);
-  }
-
-  public async saveMetadata(key: string, data: string): Promise<void> {
-    await this.client.saveMetadata(key, data);
   }
 }

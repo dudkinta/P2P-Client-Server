@@ -15,9 +15,6 @@ function toHex(buffer: Uint8Array): string {
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
-export interface WalletPublicKey {
-  publicKey: string | null;
-}
 
 export interface WalletEvents {
   "wallet:change": [Wallet];
@@ -27,8 +24,7 @@ export interface WalletEvents {
 }
 
 export class Wallet
-  extends EventEmitter<WalletEvents>
-  implements WalletPublicKey {
+  extends EventEmitter<WalletEvents> {
   private static eventEmitter: EventEmitter = new EventEmitter();
   public static instances: Wallet[] = [];
   public static current: Wallet | null = null;
@@ -260,14 +256,5 @@ export class Wallet
     }
 
     transaction.signature = toHex(signature);
-  }
-
-  public toWalletPublicKey(): WalletPublicKey {
-    if (!this.publicKey) {
-      throw new Error("Wallet publicKey is not set");
-    }
-    return {
-      publicKey: this.publicKey,
-    };
   }
 }

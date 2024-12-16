@@ -2,12 +2,10 @@ import { injectable, inject } from "inversify";
 import { TYPES } from "../../types.js";
 import { Router } from "express";
 import { BlockChain } from "../blockchain.js";
-import { Delegator } from "../../delegator/delegator.js";
 
 @injectable()
 export class BlockChainRoutesFactory {
-  constructor(@inject(TYPES.BlockChain) private blockChain: BlockChain,
-    @inject(TYPES.Delegator) private delegator: Delegator) { }
+  constructor(@inject(TYPES.BlockChain) private blockChain: BlockChain) { }
 
   create(): Router {
     const router = Router();
@@ -33,16 +31,6 @@ export class BlockChainRoutesFactory {
         res
           .status(500)
           .json({ error: "Failed to get from blockchain", details: error.message });
-      }
-    });
-    router.get("/delegates", async (req, res) => {
-      try {
-        const wallets = this.delegator.getDelegates();
-        res.json({ neighbors: wallets });
-      } catch (error: any) {
-        res
-          .status(500)
-          .json({ error: "Failed to get neighbors", details: error.message });
       }
     });
     return router;

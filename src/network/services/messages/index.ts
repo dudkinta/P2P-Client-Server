@@ -1,8 +1,5 @@
-import { Container } from "inversify";
-import { MessagesService as MessagesServiceClass } from "./messages.js";
 import crypto from "crypto";
 import type {
-  TypedEventEmitter,
   ComponentLogger,
   PeerStore,
   TypedEventTarget,
@@ -15,31 +12,18 @@ import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
 import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
 import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
-import { WalletPublicKey } from "../../../wallet/wallet.js";
 import { GossipsubEvents } from "@chainsafe/libp2p-gossipsub";
 
-export interface MessageServiceEvents {
-  "message:headIndex": CustomEvent<number>;
-  "message:requestchain": CustomEvent<MessageChain>;
-  "message:blockchainData": CustomEvent<MessageChain>;
-  "message:unknown": CustomEvent<MessageChain>;
-
-  "message:error": CustomEvent<Error>;
-}
-
-export interface MessagesService
-  extends TypedEventEmitter<MessageServiceEvents> {
+export interface MessagesService {
   startListeners(): void;
   broadcastMessage(message: MessageChain): Promise<void>;
   sendMessage(connection: string, message: MessageChain): Promise<void>;
 }
 
 export interface MessageRequest {
-  key: string;
   index: number;
 }
 export interface BlockChainMessage {
-  key: string;
   maxIndex: number;
   block: Block;
 }
@@ -48,11 +32,9 @@ export enum MessageType {
   TRANSACTION = 1,
   SMART_CONTRACT = 2,
   CONTRACT_TRANSACTION = 3,
-  WALLET = 4,
-  CHAIN = 5,
-  REQUEST_CHAIN = 6,
-  HEAD_BLOCK_INDEX = 7,
-  WALLET_REMOVE = 8,
+  CHAIN = 4,
+  REQUEST_CHAIN = 5,
+  HEAD_BLOCK_INDEX = 6
 }
 
 export class MessageChain {
@@ -64,7 +46,6 @@ export class MessageChain {
     | Transaction
     | SmartContract
     | ContractTransaction
-    | WalletPublicKey
     | BlockChainMessage
     | MessageRequest
     | number;
@@ -75,7 +56,6 @@ export class MessageChain {
       | Transaction
       | SmartContract
       | ContractTransaction
-      | WalletPublicKey
       | BlockChainMessage
       | MessageRequest
       | number,
@@ -119,12 +99,6 @@ export class MessageChain {
       case MessageType.CONTRACT_TRANSACTION:
         message.contract_transaction = this.value;
         break;
-      case MessageType.WALLET:
-        message.wallet = this.value;
-        break;
-      case MessageType.WALLET_REMOVE:
-        message.wallet = this.value;
-        break;
       case MessageType.CHAIN:
         message.chain = this.value;
         break;
@@ -138,7 +112,6 @@ export class MessageChain {
         throw new Error(`Unsupported type (toProtobuf): ${this.type}`);
     }
 
-    // Проверяем сообщение перед сериализацией
     const errMsg = ProtobufMessageChain.verify(message);
     if (errMsg) throw new Error(`Invalid message: ${errMsg}`);
 
@@ -169,16 +142,6 @@ export class MessageChain {
           MessageType.CONTRACT_TRANSACTION,
           decodedMessage.contract_transaction, decodedMessage.sender
         );
-      case MessageType.WALLET:
-        return new MessageChain(
-          MessageType.WALLET,
-          decodedMessage.wallet, decodedMessage.sender
-        );
-      case MessageType.WALLET_REMOVE:
-        return new MessageChain(
-          MessageType.WALLET_REMOVE,
-          decodedMessage.wallet, decodedMessage.sender
-        )
       case MessageType.CHAIN:
         return new MessageChain(
           MessageType.CHAIN,

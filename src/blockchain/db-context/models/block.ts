@@ -2,7 +2,6 @@ import crypto from "crypto";
 import { Transaction } from "./transaction.js";
 import { SmartContract } from "./smart-contract.js";
 import { ContractTransaction } from "./contract-transaction.js";
-import { selectDelegates } from "./../../../delegator/delegator.js";
 
 export class Block {
   public hash: string;
@@ -14,8 +13,6 @@ export class Block {
   public transactions: Transaction[];
   public smartContracts: SmartContract[];
   public contractTransactions: ContractTransaction[];
-  public neighbors: string[] = [];
-  public selectedDelegates: string[] = [];
 
   constructor(
     index: number,
@@ -25,8 +22,6 @@ export class Block {
     transactions: Transaction[] = [],
     smartContracts: SmartContract[] = [],
     contractTransactions: ContractTransaction[] = [],
-    neighbors: string[] = [],
-    selectedDelegates: string[] = []
   ) {
     this.index = index;
     this.previousHash = previousHash;
@@ -35,8 +30,6 @@ export class Block {
     this.transactions = transactions;
     this.smartContracts = smartContracts;
     this.contractTransactions = contractTransactions;
-    this.neighbors = neighbors;
-    this.selectedDelegates = selectedDelegates;
     this.merkleRoot = this.calculateMerkleRoot();
     this.hash = this.calculateHash();
     this.reward.block = this.hash;
@@ -56,24 +49,17 @@ export class Block {
       .createHash("sha256")
       .update(
         this.index +
-          this.merkleRoot +
-          this.previousHash +
-          this.timestamp +
-          JSON.stringify(this.transactions) +
-          JSON.stringify(this.smartContracts) +
-          JSON.stringify(this.contractTransactions) +
-          JSON.stringify(this.neighbors) +
-          JSON.stringify(this.selectedDelegates)
+        this.merkleRoot +
+        this.previousHash +
+        this.timestamp +
+        JSON.stringify(this.transactions) +
+        JSON.stringify(this.smartContracts) +
+        JSON.stringify(this.contractTransactions)
       )
       .digest("hex");
   }
 
   isValid(): boolean {
-    const checkDelegates = selectDelegates(
-      this.previousHash,
-      this.timestamp,
-      this.neighbors
-    );
     if (this.hash !== this.calculateHash()) {
       return false;
     }
@@ -94,11 +80,6 @@ export class Block {
       if (!contractTx.isValid()) {
         return false;
       }
-    }
-    if (
-      JSON.stringify(checkDelegates) !== JSON.stringify(this.selectedDelegates)
-    ) {
-      return false;
     }
     return true;
   }
@@ -125,7 +106,6 @@ export class Block {
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
-      Delegates: ${JSON.stringify(this.selectedDelegates, null, 2)}
     `;
   }
 

@@ -6,17 +6,14 @@ import "../../../blockchain/db-context/models/block.proto";
 import "../../../blockchain/db-context/models/transaction.proto";
 import "../../../blockchain/db-context/models/smart-contract.proto";
 import "../../../blockchain/db-context/models/contract-transaction.proto";
-import "../../../wallet/wallet-publickey.proto";
 
 message MessageRequest {
-    string key = 0;
-    int32 index = 1;
+    int32 index = 0;
 }
 
 message BlockChainMessage {
-    string key = 0;
-    int32 maxIndex = 1;
-    blockchain.block.Block block = 2;
+    int32 maxIndex = 0;
+    blockchain.block.Block block = 1;
 }
 
 enum MessageType {
@@ -24,11 +21,9 @@ enum MessageType {
     TRANSACTION = 1;
     SMART_CONTRACT = 2;
     CONTRACT_TRANSACTION = 3;
-    WALLET = 4;
-    CHAIN = 5;
-    REQUEST_CHAIN = 6;
-    HEAD_BLOCK_INDEX = 7;
-    WALLET_REMOVE = 8;
+    CHAIN = 4;
+    REQUEST_CHAIN = 5;
+    HEAD_BLOCK_INDEX = 6;
 }
 
 message MessageChain {
@@ -39,9 +34,8 @@ message MessageChain {
         blockchain.transaction.Transaction transaction = 4;
         blockchain.contract.SmartContract smart_contract = 5;
         blockchain.contract.ContractTransaction contract_transaction = 6;
-        blockchain.wallet.WalletPublicKey wallet = 7;
-        BlockChainMessage chain = 8;
-        MessageRequest request = 9;
-        int32 headIndex = 10;
+        BlockChainMessage chain = 7;
+        MessageRequest request = 8;
+        int32 headIndex = 9;
     }
 }

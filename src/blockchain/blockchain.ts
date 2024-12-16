@@ -1,12 +1,10 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types.js";
-import crypto from "crypto";
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
 import { SmartContract } from "./db-context/models/smart-contract.js";
 import { Transaction } from "./db-context/models/transaction.js";
 import { ContractTransaction } from "./db-context/models/contract-transaction.js";
-import * as tinySecp256k1 from "tiny-secp256k1";
 import { EventEmitter } from "events";
 import {
   MessageChain,
@@ -15,11 +13,6 @@ import {
   MessageRequest,
 } from "./../network/services/messages/index.js";
 import { Wallet } from "./../wallet/wallet.js";
-import {
-  Delegator,
-  selectDelegates,
-  REQUIRE_DELEGATE_COUNT,
-} from "../delegator/delegator.js";
 import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
@@ -48,8 +41,7 @@ export class BlockChain extends EventEmitter {
     );
   };
 
-  constructor(@inject(TYPES.DbContext) private db: dbContext,
-    @inject(TYPES.Delegator) private delegator: Delegator) {
+  constructor(@inject(TYPES.DbContext) private db: dbContext) {
     super();
   }
 
@@ -95,22 +87,7 @@ export class BlockChain extends EventEmitter {
       if (existBlock.hash === block.hash) {
         return;
       } else {
-        let existRewartIndexReceiver: number = 999;
-        if (existBlock.reward.receiver) {
-          existRewartIndexReceiver = existBlock.selectedDelegates.indexOf(
-            existBlock.reward.receiver
-          );
-        }
-        let currentRewartIndexReceiver: number = 999;
-        if (block.reward.receiver) {
-          currentRewartIndexReceiver = block.selectedDelegates.indexOf(
-            block.reward.receiver
-          );
-        }
-        if (existRewartIndexReceiver > currentRewartIndexReceiver) {
-          await this.replaceBlock(existBlock, block, isFillChain);
-        }
-        return;
+
       }
     }
     this.chain.push(block);
@@ -137,8 +114,7 @@ export class BlockChain extends EventEmitter {
     if (
       !isFillChain &&
       Wallet.current &&
-      Wallet.current.publicKey &&
-      block.selectedDelegates.includes(Wallet.current.publicKey)
+      Wallet.current.publicKey
     ) {
       setTimeout(async () => {
         this.createBlock();
@@ -247,12 +223,10 @@ export class BlockChain extends EventEmitter {
     }
     if (message.type == MessageType.REQUEST_CHAIN) {
       const messageValue = message.value as MessageRequest;
-      const key = messageValue.key;
       const index = messageValue.index;
       const block = await this.getBlock(index);
       if (block) {
         const messageChain = new MessageChain(MessageType.CHAIN, {
-          key: key,
           maxIndex: this.chain.length - 1,
           block: block,
         }, message.sender);
@@ -261,36 +235,8 @@ export class BlockChain extends EventEmitter {
     }
     if (message.type == MessageType.CHAIN) {
       const messageValue = message.value as BlockChainMessage;
-      const key = messageValue.key;
       const maxIndex = messageValue.maxIndex;
       const block = messageValue.block;
-      if (!Wallet.current) {
-        this.log(LogLevel.Error, "Current wallet is null");
-        return;
-      }
-      if (!Wallet.current.publicKey) {
-        this.log(LogLevel.Error, "Publick key is null");
-        return;
-      }
-      const publicKeyBuffer = Buffer.from(Wallet.current.publicKey, "hex");
-      if (!tinySecp256k1.isPoint(publicKeyBuffer)) {
-        console.error("Invalid sender public key.");
-        return;
-      }
-      const signatureBuffer = Buffer.from(key, "hex");
-      const hash = crypto
-        .createHash("sha256")
-        .update(block.index.toString())
-        .digest();
-      const isSignatureValid = tinySecp256k1.verify(
-        hash,
-        publicKeyBuffer,
-        signatureBuffer
-      );
-      if (!isSignatureValid) {
-        this.log(LogLevel.Error, "Invalid signature for chain message.");
-        return;
-      }
 
       if (block.isValid()) {
         const index = block.index;
@@ -320,30 +266,14 @@ export class BlockChain extends EventEmitter {
     const lastIndex = lastBlock?.index ?? 0;
     if (Wallet.current) {
       const key = Wallet.current?.signMessage(lastIndex.toString());
-      this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN,
-        {
-          key: key,
-          index: lastIndex
-        },
-        ''));
+      this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN, { index: lastIndex }, ''));
     }
   }
 
   public async createBlock(): Promise<void> {
     const lastBlock = await this.getLastBlock();
     const dtNow = Date.now();
-    const neighbors = this.delegator.walletDelegates.map(
-      (delegate) => delegate.publicKey
-    );
-    const selectedDelegates = selectDelegates(
-      lastBlock?.hash ?? "0",
-      dtNow,
-      neighbors
-    );
-    if (selectedDelegates.length != REQUIRE_DELEGATE_COUNT) {
-      this.log(LogLevel.Error, "Delegates are not selected.");
-      return;
-    }
+
     if (!Wallet.current) {
       this.log(LogLevel.Error, "Current wallet is null");
       return;
@@ -368,9 +298,7 @@ export class BlockChain extends EventEmitter {
         rewardTransaction,
         this.pendingTransactions,
         this.pendingSmartContracts,
-        this.pendingContractTransactions,
-        neighbors,
-        selectedDelegates
+        this.pendingContractTransactions
       );
       //console.log("block", genesisBlock);
       await this.addBlock(genesisBlock, false);
@@ -386,14 +314,11 @@ export class BlockChain extends EventEmitter {
         rewardTransaction,
         this.pendingTransactions,
         this.pendingSmartContracts,
-        this.pendingContractTransactions,
-        neighbors,
-        selectedDelegates
+        this.pendingContractTransactions
       );
       this.pendingTransactions = [];
       this.pendingSmartContracts = [];
       this.pendingContractTransactions = [];
-      //console.log("block", block);
       await this.addBlock(block, false);
       this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block, ''));
     }
