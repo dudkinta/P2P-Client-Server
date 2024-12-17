@@ -16,6 +16,12 @@ message BlockChainMessage {
     blockchain.block.Block block = 1;
 }
 
+message BlockValidate {
+    int32 index = 0;
+    string publicKey = 1;
+    string hash =2;
+}
+
 enum MessageType {
     BLOCK = 0;
     TRANSACTION = 1;
@@ -24,6 +30,7 @@ enum MessageType {
     CHAIN = 4;
     REQUEST_CHAIN = 5;
     HEAD_BLOCK_INDEX = 6;
+    BLOCK_VALIDATE = 7;
 }
 
 message MessageChain {
@@ -37,5 +44,6 @@ message MessageChain {
         BlockChainMessage chain = 7;
         MessageRequest request = 8;
         int32 headIndex = 9;
+        BlockValidate block_validate = 10;
     }
 }

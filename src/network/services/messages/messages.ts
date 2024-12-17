@@ -103,6 +103,9 @@ export class MessagesService
     this.blockchain.on("message:request", async (message) => {
       await this.broadcastMessage(message);
     });
+    this.blockchain.on("message:validateBlock", async (message) => {
+      await this.broadcastMessage(message);
+    });
     this.blockchain.on("message:chain", async (message) => {
       await this.sendMessage(message.sender, message); //возврат сообщения запрашиваемому пиру
     });
@@ -304,6 +307,9 @@ export class MessagesService
       case MessageType.CONTRACT_TRANSACTION: {
         this.blockchain.addBlockchainData(message);
         break;
+      }
+      case MessageType.BLOCK_VALIDATE: {
+        this.blockchain.addBlockchainData(message);
       }
       default: {
         this.log(LogLevel.Warning, `Incoming unknown message type`);

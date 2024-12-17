@@ -27,6 +27,11 @@ export interface BlockChainMessage {
   maxIndex: number;
   block: Block;
 }
+export interface BlockValidate {
+  index: number;
+  publicKey: string;
+  hash: string;
+}
 export enum MessageType {
   BLOCK = 0,
   TRANSACTION = 1,
@@ -34,7 +39,8 @@ export enum MessageType {
   CONTRACT_TRANSACTION = 3,
   CHAIN = 4,
   REQUEST_CHAIN = 5,
-  HEAD_BLOCK_INDEX = 6
+  HEAD_BLOCK_INDEX = 6,
+  BLOCK_VALIDATE = 7
 }
 
 export class MessageChain {
@@ -48,6 +54,7 @@ export class MessageChain {
     | ContractTransaction
     | BlockChainMessage
     | MessageRequest
+    | BlockValidate
     | number;
   constructor(
     type: MessageType,
@@ -58,6 +65,7 @@ export class MessageChain {
       | ContractTransaction
       | BlockChainMessage
       | MessageRequest
+      | BlockValidate
       | number,
     sender: string
   ) {
@@ -108,6 +116,9 @@ export class MessageChain {
       case MessageType.HEAD_BLOCK_INDEX:
         message.headIndex = this.value;
         break;
+      case MessageType.BLOCK_VALIDATE:
+        message.block_validate = this.value;
+        break;
       default:
         throw new Error(`Unsupported type (toProtobuf): ${this.type}`);
     }
@@ -156,6 +167,11 @@ export class MessageChain {
         return new MessageChain(
           MessageType.HEAD_BLOCK_INDEX,
           decodedMessage.headIndex, decodedMessage.sender
+        );
+      case MessageType.BLOCK_VALIDATE:
+        return new MessageChain(
+          MessageType.BLOCK_VALIDATE,
+          decodedMessage.block_validate, decodedMessage.sender
         );
       default:
         throw new Error(`Unsupported type (fromProtobuf): ${decodedMessage.type}`);

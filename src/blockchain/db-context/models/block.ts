@@ -12,7 +12,7 @@ export class Block {
   public transactions: Transaction[];
   public smartContracts: SmartContract[];
   public contractTransactions: ContractTransaction[];
-
+  public validators: string[] = [];
   constructor(
     index: number,
     previousHash: string,
@@ -102,6 +102,7 @@ export class Block {
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
+      Validators: ${JSON.stringify(this.validators, null, 2)}
     `;
   }
 }

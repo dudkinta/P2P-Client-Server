@@ -11,6 +11,7 @@ import {
   MessageType,
   BlockChainMessage,
   MessageRequest,
+  BlockValidate,
 } from "./../network/services/messages/index.js";
 import { Wallet } from "./../wallet/wallet.js";
 import { LogLevel } from "../network/helpers/log-level.js";
@@ -215,6 +216,15 @@ export class BlockChain extends EventEmitter {
         }
         if (lastBlock && lastBlock.index + 1 !== block.index) {
           //ignore block/ need to request missing blocks
+        }
+      }
+    }
+    if (message.type === MessageType.BLOCK_VALIDATE) {
+      const validateData = message.value as BlockValidate;
+      const lastBlock = await this.getLastBlock();
+      if (lastBlock && lastBlock.index == validateData.index && lastBlock.hash == validateData.hash) {
+        if (!lastBlock.validators.includes(validateData.publicKey)) {
+          lastBlock.validators.push(validateData.publicKey);
         }
       }
     }
