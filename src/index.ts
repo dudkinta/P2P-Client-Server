@@ -12,6 +12,7 @@ import { BlockChainRoutesFactory } from './blockchain/api/blockchain-routes.js';
 import { MessagesServiceComponents, MessagesServiceInit } from './network/services/messages/index.js';
 import { MessagesService } from './network/services/messages/messages.js';
 import { p2pClientHelper } from './network/helpers/libp2p-helper.js';
+import { Statistic } from './blockchain/statistic.js';
 // Основной класс
 @injectable()
 class App {
@@ -56,6 +57,7 @@ class App {
   container.bind<BlockChainRoutesFactory>(TYPES.BlockChainRoutesFactory).to(BlockChainRoutesFactory).inSingletonScope();
   container.bind<WalletRoutesFactory>(TYPES.WalletRoutesFactory).to(WalletRoutesFactory).inSingletonScope();
   container.bind<p2pClientHelper>(TYPES.p2pClientHelper).to(p2pClientHelper).inSingletonScope();
+  container.bind<Statistic>(TYPES.Statistic).to(Statistic).inSingletonScope();
   container.bind(App).to(App);
 
   const app = container.get(App);

@@ -3,7 +3,7 @@ import { TYPES } from "../types.js";
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
 import { SmartContract } from "./db-context/models/smart-contract.js";
-import { Transaction } from "./db-context/models/transaction.js";
+import { Status, Transaction } from "./db-context/models/transaction.js";
 import { ContractTransaction } from "./db-context/models/contract-transaction.js";
 import { EventEmitter } from "events";
 import {
@@ -17,6 +17,7 @@ import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
 import { AllowedTypes } from "./db-context/models/common.js";
+import { Statistic } from "./statistic.js";
 
 const { debug } = pkg;
 
@@ -41,7 +42,9 @@ export class BlockChain extends EventEmitter {
     );
   };
 
-  constructor(@inject(TYPES.DbContext) private db: dbContext) {
+  constructor(
+    @inject(TYPES.DbContext) private db: dbContext,
+    @inject(TYPES.Statistic) private statistic: Statistic) {
     super();
   }
 
@@ -69,6 +72,12 @@ export class BlockChain extends EventEmitter {
         await this.db.blockStorage.delete(errorIndex);
       }
     }
+    this.chain.forEach((block) => {
+      if (block.transactions.length > 0) {
+        block.transactions.forEach((tx) => this.statistic.calcBalances(tx));
+      }
+      this.statistic.calcActive(block);
+    });
     const headIndex =
       this.chain.length == 0
         ? -1
@@ -124,6 +133,12 @@ export class BlockChain extends EventEmitter {
       LogLevel.Info,
       `Block added: ${block.index} reward:${block.reward.amount}`
     );
+
+    if (block.transactions.length > 0) {
+      block.transactions.forEach((tx) => this.statistic.calcBalances(tx));
+    }
+    this.statistic.calcBalances(block.reward);
+    this.statistic.calcActive(block);
     await this.db.blockStorage.save(block);
     if (this.getHeadIndex() < block.index) {
       this.setHeadIndex(block.index);
@@ -286,21 +301,24 @@ export class BlockChain extends EventEmitter {
       Wallet.current.publicKey,
       Wallet.current.publicKey,
       this.calculateBlockReward(lastBlock?.index ?? 0),
-      AllowedTypes.REWART,
+      AllowedTypes.REWARD,
       dtNow
     );
     Wallet.current.signTransaction(rewardTransaction);
+    const txToBlock = this.pendingTransactions.filter((tx) => this.statistic.checkBalance(tx));
+    txToBlock.forEach(tx => {
+      tx.status = Status.COMPLETE
+    });
     if (!lastBlock) {
       const genesisBlock = new Block(
         0,
         "0",
         dtNow,
         rewardTransaction,
-        this.pendingTransactions,
+        txToBlock,
         this.pendingSmartContracts,
         this.pendingContractTransactions
       );
-      //console.log("block", genesisBlock);
       await this.addBlock(genesisBlock, false);
       this.emit(
         "message:newBlock",
@@ -312,13 +330,10 @@ export class BlockChain extends EventEmitter {
         lastBlock.hash,
         dtNow,
         rewardTransaction,
-        this.pendingTransactions,
+        txToBlock,
         this.pendingSmartContracts,
         this.pendingContractTransactions
       );
-      this.pendingTransactions = [];
-      this.pendingSmartContracts = [];
-      this.pendingContractTransactions = [];
       await this.addBlock(block, false);
       this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block, ''));
     }

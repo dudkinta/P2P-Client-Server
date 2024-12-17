@@ -5,7 +5,6 @@ import { ContractTransaction } from "./contract-transaction.js";
 
 export class Block {
   public hash: string;
-  public merkleRoot: string;
   public previousHash: string;
   public index: number;
   public timestamp: number;
@@ -30,7 +29,6 @@ export class Block {
     this.transactions = transactions;
     this.smartContracts = smartContracts;
     this.contractTransactions = contractTransactions;
-    this.merkleRoot = this.calculateMerkleRoot();
     this.hash = this.calculateHash();
     this.reward.block = this.hash;
     for (const tx of this.transactions) {
@@ -49,7 +47,6 @@ export class Block {
       .createHash("sha256")
       .update(
         this.index +
-        this.merkleRoot +
         this.previousHash +
         this.timestamp +
         JSON.stringify(this.transactions) +
@@ -102,46 +99,9 @@ export class Block {
       Timestamp: ${this.timestamp}
       Previous Hash: ${this.previousHash}
       Hash: ${this.hash}
-      MerkleRoot: ${this.merkleRoot}
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
       SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
       ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
     `;
-  }
-
-  calculateMerkleRoot(): string {
-    if (this.transactions.length === 0) {
-      // Если нет транзакций, возвращаем фиксированный пустой хэш
-      return crypto.createHash("sha256").update("").digest("hex");
-    }
-
-    if (this.transactions.length === 1) {
-      // Если только одна транзакция, возвращаем её хэш
-      return this.transactions[0].hash;
-    }
-
-    const transactionHashes = this.transactions.map((tx) => tx.hash);
-
-    return this.buildMerkleTreeIterative(transactionHashes);
-  }
-
-  private buildMerkleTreeIterative(hashes: string[]): string {
-    while (hashes.length > 1) {
-      const nextLevel: string[] = [];
-
-      for (let i = 0; i < hashes.length; i += 2) {
-        const left = hashes[i];
-        const right = i + 1 < hashes.length ? hashes[i + 1] : left;
-        const combinedHash = crypto
-          .createHash("sha256")
-          .update(left + right)
-          .digest("hex");
-        nextLevel.push(combinedHash);
-      }
-
-      hashes = nextLevel;
-    }
-
-    return hashes[0];
   }
 }

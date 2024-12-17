@@ -10,4 +10,5 @@ export const TYPES = {
     WalletRoutesFactory: Symbol.for("WalletRoutesFactory"),
     MessagesServiceFactory: Symbol.for("MessagesServiceFactory"),
     p2pClientHelper: Symbol.for("p2pClientHelper"),
+    Statistic: Symbol.for("Statistic"),
 };

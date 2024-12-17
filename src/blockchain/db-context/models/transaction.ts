@@ -2,6 +2,12 @@ import crypto from "crypto";
 import * as tinySecp256k1 from "tiny-secp256k1";
 import { AllowedTypes } from "./common.js";
 
+export enum Status {
+  PENDING = 0,
+  COMPLETE = 1,
+  REJECT = 2
+}
+
 export class Transaction {
   public hash: string;
   public block?: string;
@@ -11,6 +17,7 @@ export class Transaction {
   public timestamp: number;
   public signature?: string;
   public type: AllowedTypes;
+  public status: Status;
   constructor(
     sender: string,
     receiver: string,
@@ -23,6 +30,7 @@ export class Transaction {
     this.amount = amount;
     this.timestamp = timestamp;
     this.type = type;
+    this.status = Status.PENDING;
     this.hash = this.calculateHash();
   }
 
