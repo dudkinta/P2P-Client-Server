@@ -1,6 +1,18 @@
 import { Block } from "./models/block.js";
 import { Level } from "level";
 
+export interface BlockDB {
+  Index: number;
+  Hash: string;
+  Parent: string;
+  TimeStamp: number;
+  Reward: string;
+  Transactions: string[];
+  SmartContracts: string[];
+  ContractTransaction: string[];
+  Validators: string[];
+}
+
 export class BlockStorage {
   private db: Level<string, object>;
   constructor(db: Level<string, object>) {
@@ -22,24 +34,24 @@ export class BlockStorage {
     await this.db.put(key, db_block);
   }
 
-  async get(hash: string): Promise<Block | undefined> {
+  public async get(hash: string): Promise<BlockDB | undefined> {
     try {
       const key = `block:${hash}`;
-      return (await this.db.get(key)) as Block;
+      return (await this.db.get(key)) as BlockDB;
     } catch (err) {
       return undefined;
     }
   }
 
-  async getAll(): Promise<Block[]> {
-    const blocks: Block[] = [];
+  public async getAll(): Promise<BlockDB[]> {
+    const blocks: BlockDB[] = [];
     for await (const [key, value] of this.db.iterator()) {
-      blocks.push(value as Block);
+      blocks.push(value as BlockDB);
     }
     return blocks;
   }
 
-  async delete(hash: string): Promise<void> {
+  public async delete(hash: string): Promise<void> {
     const key = `block:${hash}`;
     await this.db.del(key);
   }

@@ -20,13 +20,14 @@ export class SmartContractStorage {
     }
   }
 
-  async getAll(): Promise<SmartContract[]> {
+  async getAll(hashes: string[]): Promise<SmartContract[]> {
     const contracts: SmartContract[] = [];
-    for await (const [key, value] of this.db.iterator({
-      gte: "smartContract:",
-      lte: "smartContract:~",
-    })) {
-      contracts.push(value as SmartContract);
+    for (const hash of hashes) {
+      const key = `smartContract:${hash}`;
+      const value = await this.db.get(key).catch(() => null); // Если ключ не найден, вернуть null
+      if (value) {
+        contracts.push(value as SmartContract);
+      }
     }
     return contracts;
   }

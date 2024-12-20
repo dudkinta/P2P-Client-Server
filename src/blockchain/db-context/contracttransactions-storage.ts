@@ -20,13 +20,14 @@ export class ContractTransactionStorage {
     }
   }
 
-  async getAll(): Promise<ContractTransaction[]> {
+  async getAll(hashes: string[]): Promise<ContractTransaction[]> {
     const transactions: ContractTransaction[] = [];
-    for await (const [key, value] of this.db.iterator({
-      gte: "contractTransaction:",
-      lte: "contractTransaction:~",
-    })) {
-      transactions.push(value as ContractTransaction);
+    for (const hash of hashes) {
+      const key = `contractTransaction:${hash}`;
+      const value = await this.db.get(key).catch(() => null); // Если ключ не найден, вернуть null
+      if (value) {
+        transactions.push(value as ContractTransaction);
+      }
     }
     return transactions;
   }

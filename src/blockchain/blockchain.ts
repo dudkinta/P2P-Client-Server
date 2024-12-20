@@ -16,8 +16,6 @@ import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
 import { AllowedTypes } from "./db-context/models/common.js";
-import { Statistic } from "./statistic.js";
-import { hasMetadata } from "reflect-metadata/no-conflict";
 const { debug } = pkg;
 
 const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
@@ -49,7 +47,7 @@ export class BlockChain extends EventEmitter {
   }
 
   public async startAsync(): Promise<void> {
-    const chain = await this.db.blockStorage.getAll();
+    const chain = await this.db.getBlocksAll();
     chain.sort((a, b) => a.index - b.index);
 
     chain.forEach((block) => {
