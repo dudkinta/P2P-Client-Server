@@ -62,7 +62,6 @@ export class MessagesService
     this.maxOutboundStreams = init.maxOutboundStreams ?? MAX_OUTBOUND_STREAMS;
     this.runOnLimitedConnection = init.runOnLimitedConnection ?? true;
     this.handleDirectMessage = this.handleDirectMessage.bind(this);
-    this.handleEventer = this.handleEventer.bind(this);
     if (init.runOnPeerConnect ?? true) {
       this.components.events.addEventListener(
         "connection:open",
@@ -134,38 +133,6 @@ export class MessagesService
         console.log(err);
       }
     });
-    //this.components.pubsub.topicValidators.set(MessageType[MessageType.HEAD_BLOCK_INDEX], this.filterMessages.bind(this));
-    //this.components.pubsub.topicValidators.set(MessageType[MessageType.REQUEST_CHAIN], this.filterMessages.bind(this));
-  }
-
-  private async filterMessages(msg: any): Promise<TopicValidatorResult> {
-    if (!this.proto_root) {
-      this.log(LogLevel.Error, 'Error filter message. PROTO_ROOT not found');
-      return TopicValidatorResult.Ignore;
-    }
-    const ProtobufMessageChain = this.proto_root.lookupType('MessageChain');
-    const bufferMessage = ProtobufMessageChain.decode(msg.data);
-    const message = MessageChain.fromProtobuf(bufferMessage);
-    if (message.sender != this.components.peerId.toString()) {
-      /*const blockchain = BlockChain.getInstance();
-      if (blockchain) {
-        if (message.type == MessageType.HEAD_BLOCK_INDEX) {
-          const msgHeadIndex = message.value as number;
-          if (msgHeadIndex <= blockchain.getHeadIndex()) {
-            this.log(LogLevel.Info, 'Ignore message: HEAD_BLOCK_INDEX');
-            return TopicValidatorResult.Ignore;
-          }
-        }
-        if (message.type == MessageType.REQUEST_CHAIN) {
-          const requestChainMessage = message.value as MessageRequest;
-          if (requestChainMessage && requestChainMessage.index < blockchain.getHeadIndex()) {
-            this.log(LogLevel.Info, 'Ignore message: REQUEST_CHAIN');
-            return TopicValidatorResult.Ignore;
-          }
-        }
-      }*/
-    }
-    return TopicValidatorResult.Accept;
   }
 
   private async messageHandler(evt: CustomEvent<Message>): Promise<void> {
@@ -176,7 +143,7 @@ export class MessagesService
         const bufferMessage = ProtobufMessageChain.decode(msg.data);
         const message = MessageChain.fromProtobuf(bufferMessage);
         this.log(LogLevel.Debug, `Receive message: ${JSON.stringify(message)}`);
-        this.handleEventer(message);
+        this.blockchain.addBlockchainData(message);
       } else {
         this.log(LogLevel.Error, `Proto_ROOT not found`);
       }
@@ -190,6 +157,9 @@ export class MessagesService
     this.log(LogLevel.Info, `Broadcasting message: ${JSON.stringify(message)}`);
     try {
       if (this.proto_root) {
+        if (!message.sender) {
+          message.sender = this.components.peerId.toString();
+        }
         this.log(LogLevel.Debug, `Send message type: ${MessageType[message.type]} data: ${JSON.stringify(message)}`);
         const protoType = this.proto_root.lookupType('MessageChain');
         const msg = message.toProtobuf(this.proto_root);
@@ -225,6 +195,9 @@ export class MessagesService
     }
     const connection = this.components.connectionManager.getConnections().find((c) => c.remotePeer.toString() == peer);
     if (connection) {
+      if (!message.sender) {
+        message.sender = this.components.peerId.toString();
+      }
       await writeToConnection(
         connection,
         this.timeout,
@@ -258,7 +231,7 @@ export class MessagesService
         throw new Error(`Failed to read message: ${err.message}`);
       });
       const message = MessageChain.fromProtobuf(decodedMessage);
-      this.handleEventer(message);
+      this.blockchain.addBlockchainData(message);
     }
     catch (err: any) {
       if (err instanceof Error) {
@@ -271,45 +244,6 @@ export class MessagesService
           LogLevel.Error,
           `Direct message error: ${JSON.stringify(err)}`
         );
-      }
-    }
-  }
-
-  private async handleEventer(message: MessageChain): Promise<void> {
-    switch (message.type) {
-      case MessageType.HEAD_BLOCK_HASH: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.REQUEST_CHAIN: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.BLOCK: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.CHAIN: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.TRANSACTION: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.SMART_CONTRACT: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.CONTRACT_TRANSACTION: {
-        this.blockchain.addBlockchainData(message);
-        break;
-      }
-      case MessageType.BLOCK_VALIDATE: {
-        this.blockchain.addBlockchainData(message);
-      }
-      default: {
-        this.log(LogLevel.Warning, `Incoming unknown message type`);
       }
     }
   }

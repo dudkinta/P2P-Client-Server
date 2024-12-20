@@ -118,8 +118,8 @@ export class BlockChain extends EventEmitter {
       const validateData = message.value as BlockValidate;
       const block = this.nodes.get(validateData.hash);
       if (block) {
-        if (!block.validators.includes(validateData.publicKey)) {
-          block.validators.push(validateData.publicKey);
+        if (!block.validators.find((v) => v.publicKey == validateData.publicKey)) {
+          block.validators.push(validateData);
         }
       }
     }
@@ -165,13 +165,7 @@ export class BlockChain extends EventEmitter {
   private insertBlockToTree(block: Block) {
     if (block.isValid()) {
       const existBlock = this.nodes.get(block.hash);
-      if (existBlock) {
-        block.validators.forEach((v) => {
-          if (!existBlock.validators.includes(v)) {
-            existBlock.validators.push(v);
-          }
-        });
-      } else {
+      if (!existBlock) {
         if (!block.parentHash) {
           this.nodes.set(block.hash, block);
         } else {
@@ -195,13 +189,26 @@ export class BlockChain extends EventEmitter {
         return maxLeaf;
       }, null as typeof leafs[number] | null);
       this.head = maxWeightLeaf;
+      if (this.head && Wallet.current && Wallet.current.publicKey) {
+        const currentWallet = Wallet.current;
+        const publicKey = Wallet.current.publicKey;
+        if (!this.head?.validators.find((v) => v.publicKey == publicKey)) {
+          const validateSign = {
+            index: this.head.index,
+            hash: this.head.hash,
+            publicKey: publicKey,
+            sign: currentWallet.signMessage(`${this.head.index}:${this.head.hash}:${publicKey}`)
+          };
+          this.head.validators.push(validateSign);
+          this.emit("message:validateBlock", new MessageChain(MessageType.BLOCK_VALIDATE, validateSign, ''));
+        }
+      }
     }
   }
 
   public async createBlock(): Promise<void> {
     const lastBlock = this.getHead();
     const dtNow = Date.now();
-
     if (!Wallet.current) {
       this.log(LogLevel.Error, "Current wallet is null");
       return;
@@ -210,15 +217,41 @@ export class BlockChain extends EventEmitter {
       this.log(LogLevel.Error, "Public key is null");
       return;
     }
+    const currentWallet = Wallet.current;
+    const publicKey = Wallet.current.publicKey;
+    const reward = this.calculateBlockReward(this.head?.index ?? 0) / 2;
     const rewardTransaction = new Transaction(
-      Wallet.current.publicKey,
-      Wallet.current.publicKey,
-      this.calculateBlockReward(this.head?.index ?? 0),
+      publicKey,
+      publicKey,
+      reward,
       AllowedTypes.REWARD,
       dtNow
     );
-    Wallet.current.signTransaction(rewardTransaction);
+    currentWallet.signTransaction(rewardTransaction);
     const txToBlock: Transaction[] = [];
+    if (this.head) {
+      const head = this.head;
+      txToBlock.push(...this.pendingTransactions.filter((tx) => head.checkBalance(tx)));
+    }
+    txToBlock.forEach(tx => {
+      tx.status = Status.COMPLETE
+    });
+    if (lastBlock) {
+      const rewardBank = lastBlock.reward.amount;
+      lastBlock.validators.forEach((v) => {
+        const stake = lastBlock.getBalanceStakeInChain(v.publicKey);
+        const reward = stake / lastBlock.weight * rewardBank;
+        const rewardTransaction = new Transaction(
+          publicKey,
+          publicKey,
+          reward,
+          AllowedTypes.REWARD,
+          dtNow
+        );
+        currentWallet.signTransaction(rewardTransaction);
+        txToBlock.push(rewardTransaction);
+      });
+    }
     if (this.head) {
       const head = this.head;
       txToBlock.push(...this.pendingTransactions.filter((tx) => head.checkBalance(tx)));

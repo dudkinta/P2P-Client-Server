@@ -10,7 +10,8 @@ import "../../../blockchain/db-context/models/contract-transaction.proto";
 message BlockValidate {
     int32 index = 0;
     string publicKey = 1;
-    string hash =2;
+    string hash = 2;
+    string sign = 3;
 }
 
 enum MessageType {

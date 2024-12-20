@@ -24,6 +24,7 @@ export interface BlockValidate {
   index: number;
   publicKey: string;
   hash: string;
+  sign: string;
 }
 export enum MessageType {
   BLOCK = 0,

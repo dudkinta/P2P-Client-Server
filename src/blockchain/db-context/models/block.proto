@@ -15,5 +15,4 @@ message Block {
     repeated blockchain.transaction.Transaction transactions = 6;
     repeated blockchain.contract.SmartContract smartContracts = 7;
     repeated blockchain.contract.ContractTransaction contractTransactions = 8;
-    repeated string validators = 9;
 }

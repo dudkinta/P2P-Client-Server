@@ -3,6 +3,7 @@ import { Transaction, Status } from "./transaction.js";
 import { SmartContract } from "./smart-contract.js";
 import { ContractTransaction } from "./contract-transaction.js";
 import { AllowedTypes } from "./common.js";
+import { BlockValidate } from "../../../network/services/messages/index.js";
 
 export class Block {
   public hash: string;
@@ -13,7 +14,7 @@ export class Block {
   public transactions: Transaction[];
   public smartContracts: SmartContract[];
   public contractTransactions: ContractTransaction[];
-  public validators: string[] = [];
+  public validators: BlockValidate[] = [];
 
   public parent: Block | undefined;
   public children: Block[] = [];
@@ -51,7 +52,7 @@ export class Block {
     }
     this.inWallet.set(this.reward.sender, this.reward.amount);
     this.transactions.forEach(tx => {
-      this.calcBalances(tx);
+      this.calcBlockBalances(tx);
     });
     this.weight = this.updateWeight();
     this.cummulativaWeight = (this.parent?.weight ?? 0) + this.weight;
@@ -138,22 +139,43 @@ export class Block {
     while (currentblock) {
       const cb = currentblock;
       currentblock.validators.forEach((v) => {
-        res += cb.getBalanceStake(v);
+        res += cb.getBalanceStakeInChain(v.publicKey);
       });
       currentblock = currentblock.parent;
     }
     return res;
   }
 
-  public getBalanceWallet(owner: string): number {
+  private getBlockBalanceWallet(owner: string): number {
     return this.inWallet.get(owner) ?? 0;
   }
 
-  public getBalanceStake(owner: string): number {
+  public getBalanceWalletInChain(owner: string): number {
+    let balance: number = 0;
+    let cBlock = this.parent;
+    while (cBlock) {
+      balance = cBlock.getBlockBalanceWallet(owner);
+      cBlock = cBlock.parent;
+    }
+    return balance;
+  }
+
+  private getBlockBalanceStake(owner: string): number {
     return this.inStake.get(owner) ?? 0;
   }
 
-  private calcBalances(tx: Transaction) {
+  public getBalanceStakeInChain(owner: string): number {
+    let balance: number = 0;
+    let cBlock = this.parent;
+    while (cBlock) {
+      balance = cBlock.getBlockBalanceStake(owner);
+      cBlock = cBlock.parent;
+    }
+    return balance;
+  }
+
+
+  private calcBlockBalances(tx: Transaction) {
     if (tx.receiver && tx.sender && tx.amount > 0 && tx.type == AllowedTypes.TRANSFER) {
       const senderAmount = this.inWallet.get(tx.sender) ?? 0;
       const receiverAmount = this.inWallet.get(tx.receiver) ?? 0;
@@ -186,33 +208,18 @@ export class Block {
 
   public checkBalance(tx: Transaction): boolean {
     if (tx.receiver && tx.sender && tx.amount > 0 && tx.type == AllowedTypes.TRANSFER) {
-      let senderAmount: number = 0;
-      let cBlock: Block | undefined = this;
-      while (cBlock) {
-        senderAmount = cBlock.inWallet.get(tx.sender) ?? 0;
-        cBlock = cBlock.parent;
-      }
+      const senderAmount = this.getBalanceWalletInChain(tx.sender);
       return (senderAmount >= tx.amount);
     }
     if (tx.receiver && tx.type == AllowedTypes.REWARD) {
       return true;
     }
     if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.STAKE) {
-      let senderAmount: number = 0;
-      let cBlock: Block | undefined = this;
-      while (cBlock) {
-        senderAmount = cBlock.inWallet.get(tx.sender) ?? 0;
-        cBlock = cBlock.parent;
-      }
+      const senderAmount = this.getBalanceWalletInChain(tx.sender);
       return (senderAmount >= tx.amount);
     }
     if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.UNSTAKE) {
-      let inStakeAmount: number = 0;
-      let cBlock: Block | undefined = this;
-      while (cBlock) {
-        inStakeAmount = cBlock.inStake.get(tx.sender) ?? 0;
-        cBlock = cBlock.parent;
-      }
+      const inStakeAmount = this.getBalanceStakeInChain(tx.sender);
       return (inStakeAmount >= tx.amount);
     }
     tx.status = Status.REJECT;
