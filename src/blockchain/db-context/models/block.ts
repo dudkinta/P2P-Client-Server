@@ -135,7 +135,7 @@ export class Block {
 
   public updateWeight(): number {
     let currentblock: Block | undefined = this;
-    let res = 0;
+    let res = currentblock.getBalanceStakeInChain(currentblock.reward.sender);
     while (currentblock) {
       const cb = currentblock;
       currentblock.validators.forEach((v) => {
