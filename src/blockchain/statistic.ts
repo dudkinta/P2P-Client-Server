@@ -16,23 +16,32 @@ export class Statistic {
     constructor() {
         this.actives.set(genesisKey, genesisStartActive);
     }
-    public getBalanceWallet(owner: string) {
+    public getBalanceWallet(owner: string): number {
         return this.inWallet.get(owner) ?? 0;
     }
 
-    public getBalanceStake(owner: string) {
+    public getBalanceStake(owner: string): number {
         return this.inStake.get(owner) ?? 0;
     }
 
-    public getActives(owner: string) {
+    public getActives(owner: string): number {
         return (this.actives.get(owner) ?? 0) + Math.round((this.lastActives.get(owner) ?? 0) / 1000 / 60);
     }
 
-    public getTopActives(top?: number) {
+    public getTopActives(top?: number): Map<string, number> {
         const timePenalty = Math.round(Date.now() / 1000 / 60);
         const activesArray = Array.from(this.actives);
         const sorted = activesArray.sort((a, b) => (this.getActives(a[0]) - timePenalty) - (this.getActives(b[0]) - timePenalty));
-        return top ? sorted.slice(0, top) : sorted;
+        return new Map(top ? sorted.slice(0, top) : sorted);
+    }
+
+    public getSummActives(owners: string[]): number {
+        let res = 0;
+        const timePenalty = Math.round(Date.now() / 1000 / 60);
+        owners.forEach((owner) => {
+            res += (this.getActives(owner) - timePenalty);
+        });
+        return res;
     }
 
     public calcBalances(tx: Transaction) {
@@ -86,57 +95,61 @@ export class Statistic {
         return false;
     }
 
+    private readonly weights = {
+        reward: 1,
+        transaction: 1,
+        smartContract: 2,
+        contractTransaction: 1.5,
+        validator: 0.5,
+    } as const;
+    private addActivity(account: string, value: number, type: keyof typeof this.weights) {
+        const weight = this.weights[type];
+        const currentScore = this.actives.get(account) ?? 0;
+        this.actives.set(account, currentScore + value * weight);
+    }
+    private updateLastActive(account: string, timestamp: number) {
+        const lastActive = this.lastActives.get(account) ?? 0;
+        if (lastActive < timestamp) {
+            this.lastActives.set(account, timestamp);
+        }
+    }
+    private getTransactionValue(tx: Transaction): number {
+        switch (tx.type) {
+            case AllowedTypes.TRANSFER:
+                return 1;
+            case AllowedTypes.STAKE:
+                return 0.1 * tx.amount;
+            case AllowedTypes.UNSTAKE:
+                return -0.1 * tx.amount;
+            default:
+                return 0;
+        }
+    }
     public calcActive(block: Block) {
         if (block.reward.receiver) {
-            const receiverRewardScore = this.actives.get(block.reward.sender) ?? 0;
-            this.actives.set(block.reward.receiver, receiverRewardScore + 1);
-            const lastActives = this.lastActives.get(block.reward.receiver) ?? 0;
-            if (lastActives < block.timestamp) {
-                this.lastActives.set(block.reward.receiver, lastActives);
-            }
+            this.addActivity(block.reward.receiver, 1, "reward");
+            this.updateLastActive(block.reward.receiver, block.timestamp);
         }
-        if (block.transactions.length > 0) {
-            block.transactions.forEach((tx) => {
-                const senderScore = this.actives.get(tx.sender) ?? 0;
-                const value = tx.type == AllowedTypes.TRANSFER ? 1 :
-                    tx.type == AllowedTypes.STAKE ? 0.1 * tx.amount :
-                        tx.type == AllowedTypes.UNSTAKE ? -0.1 * tx.amount : 0;
-                this.actives.set(tx.sender, senderScore + value);
-                const lastActives = this.lastActives.get(tx.sender) ?? 0;
-                if (lastActives < block.timestamp) {
-                    this.lastActives.set(tx.sender, lastActives);
-                }
-            });
-        }
-        if (block.smartContracts.length > 0) {
-            block.smartContracts.forEach((sc) => {
-                const senderScore = this.actives.get(sc.owner) ?? 0;
-                this.actives.set(sc.owner, senderScore + 1);
-                const lastActives = this.lastActives.get(sc.owner) ?? 0;
-                if (lastActives < block.timestamp) {
-                    this.lastActives.set(sc.owner, lastActives);
-                }
-            });
-        }
-        if (block.contractTransactions.length > 0) {
-            block.contractTransactions.forEach((tx) => {
-                const senderScore = this.actives.get(tx.sender) ?? 0;
-                this.actives.set(tx.sender, senderScore + 1);
-                const lastActives = this.lastActives.get(tx.sender) ?? 0;
-                if (lastActives < block.timestamp) {
-                    this.lastActives.set(tx.sender, lastActives);
-                }
-            });
-        }
-        if (block.validators.length > 0) {
-            block.validators.forEach((v) => {
-                const activeScore = this.actives.get(v) ?? 0;
-                this.actives.set(v, activeScore + 1);
-                const lastActives = this.lastActives.get(v) ?? 0;
-                if (lastActives < block.timestamp) {
-                    this.lastActives.set(v, lastActives);
-                }
-            });
-        }
+
+        block.transactions.forEach((tx) => {
+            const value = this.getTransactionValue(tx);
+            this.addActivity(tx.sender, value, "transaction");
+            this.updateLastActive(tx.sender, block.timestamp);
+        });
+
+        block.smartContracts.forEach((sc) => {
+            this.addActivity(sc.owner, 1, "smartContract");
+            this.updateLastActive(sc.owner, block.timestamp);
+        });
+
+        block.contractTransactions.forEach((tx) => {
+            this.addActivity(tx.sender, 1, "contractTransaction");
+            this.updateLastActive(tx.sender, block.timestamp);
+        });
+
+        block.validators.forEach((v) => {
+            this.addActivity(v, 1, "validator");
+            this.updateLastActive(v, block.timestamp);
+        });
     }
 }

@@ -20,8 +20,8 @@ export class BlockChainRoutesFactory {
     });
     router.get("/block", async (req, res) => {
       try {
-        const index = parseInt(req.query.index as string);
-        const block = this.blockChain.getBlock(index);
+        const hash = req.query.index as string;
+        const block = this.blockChain.getBlock(hash);
         if (block) {
           res.json({ block: block });
         } else {

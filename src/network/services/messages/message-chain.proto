@@ -7,15 +7,6 @@ import "../../../blockchain/db-context/models/transaction.proto";
 import "../../../blockchain/db-context/models/smart-contract.proto";
 import "../../../blockchain/db-context/models/contract-transaction.proto";
 
-message MessageRequest {
-    int32 index = 0;
-}
-
-message BlockChainMessage {
-    int32 maxIndex = 0;
-    blockchain.block.Block block = 1;
-}
-
 message BlockValidate {
     int32 index = 0;
     string publicKey = 1;
@@ -41,9 +32,9 @@ message MessageChain {
         blockchain.transaction.Transaction transaction = 4;
         blockchain.contract.SmartContract smart_contract = 5;
         blockchain.contract.ContractTransaction contract_transaction = 6;
-        BlockChainMessage chain = 7;
-        MessageRequest request = 8;
-        int32 headIndex = 9;
+        blockchain.block.Block chain = 7;
+        string request = 8;
+        string headHash = 9;
         BlockValidate block_validate = 10;
     }
 }

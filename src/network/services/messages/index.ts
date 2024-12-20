@@ -20,13 +20,6 @@ export interface MessagesService {
   sendMessage(connection: string, message: MessageChain): Promise<void>;
 }
 
-export interface MessageRequest {
-  index: number;
-}
-export interface BlockChainMessage {
-  maxIndex: number;
-  block: Block;
-}
 export interface BlockValidate {
   index: number;
   publicKey: string;
@@ -39,7 +32,7 @@ export enum MessageType {
   CONTRACT_TRANSACTION = 3,
   CHAIN = 4,
   REQUEST_CHAIN = 5,
-  HEAD_BLOCK_INDEX = 6,
+  HEAD_BLOCK_HASH = 6,
   BLOCK_VALIDATE = 7
 }
 
@@ -52,10 +45,9 @@ export class MessageChain {
     | Transaction
     | SmartContract
     | ContractTransaction
-    | BlockChainMessage
-    | MessageRequest
-    | BlockValidate
-    | number;
+    | Block
+    | string
+    | BlockValidate;
   constructor(
     type: MessageType,
     value:
@@ -63,10 +55,9 @@ export class MessageChain {
       | Transaction
       | SmartContract
       | ContractTransaction
-      | BlockChainMessage
-      | MessageRequest
-      | BlockValidate
-      | number,
+      | Block
+      | string
+      | BlockValidate,
     sender: string
   ) {
     this.type = type;
@@ -108,13 +99,13 @@ export class MessageChain {
         message.contract_transaction = this.value;
         break;
       case MessageType.CHAIN:
-        message.chain = this.value;
+        message.block = this.value;
         break;
       case MessageType.REQUEST_CHAIN:
         message.request = this.value;
         break;
-      case MessageType.HEAD_BLOCK_INDEX:
-        message.headIndex = this.value;
+      case MessageType.HEAD_BLOCK_HASH:
+        message.headHash = this.value;
         break;
       case MessageType.BLOCK_VALIDATE:
         message.block_validate = this.value;
@@ -156,17 +147,17 @@ export class MessageChain {
       case MessageType.CHAIN:
         return new MessageChain(
           MessageType.CHAIN,
-          decodedMessage.chain, decodedMessage.sender
+          decodedMessage.block, decodedMessage.sender
         );
       case MessageType.REQUEST_CHAIN:
         return new MessageChain(
           MessageType.REQUEST_CHAIN,
           decodedMessage.request, decodedMessage.sender
         );
-      case MessageType.HEAD_BLOCK_INDEX:
+      case MessageType.HEAD_BLOCK_HASH:
         return new MessageChain(
-          MessageType.HEAD_BLOCK_INDEX,
-          decodedMessage.headIndex, decodedMessage.sender
+          MessageType.HEAD_BLOCK_HASH,
+          decodedMessage.headHash, decodedMessage.sender
         );
       case MessageType.BLOCK_VALIDATE:
         return new MessageChain(

@@ -71,8 +71,10 @@ export class MessagesService
             LogLevel.Info,
             `Connection open to PeerId: ${event.detail.remotePeer.toString()} Address: ${event.detail.remoteAddr.toString()}`
           );
-          const headIndex = this.blockchain.getHeadIndex();
-          await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_INDEX, headIndex, this.components.peerId.toString()));
+          const head = this.blockchain.getHead();
+          if (head) {
+            await this.sendMessage(event.detail.remotePeer.toString(), new MessageChain(MessageType.HEAD_BLOCK_HASH, head.hash, this.components.peerId.toString()));
+          }
         }
       );
     }
@@ -275,13 +277,8 @@ export class MessagesService
 
   private async handleEventer(message: MessageChain): Promise<void> {
     switch (message.type) {
-      case MessageType.HEAD_BLOCK_INDEX: {
-        const headIndex = message.value as number;
-        const myHeadIndex = this.blockchain.getHeadIndex();
-        if (myHeadIndex < headIndex) {
-          const requestMessage = new MessageChain(MessageType.REQUEST_CHAIN, { index: myHeadIndex + 1 }, message.sender);
-          await this.sendMessage(message.sender, requestMessage);
-        }
+      case MessageType.HEAD_BLOCK_HASH: {
+        this.blockchain.addBlockchainData(message);
         break;
       }
       case MessageType.REQUEST_CHAIN: {

@@ -9,8 +9,6 @@ import { EventEmitter } from "events";
 import {
   MessageChain,
   MessageType,
-  BlockChainMessage,
-  MessageRequest,
   BlockValidate,
 } from "./../network/services/messages/index.js";
 import { Wallet } from "./../wallet/wallet.js";
@@ -19,7 +17,7 @@ import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
 import { AllowedTypes } from "./db-context/models/common.js";
 import { Statistic } from "./statistic.js";
-
+import { hasMetadata } from "reflect-metadata/no-conflict";
 const { debug } = pkg;
 
 const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
@@ -30,11 +28,11 @@ const HALVINGS: number = 16; // Количество халвингов (16)
 
 @injectable()
 export class BlockChain extends EventEmitter {
-  private chain: Block[] = [];
+  private head: Block | null;
+  private nodes: Map<string, Block>;
   private pendingTransactions: Transaction[] = [];
   private pendingSmartContracts: SmartContract[] = [];
   private pendingContractTransactions: ContractTransaction[] = [];
-  private headIndex: number = -1;
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("blockchain", level, timestamp, message);
@@ -44,120 +42,38 @@ export class BlockChain extends EventEmitter {
   };
 
   constructor(
-    @inject(TYPES.DbContext) private db: dbContext,
-    @inject(TYPES.Statistic) private statistic: Statistic) {
+    @inject(TYPES.DbContext) private db: dbContext) {
     super();
+    this.head = null;
+    this.nodes = new Map();
   }
 
   public async startAsync(): Promise<void> {
-    this.chain = await this.db.blockStorage.getAll();
-    this.chain.sort((a, b) => a.index - b.index);
-    let lastBlock: Block;
-    let errorIndex: number | undefined = undefined;
-    this.chain.forEach((block) => {
-      if (!lastBlock) {
-        lastBlock = block;
-        return;
-      }
-      if (block.previousHash !== lastBlock.hash) {
-        if (!errorIndex) {
-          errorIndex = block.index;
-        }
-      }
-      lastBlock = block;
+    const chain = await this.db.blockStorage.getAll();
+    chain.sort((a, b) => a.index - b.index);
+
+    chain.forEach((block) => {
+      this.insertBlockToTree(block);
     });
-    if (errorIndex) {
-      const firstErorBlock = await this.getBlock(errorIndex);
-      if (firstErorBlock) {
-        this.chain = this.chain.filter((b) => b.index < firstErorBlock.index);
-        await this.db.blockStorage.delete(errorIndex);
-      }
-    }
-    this.chain.forEach((block) => {
-      if (block.transactions.length > 0) {
-        block.transactions.forEach((tx) => this.statistic.calcBalances(tx));
-      }
-      this.statistic.calcActive(block);
-    });
-    const headIndex =
-      this.chain.length == 0
-        ? -1
-        : Math.max(...this.chain.map((block) => block.index));
-    this.setHeadIndex(headIndex);
     this.log(LogLevel.Info, "Blockchain initialized.");
   }
 
-  public getChain(): Block[] {
-    return this.chain;
-  }
+  getChainByHash(hash: string): Block[] | null {
+    const node = this.nodes.get(hash);
+    if (!node) return null;
 
-  public async addBlock(block: Block, isFillChain: boolean): Promise<void> {
-    const existBlock = await this.getBlock(block.index);
-    if (existBlock) {
-      if (existBlock.hash === block.hash) {
-        return;
+    const chain: Block[] = [];
+    let currentNode: Block | undefined = node;
+
+    while (currentNode) {
+      chain.unshift(currentNode);
+      if (currentNode.parent) {
+        currentNode = this.nodes.get(currentNode.parent.hash);
       } else {
-
+        currentNode = undefined;
       }
     }
-    this.chain.push(block);
-    this.pendingTransactions = this.pendingTransactions.filter(
-      (transaction) =>
-        !block.transactions.some(
-          (processedTransaction) =>
-            processedTransaction.hash === transaction.hash
-        )
-    );
-    this.pendingSmartContracts = this.pendingSmartContracts.filter(
-      (contract) =>
-        !block.smartContracts.some(
-          (processedContract) => processedContract.hash === contract.hash
-        )
-    );
-    this.pendingContractTransactions = this.pendingContractTransactions.filter(
-      (transaction) =>
-        !block.contractTransactions.some(
-          (processedTransaction) =>
-            processedTransaction.hash === transaction.hash
-        )
-    );
-    if (
-      !isFillChain &&
-      Wallet.current &&
-      Wallet.current.publicKey
-    ) {
-      setTimeout(async () => {
-        this.createBlock();
-      }, BLOCK_INTERVAL * 1000);
-    }
-    this.log(
-      LogLevel.Info,
-      `Block added: ${block.index} reward:${block.reward.amount}`
-    );
-
-    if (block.transactions.length > 0) {
-      block.transactions.forEach((tx) => this.statistic.calcBalances(tx));
-    }
-    this.statistic.calcBalances(block.reward);
-    this.statistic.calcActive(block);
-    await this.db.blockStorage.save(block);
-    if (this.getHeadIndex() < block.index) {
-      this.setHeadIndex(block.index);
-    }
-  }
-
-  public async getLastBlock(): Promise<Block | undefined> {
-    return await this.getBlock(this.chain.length - 1);
-  }
-
-  public async getBlock(index: number): Promise<Block | undefined> {
-    const block = this.chain.find((b) => b.index === index);
-    if (block) return block;
-    return await this.db.blockStorage.get(index);
-  }
-
-  public async getBlocksInRange(start: number, end: number): Promise<Block[]> {
-    return await this.db.blockStorage.getByRange(start, end);
+    return chain;
   }
 
   public calculateBlockReward(
@@ -198,33 +114,14 @@ export class BlockChain extends EventEmitter {
     this.log(LogLevel.Info, `Receive blockchaindata: ${message}`);
     if (message.type === MessageType.BLOCK) {
       const block = message.value as Block;
-      if (block.isValid()) {
-        const lastBlock = await this.getLastBlock();
-        if (!lastBlock && block.index === 0) {
-          await this.addBlock(block, false);
-          return;
-        }
-        if (
-          lastBlock &&
-          block.previousHash === lastBlock.hash &&
-          block.index === lastBlock.index + 1
-        ) {
-          await this.addBlock(block, false);
-        }
-        if (!lastBlock && block.index !== 0) {
-          //ignore block/ need to request missing blocks
-        }
-        if (lastBlock && lastBlock.index + 1 !== block.index) {
-          //ignore block/ need to request missing blocks
-        }
-      }
+      this.insertBlockToTree(block);
     }
     if (message.type === MessageType.BLOCK_VALIDATE) {
       const validateData = message.value as BlockValidate;
-      const lastBlock = await this.getLastBlock();
-      if (lastBlock && lastBlock.index == validateData.index && lastBlock.hash == validateData.hash) {
-        if (!lastBlock.validators.includes(validateData.publicKey)) {
-          lastBlock.validators.push(validateData.publicKey);
+      const block = this.nodes.get(validateData.hash);
+      if (block) {
+        if (!block.validators.includes(validateData.publicKey)) {
+          block.validators.push(validateData.publicKey);
         }
       }
     }
@@ -247,56 +144,64 @@ export class BlockChain extends EventEmitter {
       }
     }
     if (message.type == MessageType.REQUEST_CHAIN) {
-      const messageValue = message.value as MessageRequest;
-      const index = messageValue.index;
-      const block = await this.getBlock(index);
+      const hash = message.value as string;
+      const block = await this.nodes.get(hash)
       if (block) {
-        const messageChain = new MessageChain(MessageType.CHAIN, {
-          maxIndex: this.chain.length - 1,
-          block: block,
-        }, message.sender);
+        const messageChain = new MessageChain(MessageType.CHAIN, block, message.sender);
         this.emit("message:chain", messageChain);
       }
     }
     if (message.type == MessageType.CHAIN) {
-      const messageValue = message.value as BlockChainMessage;
-      const maxIndex = messageValue.maxIndex;
-      const block = messageValue.block;
+      const block = message.value as Block;
+      this.insertBlockToTree(block);
+    }
+    if (message.type == MessageType.HEAD_BLOCK_HASH) {
+      const receiveHeadHash = message.value as string;
+      const block = this.nodes.get(receiveHeadHash);
+      if (!block) {
+        this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN, receiveHeadHash, ''));
+      }
+    }
+  }
 
-      if (block.isValid()) {
-        const index = block.index;
-        if (block.index === 0) {
-          await this.addBlock(block, true);
-          return;
-        }
-        const lastBlock = await this.getBlock(index - 1);
-        if (lastBlock && lastBlock.hash === block.previousHash) {
-          await this.addBlock(block, true);
-          if (lastBlock.index < maxIndex || lastBlock.index < this.getHeadIndex()) {
-            await this.prepareChainRequest();
+  private insertBlockToTree(block: Block) {
+    if (block.isValid()) {
+      const existBlock = this.nodes.get(block.hash);
+      if (existBlock) {
+        block.validators.forEach((v) => {
+          if (!existBlock.validators.includes(v)) {
+            existBlock.validators.push(v);
+          }
+        });
+      } else {
+        if (!block.parentHash) {
+          this.nodes.set(block.hash, block);
+        } else {
+          const parent = this.nodes.get(block.parentHash);
+          if (!parent) {
+            this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN, block.parentHash, ''));
+            return;
+          } else {
+            block.setParentBlock(parent);
+            this.nodes.set(block.hash, block);
           }
         }
       }
     }
-    if (message.type == MessageType.HEAD_BLOCK_INDEX) {
-      const receiveHeadIndex = message.value as number;
-      if (receiveHeadIndex > this.getHeadIndex()) {
-        await this.prepareChainRequest();
-      }
-    }
-  }
-
-  private async prepareChainRequest() {
-    const lastBlock = await this.getLastBlock();
-    const lastIndex = lastBlock?.index ?? 0;
-    if (Wallet.current) {
-      const key = Wallet.current?.signMessage(lastIndex.toString());
-      this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN, { index: lastIndex }, ''));
+    const leafs = [...this.nodes].filter((v) => v[1].children.length == 0).map(v => v[1]);
+    if (leafs.length > 0) {
+      const maxWeightLeaf = leafs.reduce((maxLeaf, currentLeaf) => {
+        if (!maxLeaf || currentLeaf.cummulativaWeight > maxLeaf.cummulativaWeight) {
+          return currentLeaf;
+        }
+        return maxLeaf;
+      }, null as typeof leafs[number] | null);
+      this.head = maxWeightLeaf;
     }
   }
 
   public async createBlock(): Promise<void> {
-    const lastBlock = await this.getLastBlock();
+    const lastBlock = this.getHead();
     const dtNow = Date.now();
 
     if (!Wallet.current) {
@@ -310,26 +215,30 @@ export class BlockChain extends EventEmitter {
     const rewardTransaction = new Transaction(
       Wallet.current.publicKey,
       Wallet.current.publicKey,
-      this.calculateBlockReward(lastBlock?.index ?? 0),
+      this.calculateBlockReward(this.head?.index ?? 0),
       AllowedTypes.REWARD,
       dtNow
     );
     Wallet.current.signTransaction(rewardTransaction);
-    const txToBlock = this.pendingTransactions.filter((tx) => this.statistic.checkBalance(tx));
+    const txToBlock: Transaction[] = [];
+    if (this.head) {
+      const head = this.head;
+      txToBlock.push(...this.pendingTransactions.filter((tx) => head.checkBalance(tx)));
+    }
     txToBlock.forEach(tx => {
       tx.status = Status.COMPLETE
     });
     if (!lastBlock) {
       const genesisBlock = new Block(
         0,
-        "0",
+        '',
         dtNow,
         rewardTransaction,
         txToBlock,
         this.pendingSmartContracts,
         this.pendingContractTransactions
       );
-      await this.addBlock(genesisBlock, false);
+      await this.insertBlockToTree(genesisBlock);
       this.emit(
         "message:newBlock",
         new MessageChain(MessageType.BLOCK, genesisBlock, '')
@@ -344,36 +253,24 @@ export class BlockChain extends EventEmitter {
         this.pendingSmartContracts,
         this.pendingContractTransactions
       );
-      await this.addBlock(block, false);
+      await this.insertBlockToTree(block);
       this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block, ''));
     }
   }
 
-  private async replaceBlock(
-    oldBlock: Block,
-    newBlock: Block,
-    isFillChain: boolean
-  ): Promise<void> {
-    oldBlock.transactions.forEach(async (transaction) => {
-      this.pendingTransactions.push(transaction);
-    });
-    oldBlock.smartContracts.forEach(async (contract) => {
-      this.pendingSmartContracts.push(contract);
-    });
-    oldBlock.contractTransactions.forEach(async (transaction) => {
-      this.pendingContractTransactions.push(transaction);
-    });
-    this.chain = this.chain.filter((b) => b.hash !== oldBlock.hash);
-    this.db.blockStorage.delete(oldBlock.index);
-    await this.addBlock(newBlock, isFillChain);
+  public getHead() {
+    return this.head;
   }
 
-  public getHeadIndex(): number {
-    return this.headIndex;
+  public getBlock(hash: string) {
+    return this.nodes.get(hash);
   }
 
-  public setHeadIndex(index: number) {
-    this.headIndex = index;
-    this.emit('setHeadIndex', this.headIndex);
+  public getChain(hash?: string) {
+    let startHash = hash ?? this.head?.hash;
+    if (!startHash) {
+      return;
+    }
+    return this.getChainByHash(startHash);
   }
 }

@@ -8,10 +8,10 @@ import "smart-contract.proto";
 
 message Block {
     string hash = 1;
-    string merkleRoot = 2;
-    string previousHash = 3;
-    int32 index = 4;
-    int64 timestamp = 5;
+    string parentHash = 2;
+    int32 index = 3;
+    int64 timestamp = 4;
+    blockchain.transaction.Transaction reward = 5;
     repeated blockchain.transaction.Transaction transactions = 6;
     repeated blockchain.contract.SmartContract smartContracts = 7;
     repeated blockchain.contract.ContractTransaction contractTransactions = 8;
