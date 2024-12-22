@@ -1,228 +1,233 @@
 import crypto from "crypto";
-import { Transaction, Status } from "./transaction.js";
-import { SmartContract } from "./smart-contract.js";
-import { ContractTransaction } from "./contract-transaction.js";
-import { AllowedTypes } from "./common.js";
+import { Transaction } from "./transaction.js";
 import { BlockValidate } from "../../../network/services/messages/index.js";
+import { BlockDiff, UTXOPool } from "./utxp-pool.js";
 
 export class Block {
-  public hash: string;
-  public index: number;
-  public parentHash: string;
-  public timestamp: number;
-  public reward: Transaction;
-  public transactions: Transaction[];
-  public smartContracts: SmartContract[];
-  public contractTransactions: ContractTransaction[];
-  public validators: BlockValidate[] = [];
-
-  public parent: Block | undefined;
+  public hash: string; // Хэш текущего блока
+  public index: number; // Индекс блока
+  public parentHash: string; // Хэш родительского блока
+  public timestamp: number; // Время создания блока
+  public transactions: Transaction[]; // Транзакции в блоке
+  public parent?: Block; // Ссылка на родительский блок
   public children: Block[] = [];
-  public weight: number;
-  public cummulativaWeight: number;
-  private inWallet: Map<string, number> = new Map();
-  private inStake: Map<string, number> = new Map();
-
+  public validators: BlockValidate[] = [];
+  public cummulativeWeight: number = 0;
+  public weight: number = 0;
+  private diff?: BlockDiff;
   constructor(
     index: number,
     parentHash: string,
     timestamp: number,
-    reward: Transaction,
-    transactions: Transaction[] = [],
-    smartContracts: SmartContract[] = [],
-    contractTransactions: ContractTransaction[] = [],
+    transactions: Transaction[] = []
   ) {
     this.index = index;
     this.parentHash = parentHash;
     this.timestamp = timestamp;
-    this.reward = reward;
     this.transactions = transactions;
-    this.smartContracts = smartContracts;
-    this.contractTransactions = contractTransactions;
     this.hash = this.calculateHash();
-    this.reward.block = this.hash;
-    for (const tx of this.transactions) {
-      tx.block = this.hash;
-    }
-    for (const contract of this.smartContracts) {
-      contract.block = this.hash;
-    }
-    for (const contractTx of this.contractTransactions) {
-      contractTx.block = this.hash;
-    }
-    this.inWallet.set(this.reward.sender, this.reward.amount);
-    this.transactions.forEach(tx => {
-      this.calcBlockBalances(tx);
-    });
-    this.weight = this.updateWeight();
-    this.cummulativaWeight = (this.parent?.weight ?? 0) + this.weight;
   }
 
+  // Расчёт хэша блока
   public calculateHash(): string {
     return crypto
       .createHash("sha256")
       .update(
         this.index +
-        (this.parent?.hash ?? "") +
+        this.parentHash +
         this.timestamp +
-        JSON.stringify(this.reward) +
-        JSON.stringify(this.transactions) +
-        JSON.stringify(this.smartContracts) +
-        JSON.stringify(this.contractTransactions)
+        JSON.stringify(this.transactions)
       )
       .digest("hex");
   }
 
+  // Проверка валидности блока
   public isValid(): boolean {
+    // Проверка корректности хэша
     if (this.hash !== this.calculateHash()) {
+      console.error("Block hash mismatch.");
       return false;
     }
-    if (!this.parentHash && this.index != 0) {
-      return false;
-    }
-    if (!this.reward.isValid()) {
-      return false;
-    }
+
+    // Проверка транзакций
     for (const tx of this.transactions) {
       if (!tx.isValid()) {
-        return false;
-      }
-    }
-    for (const contract of this.smartContracts) {
-      if (!contract.isValid()) {
-        return false;
-      }
-    }
-    for (const contractTx of this.contractTransactions) {
-      if (!contractTx.isValid()) {
+        console.error("Invalid transaction detected.");
         return false;
       }
     }
     return true;
   }
 
-  public addTransaction(tx: Transaction): void {
-    this.transactions.push(tx);
+  public setParent(parent: Block, utxoPool: UTXOPool) {
+    this.parent = parent;
+    if (this.parent.children.find((b) => b.hash === this.hash)) {
+      return; // Блок уже добавлен
+    }
+    this.parent.children.push(this);
+    this.weight = this.calculateWeight(utxoPool)
+    this.cummulativeWeight = this.parent.cummulativeWeight + this.weight;
   }
 
-  public addSmartContract(contract: SmartContract): void {
-    this.smartContracts.push(contract);
-  }
-
-  public addContractTransaction(contractTx: ContractTransaction): void {
-    this.contractTransactions.push(contractTx);
-  }
-
+  // Печать блока
   public toString(): string {
     return `
       Block #${this.index}
       Timestamp: ${this.timestamp}
-      Previous Hash: ${this.parent?.hash}
+      Previous Hash: ${this.parentHash}
       Hash: ${this.hash}
       Transactions: ${JSON.stringify(this.transactions, null, 2)}
-      SmartContract: ${JSON.stringify(this.smartContracts, null, 2)}
-      ContractTransaction: ${JSON.stringify(this.contractTransactions, null, 2)}
-      Validators: ${JSON.stringify(this.validators, null, 2)}
     `;
   }
 
-  public setParentBlock(parent: Block) {
-    this.parent = parent;
-    if (!parent.children.find((b) => b.hash == this.hash)) {
-      parent.children.push(this);
+  private calculateWeight(utxoPool: UTXOPool): number {
+    if (!this.diff) {
+      throw new Error("Diff not generated for this block.");
     }
-  }
 
-  public updateWeight(): number {
-    let currentblock: Block | undefined = this;
-    let res = currentblock.getBalanceStakeInChain(currentblock.reward.sender);
-    while (currentblock) {
-      const cb = currentblock;
-      currentblock.validators.forEach((v) => {
-        res += cb.getBalanceStakeInChain(v.publicKey);
+    // Сохраняем текущее состояние UTXOPool
+    const originalBlockHash = utxoPool.currentBlockHash;
+
+    try {
+      // Применяем диффы, если UTXOPool не синхронизирован с текущим блоком
+      if (originalBlockHash !== this.parentHash) {
+        this.syncUTXOPoolToBlock(utxoPool);
+      }
+
+      let weight = 0;
+
+      // Учитываем сумму всех outputs (добавленные UTXO)
+      this.diff.addedUTXOs.forEach((output) => {
+        const activity = utxoPool.getActivity(output.address);
+        weight += output.amount + activity * 0.1;
       });
-      currentblock = currentblock.parent;
-    }
-    return res;
-  }
 
-  private getBlockBalanceWallet(owner: string): number {
-    return this.inWallet.get(owner) ?? 0;
-  }
+      // Учитываем удаленные UTXO (inputs)
+      this.diff.removedUTXOs.forEach((utxo) => {
+        const activity = utxoPool.getActivity(utxo.address);
+        weight += activity * 0.1;
+      });
 
-  public getBalanceWalletInChain(owner: string): number {
-    let balance: number = 0;
-    let cBlock = this.parent;
-    while (cBlock) {
-      balance = cBlock.getBlockBalanceWallet(owner);
-      cBlock = cBlock.parent;
-    }
-    return balance;
-  }
+      // Учитываем количество inputs и outputs
+      weight += this.diff.removedUTXOs.size * 0.5;
+      weight += this.diff.addedUTXOs.size * 0.2;
 
-  private getBlockBalanceStake(owner: string): number {
-    return this.inStake.get(owner) ?? 0;
-  }
+      // Фиксированный вес за транзакцию
+      weight += this.transactions.length * 1;
 
-  public getBalanceStakeInChain(owner: string): number {
-    let balance: number = 0;
-    let cBlock = this.parent;
-    while (cBlock) {
-      balance = cBlock.getBlockBalanceStake(owner);
-      cBlock = cBlock.parent;
-    }
-    return balance;
-  }
+      // Учитываем вес от валидаторов
+      weight += this.validators.length * 2;
+      this.validators.forEach((v) => {
+        const activity = utxoPool.getActivity(v.publicKey);
+        weight += activity;
+      });
 
-
-  private calcBlockBalances(tx: Transaction) {
-    if (tx.receiver && tx.sender && tx.amount > 0 && tx.type == AllowedTypes.TRANSFER) {
-      const senderAmount = this.inWallet.get(tx.sender) ?? 0;
-      const receiverAmount = this.inWallet.get(tx.receiver) ?? 0;
-      if (senderAmount >= tx.amount) {
-        this.inWallet.set(tx.sender, senderAmount - tx.amount);
-        this.inWallet.set(tx.receiver, receiverAmount + tx.amount);
-      }
-    }
-    if (tx.receiver && tx.amount > 0 && tx.type == AllowedTypes.REWARD) {
-      const receiverAmount = this.inWallet.get(tx.receiver) ?? 0;
-      this.inWallet.set(tx.receiver, receiverAmount + tx.amount);
-    }
-    if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.STAKE) {
-      const senderAmount = this.inWallet.get(tx.sender) ?? 0;
-      if (senderAmount >= tx.amount) {
-        const inStakeAmount = this.inStake.get(tx.sender) ?? 0;
-        this.inWallet.set(tx.sender, senderAmount - tx.amount);
-        this.inStake.set(tx.sender, inStakeAmount + tx.amount);
-      }
-    }
-    if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.UNSTAKE) {
-      const inStakeAmount = this.inStake.get(tx.sender) ?? 0;
-      if (inStakeAmount >= tx.amount) {
-        const senderAmount = this.inWallet.get(tx.sender) ?? 0;
-        this.inStake.set(tx.sender, inStakeAmount - tx.amount);
-        this.inWallet.set(tx.sender, senderAmount + tx.amount);
+      return weight;
+    } finally {
+      // Откат UTXOPool в исходное состояние
+      if (originalBlockHash !== utxoPool.currentBlockHash) {
+        this.revertUTXOPoolToOriginalState(utxoPool, originalBlockHash);
       }
     }
   }
 
-  public checkBalance(tx: Transaction): boolean {
-    if (tx.receiver && tx.sender && tx.amount > 0 && tx.type == AllowedTypes.TRANSFER) {
-      const senderAmount = this.getBalanceWalletInChain(tx.sender);
-      return (senderAmount >= tx.amount);
+  public addValidators(validators: BlockValidate[], utxoPool: UTXOPool): void {
+    validators.forEach((validator) => {
+      if (!this.validators.find((v) => v.publicKey === validator.publicKey)) {
+        this.validators.push(validator);
+      }
+    });
+    this.updateWeight(utxoPool);
+  }
+
+  public addValidator(validator: BlockValidate, utxoPool: UTXOPool): void {
+    if (!this.validators.find((v) => v.publicKey === validator.publicKey)) {
+      this.validators.push(validator);
+      this.updateWeight(utxoPool);
     }
-    if (tx.receiver && tx.type == AllowedTypes.REWARD) {
-      return true;
+  }
+
+  private updateWeight(uthoPool: UTXOPool): void {
+    this.weight = this.calculateWeight(uthoPool);
+    this.cummulativeWeight = (this.parent?.cummulativeWeight ?? 0) + this.weight;
+  }
+
+  public generateDiff(utxoPool: UTXOPool): BlockDiff {
+    if (utxoPool.currentBlockHash !== this.parentHash) {
+      throw new Error("UTXOPool is not synchronized with this block's parent.");
     }
-    if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.STAKE) {
-      const senderAmount = this.getBalanceWalletInChain(tx.sender);
-      return (senderAmount >= tx.amount);
+
+    const diff = new BlockDiff();
+
+    for (const tx of this.transactions) {
+      // Удаляем UTXO, которые были использованы в input'ах
+      for (const input of tx.inputs) {
+        const key = `${input.txId}:${input.outputIndex}`;
+        const utxo = utxoPool.getUTXO(input.txId, input.outputIndex);
+        if (utxo) {
+          diff.removedUTXOs.set(key, utxo);
+        } else {
+          throw new Error(`UTXO ${key} not found. Block may be invalid.`);
+        }
+      }
+
+      // Добавляем UTXO, которые были созданы в output'ах
+      tx.outputs.forEach((output, index) => {
+        const key = `${tx.hash}:${index}`;
+        diff.addedUTXOs.set(key, output);
+      });
     }
-    if (tx.sender && tx.amount > 0 && tx.type == AllowedTypes.UNSTAKE) {
-      const inStakeAmount = this.getBalanceStakeInChain(tx.sender);
-      return (inStakeAmount >= tx.amount);
+
+    this.diff = diff;
+    return diff;
+  }
+
+  public getDiff(): BlockDiff {
+    if (!this.diff) {
+      throw new Error("Diff not generated for this block.");
     }
-    tx.status = Status.REJECT;
-    return false;
+    return this.diff;
+  }
+
+  private syncUTXOPoolToBlock(utxoPool: UTXOPool): void {
+    let currentBlock: Block | undefined = this;
+
+    const diffs: BlockDiff[] = [];
+
+    // Идем по цепочке до синхронизированного блока
+    while (currentBlock && utxoPool.currentBlockHash !== currentBlock.parentHash) {
+      if (!currentBlock.diff) {
+        throw new Error(`Diff not generated for block ${currentBlock.hash}`);
+      }
+      diffs.push(currentBlock.diff);
+      currentBlock = currentBlock.parent;
+    }
+
+    // Применяем все диффы в обратном порядке
+    for (let i = diffs.length - 1; i >= 0; i--) {
+      utxoPool.applyDiff(diffs[i]);
+    }
+  }
+  private revertUTXOPoolToOriginalState(
+    utxoPool: UTXOPool,
+    originalBlockHash: string | null
+  ): void {
+    let currentBlock: Block | undefined = this;
+
+    const diffs: BlockDiff[] = [];
+
+    // Идем по цепочке до синхронизированного блока
+    while (currentBlock && utxoPool.currentBlockHash !== originalBlockHash) {
+      if (!currentBlock.diff) {
+        throw new Error(`Diff not generated for block ${currentBlock.hash}`);
+      }
+      diffs.push(currentBlock.diff);
+      currentBlock = currentBlock.parent;
+    }
+
+    // Откатываем все диффы
+    for (const diff of diffs) {
+      utxoPool.revertDiff(diff);
+    }
   }
 }

@@ -2,9 +2,7 @@ import { injectable, inject } from "inversify";
 import { TYPES } from "../types.js";
 import { dbContext } from "./db-context/database.js";
 import { Block } from "./db-context/models/block.js";
-import { SmartContract } from "./db-context/models/smart-contract.js";
 import { Status, Transaction } from "./db-context/models/transaction.js";
-import { ContractTransaction } from "./db-context/models/contract-transaction.js";
 import { EventEmitter } from "events";
 import {
   MessageChain,
@@ -15,7 +13,7 @@ import { Wallet } from "./../wallet/wallet.js";
 import { LogLevel } from "../network/helpers/log-level.js";
 import { sendDebug } from "./../network/services/socket-service.js";
 import pkg from "debug";
-import { AllowedTypes } from "./db-context/models/common.js";
+import { UTXOPool } from "./db-context/models/utxp-pool.js";
 const { debug } = pkg;
 
 const TOTAL_COINS: number = 1000000000; // Общее количество монет (1 миллиард)
@@ -29,8 +27,6 @@ export class BlockChain extends EventEmitter {
   private head: Block | null;
   private nodes: Map<string, Block>;
   private pendingTransactions: Transaction[] = [];
-  private pendingSmartContracts: SmartContract[] = [];
-  private pendingContractTransactions: ContractTransaction[] = [];
   private log = (level: LogLevel, message: string) => {
     const timestamp = new Date();
     sendDebug("blockchain", level, timestamp, message);
@@ -40,7 +36,8 @@ export class BlockChain extends EventEmitter {
   };
 
   constructor(
-    @inject(TYPES.DbContext) private db: dbContext) {
+    @inject(TYPES.DbContext) private db: dbContext,
+    @inject(TYPES.UTXOpoot) private utxoPool: UTXOPool) {
     super();
     this.head = null;
     this.nodes = new Map();
@@ -118,27 +115,13 @@ export class BlockChain extends EventEmitter {
       const validateData = message.value as BlockValidate;
       const block = this.nodes.get(validateData.hash);
       if (block) {
-        if (!block.validators.find((v) => v.publicKey == validateData.publicKey)) {
-          block.validators.push(validateData);
-        }
+        block.addValidator(validateData, this.utxoPool);
       }
     }
     if (message.type === MessageType.TRANSACTION) {
       const transaction = message.value as Transaction;
       if (transaction.isValid()) {
         this.pendingTransactions.push(transaction);
-      }
-    }
-    if (message.type === MessageType.SMART_CONTRACT) {
-      const contract = message.value as SmartContract;
-      if (contract.isValid()) {
-        this.pendingSmartContracts.push(contract);
-      }
-    }
-    if (message.type === MessageType.CONTRACT_TRANSACTION) {
-      const contract_transaction = message.value as ContractTransaction;
-      if (contract_transaction.isValid()) {
-        this.pendingContractTransactions.push(contract_transaction);
       }
     }
     if (message.type == MessageType.REQUEST_CHAIN) {
@@ -162,46 +145,65 @@ export class BlockChain extends EventEmitter {
     }
   }
 
-  private insertBlockToTree(block: Block) {
-    if (block.isValid()) {
-      const existBlock = this.nodes.get(block.hash);
-      if (!existBlock) {
-        if (!block.parentHash) {
-          this.nodes.set(block.hash, block);
+  private insertBlockToTree(block: Block): void {
+    if (!block.isValid()) {
+      this.log(LogLevel.Warning, `Block with hash ${block.hash} is invalid.`);
+      return;
+    }
+
+    const existBlock = this.nodes.get(block.hash);
+    if (!existBlock) {
+      if (!block.parentHash) {
+        this.nodes.set(block.hash, block);
+      } else {
+        const parent = this.nodes.get(block.parentHash);
+        if (!parent) {
+          this.emit(
+            "message:request",
+            new MessageChain(MessageType.REQUEST_CHAIN, block.parentHash, "")
+          );
+          return;
         } else {
-          const parent = this.nodes.get(block.parentHash);
-          if (!parent) {
-            this.emit("message:request", new MessageChain(MessageType.REQUEST_CHAIN, block.parentHash, ''));
-            return;
-          } else {
-            block.setParentBlock(parent);
-            this.nodes.set(block.hash, block);
-          }
+          block.setParent(parent, this.utxoPool);
+          this.nodes.set(block.hash, block);
         }
       }
+    } else {
+      // Если блок уже существует, обновляем валидаторов
+      existBlock.addValidators(block.validators, this.utxoPool);
     }
-    const leafs = [...this.nodes].filter((v) => v[1].children.length == 0).map(v => v[1]);
+
+    // Логика выбора нового head остается прежней
+    const leafs = [...this.nodes.values()].filter((b) => b.children.length === 0);
     if (leafs.length > 0) {
-      const maxWeightLeaf = leafs.reduce((maxLeaf, currentLeaf) => {
-        if (!maxLeaf || currentLeaf.cummulativaWeight > maxLeaf.cummulativaWeight) {
-          return currentLeaf;
-        }
-        return maxLeaf;
-      }, null as typeof leafs[number] | null);
+      const maxWeightLeaf = leafs.reduce((maxLeaf, currentLeaf) =>
+        !maxLeaf || currentLeaf.cummulativeWeight > maxLeaf.cummulativeWeight
+          ? currentLeaf
+          : maxLeaf
+        , null as Block | null);
+
       this.head = maxWeightLeaf;
+
+      if (this.head) {
+        this.utxoPool.applyBlockToUTXOPool(this.head);
+      }
+
       if (this.head && Wallet.current && Wallet.current.publicKey) {
         const currentWallet = Wallet.current;
         const publicKey = Wallet.current.publicKey;
-        if (!this.head?.validators.find((v) => v.publicKey == publicKey)) {
-          const validateSign = {
-            index: this.head.index,
-            hash: this.head.hash,
-            publicKey: publicKey,
-            sign: currentWallet.signMessage(`${this.head.index}:${this.head.hash}:${publicKey}`)
-          };
-          this.head.validators.push(validateSign);
-          this.emit("message:validateBlock", new MessageChain(MessageType.BLOCK_VALIDATE, validateSign, ''));
-        }
+        const validateSign = {
+          index: this.head.index,
+          hash: this.head.hash,
+          publicKey: publicKey,
+          sign: currentWallet.signMessage(
+            `${this.head.index}:${this.head.hash}:${publicKey}`
+          ),
+        };
+        this.head.addValidator(validateSign, this.utxoPool);
+        this.emit(
+          "message:validateBlock",
+          new MessageChain(MessageType.BLOCK_VALIDATE, validateSign, "")
+        );
       }
     }
   }
@@ -221,72 +223,30 @@ export class BlockChain extends EventEmitter {
     const publicKey = Wallet.current.publicKey;
     const reward = this.calculateBlockReward(this.head?.index ?? 0) / 2;
     const rewardTransaction = new Transaction(
-      publicKey,
-      publicKey,
-      reward,
-      AllowedTypes.REWARD,
-      dtNow
+      [], [{
+        address: publicKey,
+        amount: reward
+      },], dtNow
     );
     currentWallet.signTransaction(rewardTransaction);
-    const txToBlock: Transaction[] = [];
-    if (this.head) {
-      const head = this.head;
-      txToBlock.push(...this.pendingTransactions.filter((tx) => head.checkBalance(tx)));
-    }
+    const txToBlock = this.pendingTransactions;
     txToBlock.forEach(tx => {
       tx.status = Status.COMPLETE
     });
-    if (lastBlock) {
-      const rewardBank = lastBlock.reward.amount;
-      lastBlock.validators.forEach((v) => {
-        const stake = lastBlock.getBalanceStakeInChain(v.publicKey);
-        const reward = stake / lastBlock.weight * rewardBank;
-        const rewardTransaction = new Transaction(
-          publicKey,
-          publicKey,
-          reward,
-          AllowedTypes.REWARD,
-          dtNow
-        );
-        currentWallet.signTransaction(rewardTransaction);
-        txToBlock.push(rewardTransaction);
-      });
-    }
-    if (this.head) {
-      const head = this.head;
-      txToBlock.push(...this.pendingTransactions.filter((tx) => head.checkBalance(tx)));
-    }
-    txToBlock.forEach(tx => {
-      tx.status = Status.COMPLETE
-    });
-    if (!lastBlock) {
-      const genesisBlock = new Block(
-        0,
-        '',
-        dtNow,
-        rewardTransaction,
-        txToBlock,
-        this.pendingSmartContracts,
-        this.pendingContractTransactions
-      );
-      await this.insertBlockToTree(genesisBlock);
-      this.emit(
-        "message:newBlock",
-        new MessageChain(MessageType.BLOCK, genesisBlock, '')
-      );
-    } else {
-      const block = new Block(
-        lastBlock.index + 1,
-        lastBlock.hash,
-        dtNow,
-        rewardTransaction,
-        txToBlock,
-        this.pendingSmartContracts,
-        this.pendingContractTransactions
-      );
-      await this.insertBlockToTree(block);
-      this.emit("message:newBlock", new MessageChain(MessageType.BLOCK, block, ''));
-    }
+    this.pendingTransactions = [];
+    const lastIndex = lastBlock?.index ?? -1;
+    const lastHash = lastBlock?.hash ?? '';
+    const block = new Block(
+      lastIndex + 1,
+      lastHash,
+      dtNow,
+      txToBlock
+    );
+    this.insertBlockToTree(block);
+    this.emit(
+      "message:newBlock",
+      new MessageChain(MessageType.BLOCK, block, '')
+    );
   }
 
   public getHead() {
@@ -304,4 +264,5 @@ export class BlockChain extends EventEmitter {
     }
     return this.getChainByHash(startHash);
   }
+
 }

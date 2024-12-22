@@ -1,76 +1,77 @@
 import crypto from "crypto";
 import * as tinySecp256k1 from "tiny-secp256k1";
-import { AllowedTypes } from "./common.js";
 
 export enum Status {
   PENDING = 0,
   COMPLETE = 1,
   REJECT = 2
 }
+export interface Output {
+  address: string; // Публичный ключ получателя
+  amount: number; // Сумма UTXO
+}
+export interface Input {
+  txId: string; // ID транзакции, где находится UTXO
+  outputIndex: number; // Индекс UTXO в выходах этой транзакции
+  address: string; // Публичный ключ владельца UTXO
+  amount: number; // Сумма UTXO
+  signature: string; // Подпись, подтверждающая использование UTXO
+}
 
 export class Transaction {
   public hash: string;
   public block?: string;
-  public sender: string;
-  public receiver?: string;
-  public amount: number;
+  public inputs: Input[];
+  public outputs: Output[];
   public timestamp: number;
   public signature?: string;
-  public type: AllowedTypes;
   public status: Status;
-  constructor(
-    sender: string,
-    receiver: string,
-    amount: number,
-    type: AllowedTypes,
-    timestamp: number
-  ) {
-    this.sender = sender;
-    this.receiver = receiver;
-    this.amount = amount;
+  constructor(inputs: Input[], outputs: Output[], timestamp: number) {
+    this.inputs = inputs;
+    this.outputs = outputs;
     this.timestamp = timestamp;
-    this.type = type;
     this.status = Status.PENDING;
     this.hash = this.calculateHash();
   }
 
   isValid(): boolean {
-    if (
-      !this.sender ||
-      !this.amount ||
-      !this.signature ||
-      !this.type ||
-      ((this.type as AllowedTypes) == AllowedTypes.TRANSFER && !this.receiver)
-    ) {
-      console.error("Transaction is missing required fields.");
+    if (!this.inputs || !this.outputs || this.inputs.length === 0 || this.outputs.length === 0) {
+      console.error("Transaction must have at least one input and one output.");
       return false;
     }
 
-    if (this.amount <= 0) {
-      console.error("Transaction amount must be greater than 0.");
+    // Проверяем, что все UTXO имеют подписи и суммы корректны
+    for (const input of this.inputs) {
+      if (!input.signature || input.amount <= 0) {
+        console.error("Invalid input in transaction.");
+        return false;
+      }
+
+      const senderBuffer = Buffer.from(input.address, "hex");
+      if (!tinySecp256k1.isPoint(senderBuffer)) {
+        console.error("Invalid input address (not a valid public key).");
+        return false;
+      }
+
+      const signatureBuffer = Buffer.from(input.signature, "hex");
+      const hash = crypto
+        .createHash("sha256")
+        .update(this.getTransactionData())
+        .digest();
+      if (!tinySecp256k1.verify(hash, senderBuffer, signatureBuffer)) {
+        console.error("Invalid input signature.");
+        return false;
+      }
+    }
+
+    // Проверяем, что сумма входов >= сумма выходов
+    const inputSum = this.inputs.reduce((sum, input) => sum + input.amount, 0);
+    const outputSum = this.outputs.reduce((sum, output) => sum + output.amount, 0);
+    if (inputSum < outputSum) {
+      console.error("Input sum is less than output sum.");
       return false;
     }
 
-    const senderBuffer = Buffer.from(this.sender, "hex");
-    if (!tinySecp256k1.isPoint(senderBuffer)) {
-      console.error("Invalid sender public key.");
-      return false;
-    }
-
-    const signatureBuffer = Buffer.from(this.signature, "hex");
-    const hash = crypto
-      .createHash("sha256")
-      .update(this.getTransactionData())
-      .digest();
-    const isSignatureValid = tinySecp256k1.verify(
-      hash,
-      senderBuffer,
-      signatureBuffer
-    );
-    if (!isSignatureValid) {
-      console.error("Invalid transaction signature.");
-      return false;
-    }
     return true;
   }
 
@@ -83,10 +84,8 @@ export class Transaction {
 
   getTransactionData(): string {
     return JSON.stringify({
-      sender: this.sender,
-      receiver: this.receiver,
-      amount: this.amount,
-      type: this.type,
+      inputs: this.inputs,
+      outputs: this.outputs,
       timestamp: this.timestamp,
     });
   }

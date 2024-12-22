@@ -10,8 +10,6 @@ import type {
 import type { ConnectionManager, Registrar } from "@libp2p/interface-internal";
 import { Block } from "../../../blockchain/db-context/models/block.js";
 import { Transaction } from "../../../blockchain/db-context/models/transaction.js";
-import { SmartContract } from "../../../blockchain/db-context/models/smart-contract.js";
-import { ContractTransaction } from "../../../blockchain/db-context/models/contract-transaction.js";
 import { GossipsubEvents } from "@chainsafe/libp2p-gossipsub";
 
 export interface MessagesService {
@@ -29,12 +27,10 @@ export interface BlockValidate {
 export enum MessageType {
   BLOCK = 0,
   TRANSACTION = 1,
-  SMART_CONTRACT = 2,
-  CONTRACT_TRANSACTION = 3,
-  CHAIN = 4,
-  REQUEST_CHAIN = 5,
-  HEAD_BLOCK_HASH = 6,
-  BLOCK_VALIDATE = 7
+  CHAIN = 3,
+  REQUEST_CHAIN = 4,
+  HEAD_BLOCK_HASH = 5,
+  BLOCK_VALIDATE = 6
 }
 
 export class MessageChain {
@@ -44,8 +40,6 @@ export class MessageChain {
   public value:
     | Block
     | Transaction
-    | SmartContract
-    | ContractTransaction
     | Block
     | string
     | BlockValidate;
@@ -54,8 +48,6 @@ export class MessageChain {
     value:
       | Block
       | Transaction
-      | SmartContract
-      | ContractTransaction
       | Block
       | string
       | BlockValidate,
@@ -93,12 +85,6 @@ export class MessageChain {
       case MessageType.TRANSACTION:
         message.transaction = this.value;
         break;
-      case MessageType.SMART_CONTRACT:
-        message.smart_contract = this.value;
-        break;
-      case MessageType.CONTRACT_TRANSACTION:
-        message.contract_transaction = this.value;
-        break;
       case MessageType.CHAIN:
         message.block = this.value;
         break;
@@ -134,16 +120,6 @@ export class MessageChain {
         return new MessageChain(
           MessageType.TRANSACTION,
           decodedMessage.transaction, decodedMessage.sender
-        );
-      case MessageType.SMART_CONTRACT:
-        return new MessageChain(
-          MessageType.SMART_CONTRACT,
-          decodedMessage.smart_contract, decodedMessage.sender
-        );
-      case MessageType.CONTRACT_TRANSACTION:
-        return new MessageChain(
-          MessageType.CONTRACT_TRANSACTION,
-          decodedMessage.contract_transaction, decodedMessage.sender
         );
       case MessageType.CHAIN:
         return new MessageChain(

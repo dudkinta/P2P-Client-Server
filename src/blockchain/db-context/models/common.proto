@@ -17,11 +17,3 @@ message AllowedValue {
 enum NullValue {
     NULL_VALUE = 0;
 }
-
-// Перечисление для AllowedTypes
-enum AllowedTypes {
-    TRANSFER = 0;
-    STAKE = 1;
-    UNSTAKE = 2;
-    REWARD = 3;
-}
