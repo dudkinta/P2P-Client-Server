@@ -25,10 +25,7 @@ export class BlockStorage {
       Hash: block.hash,
       TimeStamb: block.timestamp,
       Parent: block.parent ? block.parent.hash : '',
-      Reward: block.reward.hash,
       Transactions: block.transactions.map(tx => tx.hash),
-      SmartContracts: block.smartContracts.map(sc => sc.hash),
-      ContractTransaction: block.contractTransactions.map(tx => tx.hash),
       Validators: block.validators
     };
     await this.db.put(key, db_block);
